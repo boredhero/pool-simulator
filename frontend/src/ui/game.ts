@@ -10,6 +10,19 @@ type Mode = 'aim' | 'rolling' | 'place' | 'over' | 'wait';
 
 const CHARGE_MS = 1400; // press-hold ramp to full power
 
+const FELTS = ['#0a6c2f', '#0d47a1', '#6a1b9a', '#b71c1c', '#004d40', '#37474f'];
+const WOODS = ['#4a2c14', '#8d6e63', '#212121', '#5d2a1a', '#e0e0e0', '#2e4a2c'];
+const GROUP_BALLS: Record<string, number[]> = {
+  solid: [1, 2, 3, 4, 5, 6, 7],
+  stripe: [9, 10, 11, 12, 13, 14, 15],
+};
+const BALL_CSS = ['#f5c518', '#0d47d8', '#d82323', '#5b0d8a', '#ef6c00', '#0a7a3d', '#7a1a1a', '#111111',
+  '#f5c518', '#0d47d8', '#d82323', '#5b0d8a', '#ef6c00', '#0a7a3d', '#7a1a1a'];
+const ballCss = (n: number): string => {
+  const c = BALL_CSS[(n - 1) % 15];
+  return n > 8 ? `linear-gradient(to bottom, #f8f8f8 25%, ${c} 25%, ${c} 75%, #f8f8f8 75%)` : c;
+};
+
 const freshEv = (): ShotEvents => ({
   firstContact: null, potted: [], offTable: [], railAfterContact: false, cuePotted: false,
 });
@@ -21,7 +34,7 @@ export class Game {
   angle = Math.PI; // aim direction, sim plane
   power = 0.5; // last fired power (drives cue rest offset)
   tipX = 0; tipY = 0;
-  orbit = false;
+  roomNames: string[] | null = null;
   ev: ShotEvents = freshEv();
   contact = { v: false };
   el: Record<string, HTMLElement>;
@@ -42,14 +55,52 @@ export class Game {
     this.gs = newGame(1);
     this.el = Object.fromEntries(
       ['msg', 'turn', 'version', 'onlinebtn', 'onlinepanel', 'pname', 'rcode', 'createbtn', 'joinbtn',
-        'roominfo', 'chargefill', 'spin', 'orbitbtn', 'aibtn', 'rack'].map((id) => [id, document.getElementById(id)!]),
+        'roominfo', 'chargefill', 'spin', 'aibtn', 'rack', 'settingsbtn', 'settingspanel',
+        'feltsw', 'woodsw', 'feltcustom', 'woodcustom', 'scorecard'].map((id) => [id, document.getElementById(id)!]),
     );
+    this.applyTheme(localStorage.getItem('pool:felt') ?? FELTS[0], localStorage.getItem('pool:wood') ?? WOODS[0], false);
+    this.buildThemePanel();
     this.wire(canvas);
     this.scene.onFrame(() => this.frame());
     this.hud();
   }
 
   cue(): Ball { return this.gs.balls[0]; }
+
+  applyTheme(felt: string, wood: string, save = true): void {
+    this.scene.setTheme(felt, wood);
+    if (save) {
+      localStorage.setItem('pool:felt', felt);
+      localStorage.setItem('pool:wood', wood);
+    }
+    for (const [id, list, cur] of [['feltsw', FELTS, felt], ['woodsw', WOODS, wood]] as Array<[string, string[], string]>) {
+      const box = this.el[id];
+      box.innerHTML = '';
+      for (const c of list) {
+        const d = document.createElement('div');
+        d.className = 'swatch' + (c.toLowerCase() === cur.toLowerCase() ? ' sel' : '');
+        d.style.background = c;
+        d.addEventListener('click', () => {
+          const f = id === 'feltsw' ? c : localStorage.getItem('pool:felt') ?? FELTS[0];
+          const w = id === 'woodsw' ? c : localStorage.getItem('pool:wood') ?? WOODS[0];
+          this.applyTheme(f, w);
+        });
+        box.appendChild(d);
+      }
+    }
+    (this.el.feltcustom as HTMLInputElement).value = felt;
+    (this.el.woodcustom as HTMLInputElement).value = wood;
+  }
+
+  buildThemePanel(): void {
+    this.applyTheme(localStorage.getItem('pool:felt') ?? FELTS[0], localStorage.getItem('pool:wood') ?? WOODS[0], false);
+    (this.el.feltcustom as HTMLInputElement).addEventListener('input', (e) => {
+      this.applyTheme((e.target as HTMLInputElement).value, localStorage.getItem('pool:wood') ?? WOODS[0]);
+    });
+    (this.el.woodcustom as HTMLInputElement).addEventListener('input', (e) => {
+      this.applyTheme(localStorage.getItem('pool:felt') ?? FELTS[0], (e.target as HTMLInputElement).value);
+    });
+  }
 
   canShoot(): boolean {
     if (this.mode !== 'aim' || this.gs.winner !== null) return false;
@@ -65,7 +116,6 @@ export class Game {
 
   wire(canvas: HTMLCanvasElement): void {
     const aimAt = (cx: number, cy: number) => {
-      if (this.orbit) return;
       if (this.mode === 'place') {
         this.placeX = cx; this.placeY = cy;
         return;
@@ -84,14 +134,13 @@ export class Game {
       this.hud();
     };
     canvas.addEventListener('pointermove', (e) => {
-      if (this.orbit) return;
       if (e.pointerType === 'mouse' && e.buttons !== 0 && e.buttons !== 1) return;
       const p = this.scene.pickFelt(e.clientX, e.clientY);
       if (p) aimAt(p[0], p[1]);
     });
     canvas.addEventListener('pointerdown', (e) => {
       this.sfx.unlock();
-      if (this.orbit || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
       const p = this.scene.pickFelt(e.clientX, e.clientY);
       if (!p) return;
       if (this.mode === 'place') {
@@ -149,20 +198,20 @@ export class Game {
     });
     this.el.onlinebtn.addEventListener('click', () => {
       this.el.onlinepanel.classList.toggle('open');
+      this.el.settingspanel.classList.remove('open');
+    });
+    this.el.settingsbtn.addEventListener('click', () => {
+      this.el.settingspanel.classList.toggle('open');
+      this.el.onlinepanel.classList.remove('open');
     });
     this.el.createbtn.addEventListener('click', () => this.connectRoom(true));
     this.el.joinbtn.addEventListener('click', () => this.connectRoom(false));
-    this.el.orbitbtn.addEventListener('click', () => {
-      this.orbit = !this.orbit;
-      this.chargeT0 = null;
-      this.scene.controls.enabled = this.orbit;
-      (this.el.orbitbtn as HTMLButtonElement).textContent = this.orbit ? 'Aim' : 'Orbit';
-      (this.el.orbitbtn as HTMLButtonElement).classList.toggle('on', this.orbit);
-    });
     this.el.rack.addEventListener('click', () => {
       this.gs = newGame((Math.random() * 1e9) | 0);
       this.mode = 'aim';
       this.chargeT0 = null;
+      this.lastPotted = 0;
+      this.lastSpeed.clear();
       this.hud();
     });
     this.el.aibtn.addEventListener('click', () => {
@@ -171,9 +220,10 @@ export class Game {
       (this.el.aibtn as HTMLButtonElement).classList.toggle('on', this.aiOpponent);
       this.gs = newGame((Math.random() * 1e9) | 0);
       this.mode = 'aim';
+      this.lastPotted = 0;
+      this.lastSpeed.clear();
       this.hud();
     });
-    this.scene.controls.enabled = false;
   }
 
   fire(power: number): void {
@@ -293,7 +343,53 @@ export class Game {
     else if (this.room && this.seat !== null && this.seat !== this.gs.current && this.mode === 'aim') msg += ' — opponent aiming…';
     this.el.msg.textContent = msg;
     this.el.turn.textContent = this.gs.winner !== null ? 'Game over' : `Player ${this.gs.current + 1}`;
+    this.el.turn.classList.toggle('me', !this.room || this.seat === this.gs.current);
     this.el.roominfo.textContent = this.room ? `room ${this.room.code} · you P${(this.seat ?? 0) + 1}` : 'solo table';
+    this.renderScorecard();
+  }
+
+  renderScorecard(): void {
+    const box = this.el.scorecard;
+    box.innerHTML = '';
+    const names = this.roomNames ?? [
+      'Player 1' + (this.aiOpponent ? '' : ''),
+      this.aiOpponent ? 'AI' : 'Player 2',
+    ];
+    for (const i of [0, 1]) {
+      const g = this.gs.groups[i];
+      const card = document.createElement('div');
+      card.className = 'pcard' + (this.gs.current === i && this.gs.winner === null ? ' active' : '');
+      const head = document.createElement('div');
+      head.className = 'pname';
+      const label = g === null ? (this.gs.open ? 'open' : '?') : g;
+      head.innerHTML = '';
+      const nm = document.createElement('span');
+      nm.textContent = names[i] ?? `Player ${i + 1}`;
+      const gr = document.createElement('span');
+      gr.className = 'grp';
+      gr.textContent = label;
+      head.appendChild(nm);
+      head.appendChild(gr);
+      card.appendChild(head);
+      const row = document.createElement('div');
+      row.className = 'balls';
+      const nums = g !== null && GROUP_BALLS[g] ? [...GROUP_BALLS[g]] : [];
+      const onEight = !this.gs.open && g !== null && !this.gs.balls.some(
+        (b) => !b.potted && b.n !== null && b.n !== 8 && GROUP_BALLS[g]?.includes(b.n),
+      );
+      if (onEight) nums.push(8);
+      for (const n of nums) {
+        const b = this.gs.balls.find((q) => q.n === n);
+        const d = document.createElement('div');
+        d.className = 'pball' + (n === 8 ? ' eight' : '') + (b?.potted ? '' : ' out');
+        d.style.background = b?.potted ? ballCss(n) : '';
+        d.textContent = String(n);
+        if (!b?.potted) d.style.border = '1px solid rgba(255,255,255,.4)';
+        row.appendChild(d);
+      }
+      card.appendChild(row);
+      box.appendChild(card);
+    }
   }
 
   applyServerState(s: RoomState): void {
@@ -312,6 +408,8 @@ export class Game {
     this.gs.message = s.message;
     this.mode = s.winner !== null ? 'over' : s.ball_in_hand && s.current === this.seat ? 'place' : 'aim';
     this.chargeT0 = null;
+    this.lastPotted = this.gs.balls.filter((b) => b.potted).length;
+    this.lastSpeed.clear();
     this.hud();
   }
 
@@ -340,6 +438,7 @@ export class Game {
       this.hud();
     };
     rc.onError = (e) => { this.el.msg.textContent = `net: ${e}`; };
+    rc.onJoined = (names) => { this.roomNames = names; this.hud(); };
     rc.onOpen = () => (create ? rc.create(name) : rc.join(code, name));
     rc.connect();
     this.el.onlinepanel.classList.remove('open');
