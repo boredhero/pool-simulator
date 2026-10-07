@@ -227,7 +227,9 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
       }
     },
     setAim(visible, cx, cy, angle, g) {
-      aimLine.visible = ghost.visible = tickLine.visible = visible;
+      aimLine.visible = visible;
+      ghost.visible = visible && g.hasHit;
+      tickLine.visible = visible && g.hasHit;
       if (!visible) return;
       const [cxr, czr] = toRender(cx, cy);
       const dx = Math.cos(angle), dy = Math.sin(angle);

@@ -1,6 +1,7 @@
 import { allAsleep, DT, step, strike, type Ball, type ShotEvents } from '../sim/physics';
 import { applyShot, newGame, placeCue, type GameState } from '../sim/rules';
 import { breakShot, chooseShot, legalTargets } from '../sim/ai';
+import { Sfx } from './sfx';
 import { BALL_R, TABLE_H, TABLE_W } from '../sim/table';
 import { init, type AimGhost, type SceneHandle } from '../render/scene';
 import { RoomClient, type RoomState } from '../net/room';
@@ -54,6 +55,10 @@ export class Game {
   whoShot: number | null = null;
   aiOpponent: boolean = false;
   aiTimer = 0;
+  sfx = new Sfx();
+  lastSpeed = new Map<number, number>();
+  lastPotted = 0;
+  lastT = 0;
 
   constructor(canvas: HTMLCanvasElement) {
     this.scene = init(canvas);
@@ -91,6 +96,7 @@ export class Game {
       if (p) aimAt(p[0], p[1]);
     });
     canvas.addEventListener('pointerdown', (e) => {
+      this.sfx.unlock();
       if (e.pointerType !== 'mouse') {
         const p = this.scene.pickFelt(e.clientX, e.clientY);
         if (p) aimAt(p[0], p[1]);
@@ -191,6 +197,23 @@ export class Game {
   }
 
   frame(): void {
+    // Collision audio from sudden per-ball slowdowns.
+    for (const b of this.gs.balls) {
+      if (b.potted) continue;
+      const v = Math.hypot(b.vx, b.vy);
+      const last = this.lastSpeed.get(b.id) ?? v;
+      const drop = last - v;
+      if (drop > 0.6 && v > 0.2) {
+        // Hard contact: click scaled by impact; near-rail lows get a thud mix.
+        const nearRail = b.x < 0.09 || b.x > TABLE_W - 0.09 || b.y < 0.09 || b.y > TABLE_H - 0.09;
+        if (nearRail && drop > 1.2) this.sfx.thud(drop / 8);
+        else this.sfx.click(drop / 6);
+      }
+      this.lastSpeed.set(b.id, v);
+    }
+    const potted = this.gs.balls.filter((b) => b.potted).length;
+    if (potted > this.lastPotted) this.sfx.pot();
+    this.lastPotted = potted;
     if (this.mode === 'aim' && this.aiOpponent && this.gs.current === 1 && this.gs.winner === null && !this.room) {
       this.aiTimer += 1 / 60;
       if (this.aiTimer > 1.2) {
@@ -201,8 +224,17 @@ export class Game {
       this.aiTimer = 0;
     }
     if (this.mode === 'rolling') {
-      for (let i = 0; i < 4 && !allAsleep(this.gs.balls); i++) {
+      // Fixed-step accumulator: sim time tracks wall clock (up to a cap per
+      // frame) so slow rendering doesn't dilate the shot.
+      const now = performance.now();
+      if (!this.lastT) this.lastT = now;
+      let acc = Math.min((now - this.lastT) / 1000, 0.25);
+      this.lastT = now;
+      let n = 0;
+      while (acc >= DT && !allAsleep(this.gs.balls) && n < 60) {
         step(this.gs.balls, DT, this.ev, 0, this.contact);
+        acc -= DT;
+        n++;
       }
       if (allAsleep(this.gs.balls)) {
         if (this.room && this.whoShot === this.seat) {
