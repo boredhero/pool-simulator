@@ -56,7 +56,7 @@ class ShotEvents:
 
 def shoot_speed(power: float) -> float:
     p = min(1.0, max(0.0, power))
-    return 0.3 + (p**1.7) * (10 - 0.3)
+    return 0.2 + (p**2.0) * (8 - 0.2)
 
 
 def strike(b: Ball, dx: float, dy: float, power: float, tip_x: float, tip_y: float) -> None:
