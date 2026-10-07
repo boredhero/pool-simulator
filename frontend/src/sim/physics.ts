@@ -9,7 +9,7 @@ const JAWS = jaws();
 export const DT = 1 / 240;
 const G = 9.81;
 const MU_S = 0.2; // sliding friction
-const MU_R = 0.01; // rolling resistance
+const MU_R = 0.013; // rolling resistance (slightly heavy cloth for pace)
 const E_BALL = 0.95;
 const E_CUSH = 0.85;
 const MU_BB = 0.06; // ball-ball tangential clamp
@@ -44,10 +44,10 @@ export function makeBall(id: number, n: number | null, x: number, y: number): Ba
   return { id, n, x, y, vx: 0, vy: 0, wx: 0, wy: 0, wz: 0, asleep: true, potted: false };
 }
 
-/** Power [0,1] -> cue-ball speed m/s. Soft midrange, lively top end. */
+/** Power [0,1] -> cue-ball speed m/s. Gentle floor, progressive top end. */
 export function shootSpeed(power: number): number {
   const p = Math.min(1, Math.max(0, power));
-  return 0.2 + Math.pow(p, 2.0) * (8 - 0.2);
+  return 0.4 + Math.pow(p, 1.6) * (8 - 0.4);
 }
 
 /** Apply cue strike to ball: velocity along (dx,dy) + spin from tip offset. */

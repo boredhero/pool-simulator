@@ -8,7 +8,9 @@ import { RoomClient, type RoomState } from '../net/room';
 
 type Mode = 'aim' | 'rolling' | 'place' | 'over' | 'wait';
 
-const CHARGE_MS = 1700; // press-hold ramp to full power
+// Pull-back distance (m, felt space) for full power. Power is displacement,
+// never hold time: a short tentative drag can't accidentally nuke the ball.
+const PULL_FULL = 0.35;
 
 const FELTS = ['#0a6c2f', '#0d47a1', '#6a1b9a', '#b71c1c', '#004d40', '#37474f'];
 const WOODS = ['#4a2c14', '#8d6e63', '#212121', '#5d2a1a', '#e0e0e0', '#2e4a2c'];
@@ -31,7 +33,8 @@ export class Game {
   gs: GameState;
   scene: SceneHandle;
   mode: Mode = 'aim';
-  angle = Math.PI; // aim direction, sim plane
+  angle = Math.PI; // aim direction, sim plane (eased toward targetAngle)
+  targetAngle = Math.PI;
   power = 0.5; // last fired power (drives cue rest offset)
   tipX = 0; tipY = 0;
   roomNames: string[] | null = null;
@@ -47,7 +50,9 @@ export class Game {
   lastSpeed = new Map<number, number>();
   lastPotted = 0;
   lastT = 0;
-  chargeT0: number | null = null;
+  pulling = false;
+  pressPt: [number, number] | null = null;
+  hoverPt: [number, number] | null = null;
   placeX = TABLE_W / 4; placeY = TABLE_H / 2;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -112,9 +117,10 @@ export class Game {
     return true;
   }
 
-  chargePower(now = performance.now()): number {
-    if (this.chargeT0 === null) return 0;
-    return Math.min(1, (now - this.chargeT0) / CHARGE_MS);
+  pullPower(): number {
+    if (!this.pulling || !this.pressPt || !this.hoverPt) return 0;
+    const d = Math.hypot(this.hoverPt[0] - this.pressPt[0], this.hoverPt[1] - this.pressPt[1]);
+    return Math.min(1, d / PULL_FULL);
   }
 
   wire(canvas: HTMLCanvasElement): void {
@@ -126,7 +132,7 @@ export class Game {
       if (this.mode !== 'aim' || this.cue().potted) return;
       const c = this.cue();
       const dx = cx - c.x, dy = cy - c.y;
-      if (Math.hypot(dx, dy) > 0.02) this.angle = Math.atan2(dy, dx);
+      if (Math.hypot(dx, dy) > 0.02) this.targetAngle = Math.atan2(dy, dx);
     };
     const tryPlace = (cx: number, cy: number) => {
       if (this.room) {
@@ -139,7 +145,9 @@ export class Game {
     canvas.addEventListener('pointermove', (e) => {
       if (e.pointerType === 'mouse' && e.buttons !== 0 && e.buttons !== 1) return;
       const p = this.scene.pickFelt(e.clientX, e.clientY);
-      if (p) aimAt(p[0], p[1]);
+      if (!p) return;
+      this.hoverPt = p;
+      if (!this.pulling) aimAt(p[0], p[1]); // aim locks once the pull starts
     });
     canvas.addEventListener('pointerdown', (e) => {
       this.sfx.unlock();
@@ -154,35 +162,33 @@ export class Game {
       if (this.mode === 'aim' && !this.cue().potted) {
         const c = this.cue();
         const dx = p[0] - c.x, dy = p[1] - c.y;
-        if (Math.hypot(dx, dy) > 0.02) this.angle = Math.atan2(dy, dx);
+        if (Math.hypot(dx, dy) > 0.02) this.targetAngle = Math.atan2(dy, dx);
       }
-      if (this.canShoot()) this.chargeT0 = performance.now();
+      if (this.canShoot()) {
+        this.pulling = true;
+        this.pressPt = p;
+        this.hoverPt = p;
+      }
     });
-    const cancelCharge = () => { this.chargeT0 = null; };
+    const cancelPull = () => { this.pulling = false; this.pressPt = null; };
     canvas.addEventListener('pointerup', (e) => {
-      if (this.chargeT0 === null) return;
-      if (e.pointerType === 'mouse' && e.button !== 0) { this.chargeT0 = null; return; }
-      const power = this.chargePower();
-      this.chargeT0 = null;
-      this.fire(Math.max(0.05, power));
+      if (!this.pulling) return;
+      if (e.pointerType === 'mouse' && e.button !== 0) { cancelPull(); return; }
+      const power = Math.max(0.04, this.pullPower());
+      cancelPull();
+      this.fire(power);
     });
-    canvas.addEventListener('pointercancel', cancelCharge);
-    canvas.addEventListener('pointerleave', cancelCharge);
+    canvas.addEventListener('pointercancel', cancelPull);
+    canvas.addEventListener('pointerleave', cancelPull);
     addEventListener('keydown', (e) => {
-      if (e.code === 'ArrowLeft') this.angle += 0.004;
-      if (e.code === 'ArrowRight') this.angle -= 0.004;
+      if (e.code === 'ArrowLeft') this.targetAngle += 0.03;
+      if (e.code === 'ArrowRight') this.targetAngle -= 0.03;
       if (e.code === 'Space') {
         e.preventDefault();
-        if (!e.repeat && this.chargeT0 === null && this.canShoot()) this.chargeT0 = performance.now();
+        if (!e.repeat) this.fire(0.4);
       }
     });
-    addEventListener('keyup', (e) => {
-      if (e.code === 'Space' && this.chargeT0 !== null) {
-        const power = this.chargePower();
-        this.chargeT0 = null;
-        this.fire(Math.max(0.05, power));
-      }
-    });
+    addEventListener('keyup', (_e) => { /* space fires on keydown */ });
     const spin = this.el.spin;
     const setTip = (e: PointerEvent) => {
       const r = spin.getBoundingClientRect();
@@ -212,7 +218,7 @@ export class Game {
     this.el.rack.addEventListener('click', () => {
       this.gs = newGame((Math.random() * 1e9) | 0);
       this.mode = 'aim';
-      this.chargeT0 = null;
+      this.pulling = false; this.pressPt = null;
       this.lastPotted = 0;
       this.lastSpeed.clear();
       this.hud();
@@ -266,6 +272,7 @@ export class Game {
     const shot = (this.gs.breakShot ? breakShot(this.gs.balls) : chooseShot(this.gs.balls, targets, 'medium'))
       ?? breakShot(this.gs.balls);
     this.angle = shot.angle;
+    this.targetAngle = shot.angle;
     this.power = shot.power;
     this.tipX = shot.tipX;
     this.tipY = shot.tipY;
@@ -329,11 +336,18 @@ export class Game {
       }
     }
     this.scene.setBalls(this.gs.balls);
+    // Ease aim toward target (kills mouse jitter twitch).
+    {
+      let d = this.targetAngle - this.angle;
+      while (d > Math.PI) d -= 2 * Math.PI;
+      while (d < -Math.PI) d += 2 * Math.PI;
+      this.angle += d * 0.35;
+    }
     const aiming = this.mode === 'aim' && !this.cue().potted;
-    const charging = this.chargeT0 !== null && aiming;
-    const pull = charging ? 0.02 + this.chargePower() * 0.18 : 0.02 + this.power * 0.1;
+    const pulling = this.pulling && aiming;
+    const pull = pulling ? 0.02 + this.pullPower() * 0.18 : 0.02 + this.power * 0.1;
     this.scene.setCue(aiming, this.cue().x, this.cue().y, this.angle, pull);
-    (this.el.chargefill as HTMLElement).style.width = charging ? `${this.chargePower() * 100}%` : '0%';
+    (this.el.chargefill as HTMLElement).style.width = pulling ? `${this.pullPower() * 100}%` : '0%';
     if (this.mode === 'place') {
       this.scene.setPlace(true, this.placeX, this.placeY, canPlace(this.gs, this.placeX, this.placeY));
     } else {
@@ -416,7 +430,7 @@ export class Game {
     this.gs.winner = s.winner === 1 ? 1 : s.winner === 0 ? 0 : null;
     this.gs.message = s.message;
     this.mode = s.winner !== null ? 'over' : s.ball_in_hand && s.current === this.seat ? 'place' : 'aim';
-    this.chargeT0 = null;
+    this.pulling = false; this.pressPt = null;
     this.lastPotted = this.gs.balls.filter((b) => b.potted).length;
     this.lastSpeed.clear();
     this.hud();
