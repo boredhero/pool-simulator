@@ -1,4 +1,4 @@
-import { allAsleep, DT, step, strike, type Ball, type ShotEvents } from '../sim/physics';
+import { allAsleep, DT, step, strike, VMAX_BREAK, VMAX_NORMAL, type Ball, type ShotEvents } from '../sim/physics';
 import { applyShot, canPlace, newGame, placeCue, type GameState } from '../sim/rules';
 import { breakShot, chooseShot, legalTargets } from '../sim/ai';
 import { Sfx } from './sfx';
@@ -235,15 +235,15 @@ export class Game {
     });
   }
 
-  fire(power: number): void {
+  fire(power: number, vmax = this.gs.breakShot ? VMAX_BREAK : VMAX_NORMAL): void {
     if (!this.canShoot()) return;
     document.querySelector('.hint')?.classList.add('gone');
     try { localStorage.setItem('pool:seen', '1'); } catch { /* private mode */ }
     const c = this.cue();
     if (c.potted) return;
     this.power = power;
-    const params = { aim: this.angle, power, tipX: this.tipX, tipY: this.tipY };
-    strike(c, Math.cos(this.angle), Math.sin(this.angle), power, this.tipX, this.tipY);
+    const params = { aim: this.angle, power, tipX: this.tipX, tipY: this.tipY, vmax };
+    strike(c, Math.cos(this.angle), Math.sin(this.angle), power, this.tipX, this.tipY, vmax);
     this.ev = freshEv();
     this.contact = { v: false };
     this.whoShot = this.seat;
@@ -453,7 +453,9 @@ export class Game {
     rc.onShot = (by, shot) => {
       const c = this.cue();
       if (c.potted) return;
-      strike(c, Math.cos(shot.aim), Math.sin(shot.aim), shot.power, shot.tipX, shot.tipY);
+      // Server is authoritative on break speed; ignore client-claimed vmax.
+      const vmax = this.gs.breakShot ? VMAX_BREAK : VMAX_NORMAL;
+      strike(c, Math.cos(shot.aim), Math.sin(shot.aim), shot.power, shot.tipX, shot.tipY, vmax);
       this.ev = freshEv();
       this.contact = { v: false };
       this.whoShot = by;

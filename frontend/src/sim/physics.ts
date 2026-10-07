@@ -8,19 +8,20 @@ const JAWS = jaws();
 
 export const DT = 1 / 240;
 const G = 9.81;
-const MU_S = 0.2; // sliding friction
-const MU_R = 0.013; // rolling resistance (slightly heavy cloth for pace)
-const E_BALL = 0.95;
-const E_CUSH = 0.85;
-const MU_BB = 0.06; // ball-ball tangential clamp
-const MU_RAIL = 0.3; // rail tangential clamp (for extreme spin)
-const RAIL_RET = 0.92; // rail tangential velocity retention
-const SPIN_DECAY = 8; // rad/s^2, sidespin decay on cloth
+const MU_S = 0.2; // sliding friction (Dr. Dave typical)
+const MU_R = 0.01; // rolling resistance (tournament cloth)
+const E_BALL = 0.94;
+const E_CUSH_N = 0.76; // cushion COR along contact normal (nose 15.7° tilt)
+const MU_CUSH = 0.17; // cushion tangential Coulomb friction
+const SPIN_DECAY = 10; // rad/s^2, linear sidespin decay on cloth
 const SLEEP_V = 1e-3;
 const SLEEP_W = 0.5;
-const TIP_C = 0.8; // tip offset -> spin efficiency
+const TIP_C = 2.5; // SRF = 2.5*(b/R): exact impulse model (TP A.12)
 const TIP_MAX = 0.55; // miscue limit (fraction of R)
-const SQUIRT_K = (4.5 * Math.PI) / 180; // aim deflect per unit side offset
+const SQUIRT_K = (5.7 * Math.PI) / 180; // aim deflect per unit side offset (normal cue)
+export const VMAX_NORMAL = 4.5;
+export const VMAX_BREAK = 8.5;
+const VMIN = 0.55; // nothing dies short
 
 export interface Ball {
   id: number; // 0..15 index
@@ -44,17 +45,23 @@ export function makeBall(id: number, n: number | null, x: number, y: number): Ba
   return { id, n, x, y, vx: 0, vy: 0, wx: 0, wy: 0, wz: 0, asleep: true, potted: false };
 }
 
-/** Power [0,1] -> cue-ball speed m/s. Gentle floor, progressive top end. */
-export function shootSpeed(power: number): number {
+/** Power [0,1] -> cue-ball speed m/s. Break rips, normal play stays calm. */
+export function shootSpeed(power: number, vmax = VMAX_NORMAL): number {
   const p = Math.min(1, Math.max(0, power));
-  return 0.4 + Math.pow(p, 1.6) * (8 - 0.4);
+  return VMIN + Math.pow(p, 1.55) * (vmax - VMIN);
+}
+
+/** Throw friction falls with closing speed (Dr. Dave fit of Colenso data). */
+export function throwMu(vRel: number): number {
+  const mu = 0.016 + 0.219 * Math.exp(-0.691 * Math.abs(vRel));
+  return Math.max(0.02, Math.min(0.235, mu));
 }
 
 /** Apply cue strike to ball: velocity along (dx,dy) + spin from tip offset. */
-export function strike(b: Ball, dx: number, dy: number, power: number, tipX: number, tipY: number): void {
+export function strike(b: Ball, dx: number, dy: number, power: number, tipX: number, tipY: number, vmax = VMAX_NORMAL): void {
   const tx = Math.max(-TIP_MAX, Math.min(TIP_MAX, tipX));
   const ty = Math.max(-TIP_MAX, Math.min(TIP_MAX, tipY));
-  const v = shootSpeed(power);
+  const v = shootSpeed(power, vmax);
   // Squirt: sidespin deflects departure opposite the tip side.
   const sq = tx * SQUIRT_K;
   const c = Math.cos(sq), s = Math.sin(sq);
@@ -205,9 +212,9 @@ function resolveBallBall(A: Ball, B: Ball, nx: number, ny: number, ev: ShotEvent
     const jn = (-(1 + E_BALL) * vn) / 2; // per-unit-mass (equal masses)
     A.vx += jn * nx; A.vy += jn * ny;
     B.vx -= jn * nx; B.vy -= jn * ny;
-    // Coulomb-clamped tangential impulse (throw + gear-effect spin transfer).
+    // Coulomb-clamped tangential impulse with speed-dependent throw friction.
     let jt = -vt / 2;
-    const maxJ = MU_BB * jn;
+    const maxJ = throwMu(vn) * jn;
     jt = Math.max(-maxJ, Math.min(maxJ, jt));
     A.vx += jt * tx; A.vy += jt * ty;
     B.vx -= jt * tx; B.vy -= jt * ty;
@@ -238,11 +245,13 @@ function resolveRail(A: Ball, nx: number, ny: number, ev: ShotEvents, contactMad
   const vrx = -A.wz * ry;
   const vry = A.wz * rx;
   const vtRel = (A.vx * tx + A.vy * ty) + (vrx * tx + vry * ty);
-  const jn = -(1 + E_CUSH) * vn;
+  // Cushion COR along the contact normal; Coulomb friction tangentially.
+  // The ball re-enters the skid regime after, which costs roughly half speed.
+  const jn = -(1 + E_CUSH_N) * vn;
   A.vx += jn * nx; A.vy += jn * ny;
-  // Cushions are springy: keep most tangential speed, Coulomb-clamped for spin extremes.
-  let jt = -(1 - RAIL_RET) * vtRel;
-  const maxJ = MU_RAIL * jn;
+  // Full stick desired, Coulomb-clamped (rails kill slip, keep most roll).
+  let jt = -vtRel;
+  const maxJ = MU_CUSH * jn;
   jt = Math.max(-maxJ, Math.min(maxJ, jt));
   A.vx += jt * tx; A.vy += jt * ty;
   // Torque about center: dwz = (r x J)/I, J = jt*m*t.
@@ -331,7 +340,7 @@ export function allAsleep(balls: Ball[]): boolean {
 }
 
 /** Run the shot to rest. Mutates balls. Returns events for rules. */
-export function simulateShot(balls: Ball[], cueId: number, maxSim = 30): ShotEvents {
+export function simulateShot(balls: Ball[], cueId: number, maxSim = 45): ShotEvents {
   const ev: ShotEvents = { firstContact: null, potted: [], offTable: [], railAfterContact: false, cuePotted: false };
   const contactMade = { v: false };
   let t = 0;
