@@ -26,12 +26,20 @@ button:disabled{opacity:.4}
 <div id="app"><canvas id="game-canvas"></canvas>
 <div class="hud">
   <div class="row"><div id="msg">…</div><div id="turn">…</div></div>
+  <div class="row" id="lobby">
+    <input id="pname" placeholder="name" maxlength="24" style="min-height:48px;border-radius:10px;border:1px solid #555;background:#111;color:#fff;padding:0 10px;width:110px" />
+    <input id="rcode" placeholder="code" maxlength="4" style="min-height:48px;border-radius:10px;border:1px solid #555;background:#111;color:#fff;padding:0 10px;width:70px;text-transform:uppercase" />
+    <button id="createbtn">Create</button>
+    <button id="joinbtn">Join</button>
+    <span id="roominfo">solo</span>
+  </div>
   <div class="row">
     <button id="shoot">Shoot</button>
     <input id="power" type="range" min="5" max="100" value="50" aria-label="Power" />
     <div id="spin" title="Tip offset"></div>
     <button id="orbitbtn">Orbit</button>
     <button id="rack">Rack</button>
+    <button id="aibtn">vs AI</button>
     <span id="version"></span>
   </div>
 </div></div>

@@ -38,6 +38,18 @@ engine = create_engine(
 Session = sessionmaker(bind=engine)
 
 
+if DATABASE_URL.startswith("sqlite") and ":memory:" not in DATABASE_URL:
+    from sqlalchemy import event as _sa_event
+
+    @_sa_event.listens_for(engine, "connect")
+    def _sqlite_pragmas(dbapi_conn, _conn_record) -> None:
+        cur = dbapi_conn.cursor()
+        cur.execute("PRAGMA journal_mode=WAL;")
+        cur.execute("PRAGMA busy_timeout=5000;")
+        cur.execute("PRAGMA foreign_keys=ON;")
+        cur.close()
+
+
 def init_db() -> None:
     if DATABASE_URL.startswith("sqlite") and ":memory:" not in DATABASE_URL:
         path = DATABASE_URL.split("///")[-1]

@@ -2,14 +2,21 @@
 
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import router
+from app.net.rooms import handle as handle_room_ws
 
 app = FastAPI(title="pool-simulator")
 app.include_router(router, prefix="/api")
+
+
+@app.websocket("/ws")
+async def ws_endpoint(ws: WebSocket) -> None:
+    await handle_room_ws(ws)
+
 
 DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
 
