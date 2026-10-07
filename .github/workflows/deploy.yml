@@ -64,19 +64,20 @@ jobs:
         uses: appleboy/ssh-action@v1
         env:
           GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          GITHUB_TOKEN_ENV: ${{ secrets.GITHUB_TOKEN }}
           DEPLOY_SHA: ${{ github.sha }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           command_timeout: 5m
-          envs: GHCR_TOKEN,DEPLOY_SHA
+          envs: GHCR_TOKEN,GITHUB_TOKEN_ENV,DEPLOY_SHA
           script: |
             set -e
             IMAGE="ghcr.io/${{ github.repository }}"
             mkdir -p ~/pool-simulator
             scp -o StrictHostKeyChecking=no /tmp/pool-simulator-deploy/docker-compose.prod.yml ~/pool-simulator/docker-compose.yml
-            echo "${GHCR_TOKEN:-${{ secrets.GITHUB_TOKEN }}}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            echo "${GHCR_TOKEN:-$GITHUB_TOKEN_ENV}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker pull "${IMAGE}:${DEPLOY_SHA}"
             docker tag "${IMAGE}:${DEPLOY_SHA}" "${IMAGE}:latest"
             cd ~/pool-simulator && docker compose up -d --force-recreate --remove-orphans && docker compose ps
