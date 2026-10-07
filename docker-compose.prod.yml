@@ -1,0 +1,22 @@
+# Production compose — runs on deploy host (see .github/workflows/deploy.yml).
+# Single container: FastAPI serves API + frontend/dist.
+services:
+  api:
+    image: ghcr.io/boredhero/pool-simulator:latest
+    container_name: pool-simulator-api
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:8000:8000"
+    environment:
+      DATABASE_URL: sqlite:////srv/data/pool.db
+    volumes:
+      - pool_data:/srv/data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  pool_data:
