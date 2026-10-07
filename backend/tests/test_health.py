@@ -1,5 +1,6 @@
 def test_healthz():
     from fastapi.testclient import TestClient
+
     from app.main import app
 
     c = TestClient(app)
