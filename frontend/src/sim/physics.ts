@@ -44,10 +44,10 @@ export function makeBall(id: number, n: number | null, x: number, y: number): Ba
   return { id, n, x, y, vx: 0, vy: 0, wx: 0, wy: 0, wz: 0, asleep: true, potted: false };
 }
 
-/** Power [0,1] -> cue-ball speed m/s. */
+/** Power [0,1] -> cue-ball speed m/s. Soft midrange, lively top end. */
 export function shootSpeed(power: number): number {
   const p = Math.min(1, Math.max(0, power));
-  return 0.3 + Math.pow(p, 1.7) * (10 - 0.3);
+  return 0.2 + Math.pow(p, 2.0) * (8 - 0.2);
 }
 
 /** Apply cue strike to ball: velocity along (dx,dy) + spin from tip offset. */
