@@ -1,7 +1,7 @@
 // Custom 2D + 3-axis-spin pool physics. Fixed dt=1/240, semi-implicit Euler
 // for friction + swept (analytic TOI) ball-ball / cushion / jaw collisions.
 // Mirror of backend/app/sim/physics.py — keep constants + behavior in sync.
-import { BALL_R, CAPTURE_R, JAW_R, POCKETS, TABLE_H, TABLE_W, cushions, jaws } from './table';
+import { BALL_R, POCKETS, TABLE_H, TABLE_W, captureRadius, cushions, jaws } from './table';
 
 const CUSHIONS = cushions();
 const JAWS = jaws();
@@ -173,7 +173,7 @@ function earliestContact(balls: Ball[], dt: number): Contact | null {
     // Jaw bumpers as static circles.
     for (const j of JAWS) {
       const dx = A.x - j.x, dy = A.y - j.y;
-      const rr = BALL_R + JAW_R;
+      const rr = BALL_R + j.r;
       const a = A.vx * A.vx + A.vy * A.vy;
       if (a < 1e-12) continue;
       const bq = 2 * (dx * A.vx + dy * A.vy);
@@ -294,11 +294,13 @@ export function step(balls: Ball[], dt: number, ev: ShotEvents, cueId: number, c
     if (b.potted) continue;
     let captured = false;
     const pr = prev.get(b.id);
+    const spd = Math.hypot(b.vx, b.vy);
     for (const p of POCKETS) {
+      const cr = captureRadius(p, spd);
       const d = pr
         ? segDist(pr[0], pr[1], b.x, b.y, p.x, p.y)
         : Math.hypot(b.x - p.x, b.y - p.y);
-      if (d < CAPTURE_R) {
+      if (d < cr) {
         b.potted = true;
         b.asleep = true;
         b.vx = b.vy = b.wx = b.wy = b.wz = 0;

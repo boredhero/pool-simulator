@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from app.sim.table import BALL_R, CAPTURE_R, JAW_R, POCKETS, TABLE_H, TABLE_W, cushions, jaws
+from app.sim.table import BALL_R, POCKETS, TABLE_H, TABLE_W, capture_radius, cushions, jaws
 
 DT = 1.0 / 240.0
 G = 9.81
@@ -160,7 +160,7 @@ def _earliest_contact(balls: list[Ball], dt: float):
                 best = (t, "rail", a.id, -1, 1.0 if x1 == 0 else -1.0, 0.0)
         for j in _JAWS:
             dx, dy = a.x - j[0], a.y - j[1]
-            rr = BALL_R + JAW_R
+            rr = BALL_R + j[2]
             qa = a.vx * a.vx + a.vy * a.vy
             if qa < 1e-12:
                 continue
@@ -279,12 +279,14 @@ def step(balls: list[Ball], dt: float, ev: ShotEvents, cue_id: int, contact_made
             continue
         captured = False
         pr = prev.get(b.id)
+        spd = (b.vx**2 + b.vy**2) ** 0.5
         for p in POCKETS:
+            cr = capture_radius(p[2], spd)
             if pr is not None:
                 d = seg_dist(pr[0], pr[1], b.x, b.y, p[0], p[1])
             else:
                 d = ((b.x - p[0]) ** 2 + (b.y - p[1]) ** 2) ** 0.5
-            if d < CAPTURE_R:
+            if d < cr:
                 b.potted = True
                 b.asleep = True
                 b.vx = b.vy = b.wx = b.wy = b.wz = 0.0

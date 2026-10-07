@@ -4,43 +4,55 @@ export const TABLE_W = 2.54;
 export const TABLE_H = 1.27;
 export const BALL_R = 0.028575;
 export const BALL_M = 0.17;
-export const POCKET_CORNER_W = 0.114;
-export const POCKET_SIDE_W = 0.127;
-export const CAPTURE_R = 0.075;
-export const JAW_R = 0.006;
+// WPA mouths: corner 4.5in, side 5.0in. Cushion noses end at the mouth edges.
+const CORNER_HALF = 0.0572;
+const SIDE_HALF = 0.0635;
 
-export interface Pocket { x: number; y: number; corner: boolean }
+export interface Pocket { x: number; y: number; r: number; corner: boolean }
+// Capture circles sit behind the nose line (pooltool layout, SI).
+const CB = 0.0287; // 1.6in along the corner bisector per axis
 export const POCKETS: Pocket[] = [
-  { x: 0, y: 0, corner: true },
-  { x: TABLE_W / 2, y: -0.02, corner: false },
-  { x: TABLE_W, y: 0, corner: true },
-  { x: 0, y: TABLE_H, corner: true },
-  { x: TABLE_W / 2, y: TABLE_H + 0.02, corner: false },
-  { x: TABLE_W, y: TABLE_H, corner: true },
+  { x: -CB, y: -CB, r: 0.061, corner: true },
+  { x: TABLE_W / 2, y: -0.066, r: 0.0635, corner: false },
+  { x: TABLE_W + CB, y: -CB, r: 0.061, corner: true },
+  { x: -CB, y: TABLE_H + CB, r: 0.061, corner: true },
+  { x: TABLE_W / 2, y: TABLE_H + 0.066, r: 0.0635, corner: false },
+  { x: TABLE_W + CB, y: TABLE_H + CB, r: 0.061, corner: true },
 ];
+
+/** Effective capture radius shrinks for fast balls (rattle-out). v in m/s. */
+export function captureRadius(p: Pocket, v: number): number {
+  if (v <= 1.0) return p.r;
+  const shave = 0.01016 * (v - 1.0); // 0.4in per m/s
+  return Math.max(0.6 * p.r, p.r - shave);
+}
 
 export interface Cushion { x1: number; y1: number; x2: number; y2: number }
 export function cushions(): Cushion[] {
   const W = TABLE_W, H = TABLE_H;
-  const gc = POCKET_CORNER_W / 2 + 0.01;
-  const gs = POCKET_SIDE_W / 2 + 0.01;
   return [
-    { x1: gc, y1: 0, x2: W / 2 - gs, y2: 0 },
-    { x1: W / 2 + gs, y1: 0, x2: W - gc, y2: 0 },
-    { x1: gc, y1: H, x2: W / 2 - gs, y2: H },
-    { x1: W / 2 + gs, y1: H, x2: W - gc, y2: H },
-    { x1: 0, y1: gc, x2: 0, y2: H - gc },
-    { x1: W, y1: gc, x2: W, y2: H - gc },
+    { x1: CORNER_HALF, y1: 0, x2: W / 2 - SIDE_HALF, y2: 0 },
+    { x1: W / 2 + SIDE_HALF, y1: 0, x2: W - CORNER_HALF, y2: 0 },
+    { x1: CORNER_HALF, y1: H, x2: W / 2 - SIDE_HALF, y2: H },
+    { x1: W / 2 + SIDE_HALF, y1: H, x2: W - CORNER_HALF, y2: H },
+    { x1: 0, y1: CORNER_HALF, x2: 0, y2: H - CORNER_HALF },
+    { x1: W, y1: CORNER_HALF, x2: W, y2: H - CORNER_HALF },
   ];
 }
 
-/** Jaw bumpers: small static circles at cushion ends for rattle physics. */
-export function jaws(): Array<{ x: number; y: number }> {
-  const out: Array<{ x: number; y: number }> = [];
-  for (const c of cushions()) {
-    out.push({ x: c.x1, y: c.y1 }, { x: c.x2, y: c.y2 });
-  }
-  return out;
+/** Jaw bumpers: corner r=0.83in, side r=0.31in, tucked behind the nose line. */
+export function jaws(): Array<{ x: number; y: number; r: number }> {
+  const W = TABLE_W, H = TABLE_H;
+  const cj = 0.021, sj = 0.0079;
+  const co = 0.0076, so = 0.0071; // outboard offsets
+  return [
+    { x: CORNER_HALF + co, y: -cj, r: cj }, { x: -cj, y: CORNER_HALF + co, r: cj },
+    { x: W - CORNER_HALF - co, y: -cj, r: cj }, { x: W + cj, y: CORNER_HALF + co, r: cj },
+    { x: CORNER_HALF + co, y: H + cj, r: cj }, { x: -cj, y: H - CORNER_HALF - co, r: cj },
+    { x: W - CORNER_HALF - co, y: H + cj, r: cj }, { x: W + cj, y: H - CORNER_HALF - co, r: cj },
+    { x: W / 2 - SIDE_HALF - so, y: -sj, r: sj }, { x: W / 2 + SIDE_HALF + so, y: -sj, r: sj },
+    { x: W / 2 - SIDE_HALF - so, y: H + sj, r: sj }, { x: W / 2 + SIDE_HALF + so, y: H + sj, r: sj },
+  ];
 }
 
 /** Deterministic rack order: 1 apex, 8 center, corners one solid + one stripe. */
