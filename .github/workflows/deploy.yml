@@ -49,6 +49,7 @@ jobs:
             ghcr.io/${{ github.repository }}:${{ github.sha }}
 
       - name: Stage deploy files
+        if: ${{ secrets.DEPLOY_HOST != '' }}
         uses: appleboy/scp-action@v1
         with:
           host: ${{ secrets.DEPLOY_HOST }}
@@ -58,6 +59,7 @@ jobs:
           target: /tmp/pool-simulator-deploy/
 
       - name: Deploy
+        if: ${{ secrets.DEPLOY_HOST != '' }}
         uses: appleboy/ssh-action@v1
         env:
           GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
