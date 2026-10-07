@@ -44,7 +44,7 @@ export class Game {
   power = 0.5;
   tipX = 0; tipY = 0;
   orbit = false;
-  ev: ShotEvents = { firstContact: null, potted: [], railAfterContact: false, cuePotted: false };
+  ev: ShotEvents = { firstContact: null, potted: [], offTable: [], railAfterContact: false, cuePotted: false };
   contact = { v: false };
   el: Record<string, HTMLElement>;
 
@@ -127,7 +127,7 @@ export class Game {
     const c = this.cue();
     if (c.potted) return;
     strike(c, Math.cos(this.angle), Math.sin(this.angle), this.power, this.tipX, this.tipY);
-    this.ev = { firstContact: null, potted: [], railAfterContact: false, cuePotted: false };
+    this.ev = { firstContact: null, potted: [], offTable: [], railAfterContact: false, cuePotted: false };
     this.contact = { v: false };
     this.mode = 'rolling';
     this.hud();

@@ -35,6 +35,7 @@ export interface Ball {
 export interface ShotEvents {
   firstContact: number | null; // ball number (or -1 = cue? use id) first hit by cue
   potted: number[]; // ball numbers in order
+  offTable: Array<number | null>; // driven off the table (null = cue)
   railAfterContact: boolean;
   cuePotted: boolean;
 }
@@ -252,8 +253,10 @@ function resolveRail(A: Ball, nx: number, ny: number, ev: ShotEvents, contactMad
 
 export function step(balls: Ball[], dt: number, ev: ShotEvents, cueId: number, contactMade: { v: boolean }): void {
   if (ev.firstContact !== null || ev.potted.length > 0) contactMade.v = true;
+  const prev = new Map<number, [number, number]>();
   for (const b of balls) {
     if (b.potted || b.asleep) continue;
+    prev.set(b.id, [b.x, b.y]);
     friction(b, dt);
   }
   let remaining = dt;
@@ -279,18 +282,40 @@ export function step(balls: Ball[], dt: number, ev: ShotEvents, cueId: number, c
       b.y += b.vy * remaining;
     }
   }
-  // Pockets + sleep.
+  // Pockets (swept: segment vs capture circle) + off-table + sleep.
+  const segDist = (x1: number, y1: number, x2: number, y2: number, px: number, py: number) => {
+    const dx = x2 - x1, dy = y2 - y1;
+    const l2 = dx * dx + dy * dy;
+    let t = l2 > 0 ? ((px - x1) * dx + (py - y1) * dy) / l2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(px - (x1 + dx * t), py - (y1 + dy * t));
+  };
   for (const b of balls) {
     if (b.potted) continue;
+    let captured = false;
+    const pr = prev.get(b.id);
     for (const p of POCKETS) {
-      if (Math.hypot(b.x - p.x, b.y - p.y) < CAPTURE_R) {
+      const d = pr
+        ? segDist(pr[0], pr[1], b.x, b.y, p.x, p.y)
+        : Math.hypot(b.x - p.x, b.y - p.y);
+      if (d < CAPTURE_R) {
         b.potted = true;
         b.asleep = true;
         b.vx = b.vy = b.wx = b.wy = b.wz = 0;
         if (b.n !== null) ev.potted.push(b.n);
         else ev.cuePotted = true;
+        captured = true;
         break;
       }
+    }
+    if (!captured && (b.x < -0.12 || b.x > TABLE_W + 0.12 || b.y < -0.12 || b.y > TABLE_H + 0.12)) {
+      // Escaped through a gap edge: off the table (foul, stays down).
+      b.potted = true;
+      b.asleep = true;
+      b.vx = b.vy = b.wx = b.wy = b.wz = 0;
+      ev.offTable.push(b.n);
+      if (b.n === null) ev.cuePotted = true;
+      continue;
     }
     if (!b.potted && Math.hypot(b.vx, b.vy) < SLEEP_V && Math.hypot(b.wx, b.wy) < SLEEP_W && Math.abs(b.wz) < 2) {
       b.vx = b.vy = b.wx = b.wy = b.wz = 0;
@@ -304,8 +329,8 @@ export function allAsleep(balls: Ball[]): boolean {
 }
 
 /** Run the shot to rest. Mutates balls. Returns events for rules. */
-export function simulateShot(balls: Ball[], cueId: number, maxSim = 20): ShotEvents {
-  const ev: ShotEvents = { firstContact: null, potted: [], railAfterContact: false, cuePotted: false };
+export function simulateShot(balls: Ball[], cueId: number, maxSim = 30): ShotEvents {
+  const ev: ShotEvents = { firstContact: null, potted: [], offTable: [], railAfterContact: false, cuePotted: false };
   const contactMade = { v: false };
   let t = 0;
   while (t < maxSim && !allAsleep(balls)) {

@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { applyShot, groupOf, newGame, placeCue, type GameState } from '../src/sim/rules';
+import { allAsleep, simulateShot } from '../src/sim/physics';
 import type { ShotEvents } from '../src/sim/physics';
 
 const ev = (p: Partial<ShotEvents>): ShotEvents => ({
-  firstContact: null, potted: [], railAfterContact: false, cuePotted: false, ...p,
+  firstContact: null, potted: [], offTable: [], railAfterContact: false, cuePotted: false, ...p,
 });
 
 describe('rack', () => {
@@ -12,6 +13,7 @@ describe('rack', () => {
     expect(gs.balls.length).toBe(16);
     const order = gs.balls.slice(1).map((b) => b.n!);
     expect(new Set(order).size).toBe(15);
+    expect(order).toContain(15);
     expect(order[4]).toBe(8);
     const corners = [order[10], order[14]].map(groupOf).sort();
     expect(corners).toEqual(['solid', 'stripe']);
@@ -102,5 +104,28 @@ describe('placeCue', () => {
     expect(placeCue(gs, blocker.x, blocker.y)).toBe(false);
     expect(placeCue(gs, 1.0, 0.635)).toBe(true);
     expect(gs.balls[0].potted).toBe(false);
+  });
+});
+
+describe('full break containment', () => {
+  it('nothing escapes, everything sleeps, sane timing', () => {
+    const gs = newGame(7);
+    const cue = gs.balls[0];
+    cue.asleep = false;
+    cue.vx = 8;
+    const t0 = performance.now();
+    const sev = simulateShot(gs.balls, 0);
+    const ms = performance.now() - t0;
+    expect(sev.firstContact).not.toBe(null);
+    expect(ms).toBeLessThan(2000);
+    for (const b of gs.balls) {
+      if (!b.potted) {
+        expect(b.x).toBeGreaterThan(-0.13);
+        expect(b.x).toBeLessThan(2.67);
+        expect(b.y).toBeGreaterThan(-0.13);
+        expect(b.y).toBeLessThan(1.4);
+      }
+    }
+    expect(allAsleep(gs.balls)).toBe(true);
   });
 });

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { allAsleep, hashState, makeBall, simulateShot, step, type Ball, type ShotEvents } from '../src/sim/physics';
 import { TABLE_H, TABLE_W } from '../src/sim/table';
 
-const freshEv = (): ShotEvents => ({ firstContact: null, potted: [], railAfterContact: false, cuePotted: false });
+const freshEv = (): ShotEvents => ({ firstContact: null, potted: [], offTable: [], railAfterContact: false, cuePotted: false });
 const cm = () => ({ v: false });
 const awake = (b: Ball) => { b.asleep = false; return b; };
 

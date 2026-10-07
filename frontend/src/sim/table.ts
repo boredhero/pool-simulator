@@ -57,7 +57,7 @@ export function rackOrder(seed = 1): number[] {
   };
   // Slots in triangle order: idx0 = apex, idx4 = center, idx10/idx14 = back corners.
   const solids = shuffled([2, 3, 4, 5, 6, 7]);
-  const stripes = shuffled([9, 10, 11, 12, 13, 14]);
+  const stripes = shuffled([9, 10, 11, 12, 13, 14, 15]);
   const slots: number[] = [1, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
   // Back corners: one solid, one stripe (random side).
   if (rnd() < 0.5) {

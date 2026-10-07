@@ -43,7 +43,7 @@ export function applyShot(gs: GameState, ev: ShotEvents): GameState {
   const first = ev.firstContact; // ball number or null
   let foul: string | null = null;
 
-  const potted8 = ev.potted.includes(8);
+  const potted8 = ev.potted.includes(8) || ev.offTable.includes(8);
   const myRemainingBefore = aliveBalls(gs, me);
 
   // --- 8-ball terminal cases (checked against pre-shot state) ---
@@ -64,6 +64,7 @@ export function applyShot(gs: GameState, ev: ShotEvents): GameState {
   }
   if (!foul && ev.potted.length === 0 && !ev.railAfterContact) foul = 'No rail after contact';
   if (!foul && ev.cuePotted) foul = 'Scratch';
+  if (!foul && ev.offTable.length > 0) foul = 'Ball off the table';
 
   // --- 8-ball win/loss ---
   if (potted8) {
