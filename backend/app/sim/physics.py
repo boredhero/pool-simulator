@@ -8,23 +8,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from app.sim.table import BALL_R, CAPTURE_R, JAW_R, POCKETS, TABLE_H, TABLE_W, cushions, jaws
+from app.sim.table import BALL_R, POCKETS, TABLE_H, TABLE_W, capture_radius, cushions, jaws
 
 DT = 1.0 / 240.0
 G = 9.81
 MU_S = 0.20
-MU_R = 0.013  # rolling resistance (slightly heavy cloth for pace)
-E_BALL = 0.95
-E_CUSH = 0.85
-MU_BB = 0.06
-MU_RAIL = 0.30
-RAIL_RET = 0.92
-SPIN_DECAY = 8.0
+MU_R = 0.01
+E_BALL = 0.94
+E_CUSH_N = 0.76
+MU_CUSH = 0.17
+SPIN_DECAY = 10.0
 SLEEP_V = 1e-3
 SLEEP_W = 0.5
-TIP_C = 0.8
+TIP_C = 2.5
 TIP_MAX = 0.55
-SQUIRT_K = 4.5 * 3.141592653589793 / 180.0
+SQUIRT_K = 5.7 * 3.141592653589793 / 180.0
+VMAX_NORMAL = 4.5
+VMAX_BREAK = 8.5
+VMIN = 0.55
 
 _CUSHIONS = cushions()
 _JAWS = jaws()
@@ -54,15 +55,29 @@ class ShotEvents:
     cue_potted: bool = False
 
 
-def shoot_speed(power: float) -> float:
+def shoot_speed(power: float, vmax: float = VMAX_NORMAL) -> float:
     p = min(1.0, max(0.0, power))
-    return 0.4 + (p**1.6) * (8 - 0.4)
+    return VMIN + (p**1.55) * (vmax - VMIN)
 
 
-def strike(b: Ball, dx: float, dy: float, power: float, tip_x: float, tip_y: float) -> None:
+def throw_mu(v_rel: float) -> float:
+    import math
+
+    return max(0.02, min(0.235, 0.016 + 0.219 * math.exp(-0.691 * abs(v_rel))))
+
+
+def strike(
+    b: Ball,
+    dx: float,
+    dy: float,
+    power: float,
+    tip_x: float,
+    tip_y: float,
+    vmax: float = VMAX_NORMAL,
+) -> None:
     tx = max(-TIP_MAX, min(TIP_MAX, tip_x))
     ty = max(-TIP_MAX, min(TIP_MAX, tip_y))
-    v = shoot_speed(power)
+    v = shoot_speed(power, vmax)
     import math
 
     sq = tx * SQUIRT_K
@@ -160,7 +175,7 @@ def _earliest_contact(balls: list[Ball], dt: float):
                 best = (t, "rail", a.id, -1, 1.0 if x1 == 0 else -1.0, 0.0)
         for j in _JAWS:
             dx, dy = a.x - j[0], a.y - j[1]
-            rr = BALL_R + JAW_R
+            rr = BALL_R + j[2]
             qa = a.vx * a.vx + a.vy * a.vy
             if qa < 1e-12:
                 continue
@@ -192,7 +207,7 @@ def _resolve_bb(a: Ball, b: Ball, nx: float, ny: float, ev: ShotEvents, cue_id: 
         a.vy += jn * ny
         b.vx -= jn * nx
         b.vy -= jn * ny
-        jt = max(-MU_BB * jn, min(MU_BB * jn, -vt / 2))
+        jt = max(-throw_mu(vn) * jn, min(throw_mu(vn) * jn, -vt / 2))
         a.vx += jt * tx
         a.vy += jt * ty
         b.vx -= jt * tx
@@ -221,10 +236,10 @@ def _resolve_rail(a: Ball, nx: float, ny: float, ev: ShotEvents, contact_made: d
     tx, ty = -ny, nx
     rx, ry = -nx * BALL_R, -ny * BALL_R
     vt_rel = (a.vx * tx + a.vy * ty) + ((-a.wz * ry) * tx + (a.wz * rx) * ty)
-    jn = -(1 + E_CUSH) * vn
+    jn = -(1 + E_CUSH_N) * vn
     a.vx += jn * nx
     a.vy += jn * ny
-    jt = max(-MU_RAIL * jn, min(MU_RAIL * jn, -(1 - RAIL_RET) * vt_rel))
+    jt = max(-MU_CUSH * jn, min(MU_CUSH * jn, -vt_rel))
     a.vx += jt * tx
     a.vy += jt * ty
     a.wz += 2.5 * (rx * (jt * ty) - ry * (jt * tx)) / (BALL_R * BALL_R)
@@ -279,12 +294,14 @@ def step(balls: list[Ball], dt: float, ev: ShotEvents, cue_id: int, contact_made
             continue
         captured = False
         pr = prev.get(b.id)
+        spd = (b.vx**2 + b.vy**2) ** 0.5
         for p in POCKETS:
+            cr = capture_radius(p[2], spd)
             if pr is not None:
                 d = seg_dist(pr[0], pr[1], b.x, b.y, p[0], p[1])
             else:
                 d = ((b.x - p[0]) ** 2 + (b.y - p[1]) ** 2) ** 0.5
-            if d < CAPTURE_R:
+            if d < cr:
                 b.potted = True
                 b.asleep = True
                 b.vx = b.vy = b.wx = b.wy = b.wz = 0.0
@@ -318,7 +335,7 @@ def all_asleep(balls: list[Ball]) -> bool:
     return all(b.potted or b.asleep for b in balls)
 
 
-def simulate_shot(balls: list[Ball], cue_id: int, max_sim: float = 30.0) -> ShotEvents:
+def simulate_shot(balls: list[Ball], cue_id: int, max_sim: float = 45.0) -> ShotEvents:
     ev = ShotEvents()
     contact_made: dict = {"v": False}
     t = 0.0

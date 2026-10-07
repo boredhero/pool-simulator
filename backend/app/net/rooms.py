@@ -13,7 +13,15 @@ from dataclasses import dataclass, field
 
 from fastapi import WebSocket
 
-from app.sim.physics import Ball, ShotEvents, hash_state, simulate_shot, strike
+from app.sim.physics import (
+    VMAX_BREAK,
+    VMAX_NORMAL,
+    Ball,
+    ShotEvents,
+    hash_state,
+    simulate_shot,
+    strike,
+)
 from app.sim.rules import GameState, apply_shot, new_game, place_cue
 
 POS_TOL = 0.05  # position reconciliation tolerance (m)
@@ -181,7 +189,8 @@ async def handle(ws: WebSocket) -> None:
                     await ws.send_json({"t": "error", "error": "cue ball in hand — place it first"})
                     continue
                 room.busy = True
-                strike(cue, _m.cos(aim), _m.sin(aim), power, tip_x, tip_y)
+                vmax = VMAX_BREAK if room.gs.break_shot else VMAX_NORMAL
+                strike(cue, _m.cos(aim), _m.sin(aim), power, tip_x, tip_y, vmax)
                 server_ev = simulate_shot(room.gs.balls, 0)
                 room.__dict__["pending_ev"] = server_ev
                 room.__dict__["pending_hash"] = hash_state(room.gs.balls)

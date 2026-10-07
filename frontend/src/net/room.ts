@@ -1,6 +1,6 @@
 // Room net client: join/create private rooms, shot-event sync.
 // Server is authoritative on rules; we predict locally and reconcile at rest.
-export interface ShotParams { aim: number; power: number; tipX: number; tipY: number }
+export interface ShotParams { aim: number; power: number; tipX: number; tipY: number; vmax?: number }
 export interface ServerBall { id: number; n: number | null; x: number; y: number; potted: boolean }
 export interface RoomState {
   code: string; balls: ServerBall[]; current: number;

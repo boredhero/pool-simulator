@@ -6,20 +6,29 @@ TABLE_W = 2.54  # playfield x
 TABLE_H = 1.27  # playfield y
 BALL_R = 0.028575
 BALL_DIA = BALL_R * 2
-POCKET_CORNER_W = 0.114  # ~4.5in mouth
-POCKET_SIDE_W = 0.127  # ~5in mouth
-CAPTURE_R = 0.075  # capture circle radius around pocket center
-JAW_R = 0.006  # jaw bumper radius
+# WPA mouths: corner 4.5in, side 5.0in. Cushion noses end at the mouth edges.
+CORNER_HALF = 0.0572
+SIDE_HALF = 0.0635
+_CB = 0.0287  # 1.6in along the corner bisector per axis
 
-# pocket centers: 4 corners slightly outside rails + 2 sides
-POCKETS: list[tuple[float, float, bool]] = [
-    (0.0, 0.0, True),
-    (TABLE_W / 2, -0.02, False),
-    (TABLE_W, 0.0, True),
-    (0.0, TABLE_H, True),
-    (TABLE_W / 2, TABLE_H + 0.02, False),
-    (TABLE_W, TABLE_H, True),
+# Capture circles sit behind the nose line (pooltool layout, SI).
+# (x, y, radius, is_corner)
+POCKETS: list[tuple[float, float, float, bool]] = [
+    (-_CB, -_CB, 0.061, True),
+    (TABLE_W / 2, -0.066, 0.0635, False),
+    (TABLE_W + _CB, -_CB, 0.061, True),
+    (-_CB, TABLE_H + _CB, 0.061, True),
+    (TABLE_W / 2, TABLE_H + 0.066, 0.0635, False),
+    (TABLE_W + _CB, TABLE_H + _CB, 0.061, True),
 ]
+
+
+def capture_radius(r: float, v: float) -> float:
+    """Effective capture radius shrinks for fast balls (rattle-out)."""
+    if v <= 1.0:
+        return r
+    return max(0.6 * r, r - 0.01016 * (v - 1.0))
+
 
 HEAD_STRING_X = TABLE_W * 0.25
 FOOT_SPOT = (TABLE_W * 0.75, TABLE_H / 2)
@@ -37,25 +46,34 @@ class Cushion:
 def cushions() -> list[Cushion]:
     """6 rail segments split at pocket mouths."""
     W, H = TABLE_W, TABLE_H
-    g_c = POCKET_CORNER_W / 2 + 0.01
-    g_s = POCKET_SIDE_W / 2 + 0.01
     return [
-        Cushion(g_c, 0, W / 2 - g_s, 0),
-        Cushion(W / 2 + g_s, 0, W - g_c, 0),
-        Cushion(g_c, H, W / 2 - g_s, H),
-        Cushion(W / 2 + g_s, H, W - g_c, H),
-        Cushion(0, g_c, 0, H - g_c),
-        Cushion(W, g_c, W, H - g_c),
+        Cushion(CORNER_HALF, 0, W / 2 - SIDE_HALF, 0),
+        Cushion(W / 2 + SIDE_HALF, 0, W - CORNER_HALF, 0),
+        Cushion(CORNER_HALF, H, W / 2 - SIDE_HALF, H),
+        Cushion(W / 2 + SIDE_HALF, H, W - CORNER_HALF, H),
+        Cushion(0, CORNER_HALF, 0, H - CORNER_HALF),
+        Cushion(W, CORNER_HALF, W, H - CORNER_HALF),
     ]
 
 
-def jaws() -> list[tuple[float, float]]:
-    """Static jaw-bumper circles at cushion ends for rattle physics."""
-    out: list[tuple[float, float]] = []
-    for c in cushions():
-        out.append((c.x1, c.y1))
-        out.append((c.x2, c.y2))
-    return out
+def jaws() -> list[tuple[float, float, float]]:
+    """Jaw bumpers: corner r=0.83in, side r=0.31in, tucked behind the nose line."""
+    W, H = TABLE_W, TABLE_H
+    cj, sj, co, so = 0.021, 0.0079, 0.0076, 0.0071
+    return [
+        (CORNER_HALF + co, -cj, cj),
+        (-cj, CORNER_HALF + co, cj),
+        (W - CORNER_HALF - co, -cj, cj),
+        (W + cj, CORNER_HALF + co, cj),
+        (CORNER_HALF + co, H + cj, cj),
+        (-cj, H - CORNER_HALF - co, cj),
+        (W - CORNER_HALF - co, H + cj, cj),
+        (W + cj, H - CORNER_HALF - co, cj),
+        (W / 2 - SIDE_HALF - so, -sj, sj),
+        (W / 2 + SIDE_HALF + so, -sj, sj),
+        (W / 2 - SIDE_HALF - so, H + sj, sj),
+        (W / 2 + SIDE_HALF + so, H + sj, sj),
+    ]
 
 
 def rack_order(seed: int = 1) -> list[int]:
