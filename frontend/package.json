@@ -1,0 +1,18 @@
+{
+  "name": "pool-simulator-frontend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5173",
+    "build": "tsc --noEmit && vite build",
+    "test": "vitest run",
+    "lint": "eslint src --ext .ts"
+  },
+  "dependencies": { "three": "^0.186.0" },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vite": "^6.0.0",
+    "vitest": "^2.0.0",
+    "@types/three": "^0.170.0"
+  }
+}

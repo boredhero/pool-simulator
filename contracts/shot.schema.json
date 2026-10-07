@@ -1,0 +1,1 @@
+{"$schema":"http://json-schema.org/draft-07/schema#","title":"ShotEvent","type":"object","required":["shotId","aim","power","tipX","tipY"],"properties":{"shotId":{"type":"string"},"aim":{"type":"number"},"power":{"type":"number","minimum":0,"maximum":1},"tipX":{"type":"number"},"tipY":{"type":"number"}}}
