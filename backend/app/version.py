@@ -8,7 +8,7 @@ import yaml
 
 @lru_cache
 def get_info() -> dict[str, str]:
-    p = Path(__file__).resolve().parents[3] / "info.yml"
+    p = Path(__file__).resolve().parents[2] / "info.yml"
     if not p.exists():  # Docker layout fallback (/srv/info.yml)
         alt = Path("/srv/info.yml")
         p = alt if alt.exists() else p
