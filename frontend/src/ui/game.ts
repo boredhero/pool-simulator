@@ -50,6 +50,7 @@ export class Game {
   lastSpeed = new Map<number, number>();
   lastPotted = 0;
   lastT = 0;
+  lastFrame = 0;
   pulling = false;
   pressPt: [number, number] | null = null;
   hoverPt: [number, number] | null = null;
@@ -113,6 +114,12 @@ export class Game {
   canShoot(): boolean {
     if (this.mode !== 'aim' || this.gs.winner !== null) return false;
     if (this.room && this.seat !== this.gs.current) return false;
+    return true;
+  }
+
+  /** Human may act only on their own turn (AI turns are driven by aiMove). */
+  humanTurn(): boolean {
+    if (!this.canShoot()) return false;
     if (this.aiOpponent && this.gs.current === 1) return false;
     return true;
   }
@@ -176,6 +183,7 @@ export class Game {
       if (e.pointerType === 'mouse' && e.button !== 0) { cancelPull(); return; }
       const power = Math.max(0.04, this.pullPower());
       cancelPull();
+      if (!this.humanTurn()) return;
       this.fire(power);
     });
     canvas.addEventListener('pointercancel', cancelPull);
@@ -185,7 +193,7 @@ export class Game {
       if (e.code === 'ArrowRight') this.targetAngle -= 0.03;
       if (e.code === 'Space') {
         e.preventDefault();
-        if (!e.repeat) this.fire(0.4);
+        if (!e.repeat && this.humanTurn()) this.fire(0.4);
       }
     });
     addEventListener('keyup', (_e) => { /* space fires on keydown */ });
@@ -280,6 +288,9 @@ export class Game {
   }
 
   frame(): void {
+    const fnow = performance.now();
+    const fdt = this.lastFrame ? Math.min((fnow - this.lastFrame) / 1000, 0.1) : 0.016;
+    this.lastFrame = fnow;
     for (const b of this.gs.balls) {
       if (b.potted) continue;
       const v = Math.hypot(b.vx, b.vy);
@@ -335,13 +346,13 @@ export class Game {
         this.hud();
       }
     }
-    this.scene.setBalls(this.gs.balls);
-    // Ease aim toward target (kills mouse jitter twitch).
+    this.scene.setBalls(this.gs.balls, fdt);
+    // Ease aim toward target (kills mouse jitter twitch), frame-rate independent.
     {
       let d = this.targetAngle - this.angle;
       while (d > Math.PI) d -= 2 * Math.PI;
       while (d < -Math.PI) d += 2 * Math.PI;
-      this.angle += d * 0.35;
+      this.angle += d * Math.min(1, fdt * 14);
     }
     const aiming = this.mode === 'aim' && !this.cue().potted;
     const pulling = this.pulling && aiming;

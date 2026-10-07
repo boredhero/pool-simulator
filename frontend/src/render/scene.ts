@@ -40,8 +40,11 @@ function ballTexture(n: number): THREE.CanvasTexture {
 export interface SceneHandle {
   renderer: THREE.WebGLRenderer;
   controls: OrbitControls;
-  /** Sync ball meshes from sim state. */
-  setBalls(list: Array<{ n: number | null; x: number; y: number; potted: boolean }>): void;
+  /** Sync ball meshes from sim state (rolls them by their spin state). */
+  setBalls(
+    list: Array<{ n: number | null; x: number; y: number; potted: boolean; wx: number; wy: number; wz: number }>,
+    dt: number,
+  ): void;
   /** Cue stick. pull in meters of drawback. */
   setCue(visible: boolean, cx: number, cy: number, angle: number, pull: number): void;
   /** Ball-in-hand placement preview: legal-zone outline + cursor ring. */
@@ -237,12 +240,20 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
   return {
     renderer,
     controls,
-    setBalls(list) {
+    setBalls(list, dt) {
+      const axis = new THREE.Vector3();
       for (const b of list) {
         const m = getMesh(b.n);
         const [rx, rz] = toRender(b.x, b.y);
         m.position.set(rx, BALL_R, rz);
         m.visible = !b.potted;
+        if (!b.potted && dt > 0) {
+          // Sim (x right, y plan, z up) -> render (x right, y up, z plan):
+          // axis swap + sign flip from the handedness change.
+          axis.set(-b.wx, -b.wz, -b.wy);
+          const w = axis.length();
+          if (w > 1e-3) m.rotateOnWorldAxis(axis.normalize(), Math.min(w * dt, 0.5));
+        }
       }
     },
     setTheme(felt, wood) {

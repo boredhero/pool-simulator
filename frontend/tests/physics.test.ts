@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { allAsleep, hashState, makeBall, simulateShot, step, type Ball, type ShotEvents } from '../src/sim/physics';
-import { TABLE_H, TABLE_W } from '../src/sim/table';
+import { TABLE_H, TABLE_W, BALL_R } from '../src/sim/table';
 
 const freshEv = (): ShotEvents => ({ firstContact: null, potted: [], offTable: [], railAfterContact: false, cuePotted: false });
 const cm = () => ({ v: false });
@@ -135,6 +135,40 @@ describe('shots', () => {
     balls[0].vx = 2; balls[0].wy = 2 * 30;
     for (let i = 0; i < 240 * 3; i++) step(balls, 1 / 240, freshEv(), 0, cm());
     expect(balls[0].x - drawX).toBeGreaterThan(0.05);
+  });
+});
+
+describe('spin physics', () => {
+  it('slide transitions to roll in 2u0/(7 mu_s g), then rolls straight', () => {
+    const b = awake(makeBall(0, null, 0.5, TABLE_H / 2));
+    b.vx = 2; // no spin: full skid
+    const balls = [b];
+    // Theoretical slide time for u0=2: 2*2/(7*0.2*9.81) = 0.291s.
+    let rolled = false;
+    for (let i = 0; i < 240; i++) {
+      step(balls, 1 / 240, freshEv(), 0, cm());
+      const ux = b.vx - BALL_R * b.wy, uy = b.vy + BALL_R * b.wx;
+      if (i * (1 / 240) > 0.32 && Math.hypot(ux, uy) < 0.02) rolled = true;
+    }
+    expect(rolled).toBe(true);
+    // Rolling: spin matches velocity (wy = vx/R), travels straight.
+    expect(Math.abs(b.wy - b.vx / BALL_R) / Math.max(1, Math.abs(b.vx / BALL_R))).toBeLessThan(0.1);
+    expect(Math.abs(b.vy)).toBeLessThan(0.05);
+  });
+
+  it('follow-through: topspin makes the cue chase after contact', () => {
+    const cue = awake(makeBall(0, null, 0.5, TABLE_H / 2));
+    const obj = awake(makeBall(1, 1, 0.9, TABLE_H / 2));
+    cue.vx = 2; cue.wy = 2 * 40; // heavy topspin
+    const balls = [cue, obj];
+    const ev = freshEv();
+    for (let i = 0; i < 240 * 2; i++) {
+      step(balls, 1 / 240, ev, 0, cm());
+      if (allAsleep(balls)) break;
+    }
+    expect(ev.firstContact).toBe(1);
+    // Cue retained forward roll through the hit: ends ahead of contact point.
+    expect(cue.x).toBeGreaterThan(0.85);
   });
 });
 
