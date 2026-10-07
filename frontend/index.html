@@ -5,16 +5,36 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
 <title>pool-simulator</title>
 <style>
-html,body{margin:0;height:100%;overscroll-behavior:none}
+html,body{margin:0;height:100%;overscroll-behavior:none;background:#0b1020;color:#eee;font-family:system-ui}
 #game-canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;user-select:none;-webkit-user-select:none}
-.hud{position:fixed;inset:0;pointer-events:none;padding:calc(8px + env(safe-area-inset-top)) calc(8px + env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-left))}
-.hud button{pointer-events:auto;min-height:48px;min-width:48px;touch-action:manipulation}
+.hud{position:fixed;inset:0;pointer-events:none;padding:calc(8px + env(safe-area-inset-top)) calc(8px + env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-left));display:flex;flex-direction:column;justify-content:space-between}
+.hud .row{display:flex;gap:8px;align-items:center;pointer-events:none}
+.hud .row>*{pointer-events:auto}
+#msg{background:rgba(0,0,0,.55);padding:6px 10px;border-radius:8px;font-size:14px;flex:1}
+#turn{background:rgba(0,0,0,.55);padding:6px 10px;border-radius:8px;font-size:14px;white-space:nowrap}
+button{min-height:48px;min-width:48px;touch-action:manipulation;border-radius:10px;border:1px solid #555;background:#1c2742;color:#fff;font-size:15px;padding:0 14px}
+button:disabled{opacity:.4}
+#power{width:140px;accent-color:#4caf50}
+#spin{width:72px;height:72px;border-radius:50%;background:radial-gradient(circle at center,#f8f8f8 18%,#c33 19%,#c33 26%,#eee 27%);position:relative;touch-action:none}
+#spin::after{content:'';position:absolute;left:50%;top:50%;width:10px;height:10px;margin:-5px;border-radius:50%;background:#2244aa;transform:translate(var(--tx,0px),var(--ty,0px))}
+#version{font-size:12px;opacity:.7;pointer-events:none}
 #app{height:100dvh}
+@media (pointer:coarse){button{font-size:16px}#msg{font-size:13px}}
 </style>
 </head>
 <body>
 <div id="app"><canvas id="game-canvas"></canvas>
-<div class="hud"><button id="shoot">Shoot</button><span id="version" style="pointer-events:auto;font:12px system-ui;opacity:.7"></span></div></div>
+<div class="hud">
+  <div class="row"><div id="msg">…</div><div id="turn">…</div></div>
+  <div class="row">
+    <button id="shoot">Shoot</button>
+    <input id="power" type="range" min="5" max="100" value="50" aria-label="Power" />
+    <div id="spin" title="Tip offset"></div>
+    <button id="orbitbtn">Orbit</button>
+    <button id="rack">Rack</button>
+    <span id="version"></span>
+  </div>
+</div></div>
 <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

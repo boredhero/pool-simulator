@@ -43,29 +43,32 @@ export function jaws(): Array<{ x: number; y: number }> {
   return out;
 }
 
-/** Deterministic rack order: 1 apex, 8 center, corners mixed solid/stripe. */
+/** Deterministic rack order: 1 apex, 8 center, corners one solid + one stripe. */
 export function rackOrder(seed = 1): number[] {
   let s = seed >>> 0 || 1;
   const rnd = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
-  const solids = [2, 3, 4, 5, 6, 7];
-  const stripes = [9, 10, 11, 12, 13, 14];
-  for (let i = solids.length - 1; i > 0; i--) {
-    const j = Math.floor(rnd() * (i + 1));
-    [solids[i], solids[j]] = [solids[j], solids[i]];
-    const k = Math.floor(rnd() * (i + 1));
-    [stripes[i], stripes[k]] = [stripes[k], stripes[i]];
+  const shuffled = (arr: number[]) => {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(rnd() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  };
+  // Slots in triangle order: idx0 = apex, idx4 = center, idx10/idx14 = back corners.
+  const solids = shuffled([2, 3, 4, 5, 6, 7]);
+  const stripes = shuffled([9, 10, 11, 12, 13, 14]);
+  const slots: number[] = [1, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  // Back corners: one solid, one stripe (random side).
+  if (rnd() < 0.5) {
+    slots[10] = solids.pop()!;
+    slots[14] = stripes.pop()!;
+  } else {
+    slots[10] = stripes.pop()!;
+    slots[14] = solids.pop()!;
   }
-  // Triangle slots row by row: [apex, row1..., row4...]; center slot index 4 = 8.
-  // Corners (last row ends) must be one solid + one stripe.
-  const slots = [1, solids[0], stripes[0], solids[1], 8, stripes[1], solids[2], stripes[2], solids[3], stripes[3], 0, 0, 0, 0, 0];
-  const rest = [...solids.slice(4), ...stripes.slice(4)];
-  let a = 0, b = 0;
-  // slot 10,14 = corners: force one solid one stripe
-  slots[10] = solids[4]; slots[14] = stripes[4];
-  const middle = [11, 12, 13];
-  const pool = [rest[0] ?? solids[5], rest[1] ?? stripes[5], rest[2] ?? solids[5]];
-  for (const m of middle) slots[m] = pool[a++] ?? 8;
-  void b;
+  const rest = shuffled([...solids, ...stripes]);
+  for (let i = 0; i < slots.length; i++) if (slots[i] === 0) slots[i] = rest.pop()!;
   return slots;
 }
 
