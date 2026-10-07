@@ -13,7 +13,7 @@ from app.sim.table import BALL_R, CAPTURE_R, JAW_R, POCKETS, TABLE_H, TABLE_W, c
 DT = 1.0 / 240.0
 G = 9.81
 MU_S = 0.20
-MU_R = 0.01
+MU_R = 0.013  # rolling resistance (slightly heavy cloth for pace)
 E_BALL = 0.95
 E_CUSH = 0.85
 MU_BB = 0.06
@@ -56,7 +56,7 @@ class ShotEvents:
 
 def shoot_speed(power: float) -> float:
     p = min(1.0, max(0.0, power))
-    return 0.2 + (p**2.0) * (8 - 0.2)
+    return 0.4 + (p**1.6) * (8 - 0.4)
 
 
 def strike(b: Ball, dx: float, dy: float, power: float, tip_x: float, tip_y: float) -> None:

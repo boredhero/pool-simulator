@@ -14,14 +14,15 @@ test('loads, renders table, breaks and resolves', async ({ page }) => {
   await page.screenshot({ path: 'e2e/table.png' });
   // Aim at the apex ball, hold to charge full power, release to break.
   const cbox = (await canvas.boundingBox())!;
-  // Press in the middle of the felt (guaranteed felt hit), hold for full charge.
-  await page.mouse.move(cbox.x + cbox.width / 2, cbox.y + cbox.height / 2);
+  // Press mid-felt, drag back ~400px for full power, release to break.
+  const sx = cbox.x + cbox.width / 2, sy = cbox.y + cbox.height / 2;
+  await page.mouse.move(sx, sy);
   await page.evaluate(() => {
-    const g = (window as unknown as { __pool: { angle: number } }).__pool;
-    g.angle = 0; // +x straight into the rack from the head spot
+    const g = (window as unknown as { __pool: { angle: number; targetAngle: number } }).__pool;
+    g.angle = 0; g.targetAngle = 0; // +x straight into the rack from the head spot
   });
   await page.mouse.down();
-  await page.waitForTimeout(1600); // full charge ramp
+  await page.mouse.move(sx - 300, sy + 250, { steps: 12 });
   await page.mouse.up();
   // Shot must actually be underway now.
   await page.waitForFunction(
