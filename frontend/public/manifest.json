@@ -1,6 +1,6 @@
 {
-  "name": "pool-simulator",
-  "short_name": "pool",
+  "name": "Play Pool",
+  "short_name": "Play Pool",
   "description": "GPU-accelerated browser pool",
   "start_url": "/",
   "display": "standalone",

@@ -4,22 +4,35 @@ test('loads, renders table, breaks and resolves', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto('/');
-  await expect(page).toHaveTitle(/pool-simulator/);
+  await expect(page).toHaveTitle(/Play Pool/);
   const canvas = page.locator('#game-canvas');
   await expect(canvas).toBeVisible();
   const box = await canvas.boundingBox();
   expect(box?.width).toBeGreaterThan(200);
+  await expect(page.locator('link[rel="icon"]')).toHaveCount(1);
   await page.waitForTimeout(1500);
   await page.screenshot({ path: 'e2e/table.png' });
-  // Aim at the apex ball and break at full power via the debug handle.
+  // Aim at the apex ball, hold to charge full power, release to break.
+  const cbox = (await canvas.boundingBox())!;
+  // Press in the middle of the felt (guaranteed felt hit), hold for full charge.
+  await page.mouse.move(cbox.x + cbox.width / 2, cbox.y + cbox.height / 2);
   await page.evaluate(() => {
-    const g = (window as unknown as { __pool: { angle: number; power: number } }).__pool;
+    const g = (window as unknown as { __pool: { angle: number } }).__pool;
     g.angle = 0; // +x straight into the rack from the head spot
-    g.power = 1;
   });
-  await page.locator('#shoot').click();
-  await expect(page.locator('#shoot')).toBeDisabled();
-  await expect(page.locator('#shoot')).toBeEnabled({ timeout: 90000 });
+  await page.mouse.down();
+  await page.waitForTimeout(1600); // full charge ramp
+  await page.mouse.up();
+  // Shot must actually be underway now.
+  await page.waitForFunction(
+    () => (window as unknown as { __pool: { mode: string } }).__pool.mode === 'rolling',
+    { timeout: 5000 },
+  );
+  // Rolling: charge meter was active; wait for resolution.
+  await page.waitForFunction(
+    () => (window as unknown as { __pool: { mode: string } }).__pool.mode !== 'rolling',
+    { timeout: 90000 },
+  );
   const msg = await page.locator('#msg').textContent();
   expect(msg).toMatch(/Player [12]/);
   await page.screenshot({ path: 'e2e/break.png' });

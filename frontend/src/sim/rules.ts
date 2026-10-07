@@ -141,12 +141,16 @@ function respot8(gs: GameState): void {
   eight.x = (TABLE_W * 3) / 4; eight.y = TABLE_H / 2; eight.potted = false; eight.asleep = true;
 }
 
+/** Placement legality without mutating. */
+export function canPlace(gs: GameState, x: number, y: number): boolean {
+  if (x < 0.03 || x > TABLE_W - 0.03 || y < 0.03 || y > TABLE_H - 0.03) return false;
+  return !gs.balls.some((b) => b.id !== 0 && !b.potted && Math.hypot(b.x - x, b.y - y) < 0.062);
+}
+
 /** Place cue ball (ball in hand). Returns false if blocked. */
 export function placeCue(gs: GameState, x: number, y: number): boolean {
+  if (!canPlace(gs, x, y)) return false;
   const cue = gs.balls[0];
-  if (x < 0.03 || x > TABLE_W - 0.03 || y < 0.03 || y > TABLE_H - 0.03) return false;
-  const blocked = gs.balls.some((b) => b.id !== 0 && !b.potted && Math.hypot(b.x - x, b.y - y) < 0.062);
-  if (blocked) return false;
   cue.x = x; cue.y = y;
   cue.vx = cue.vy = cue.wx = cue.wy = cue.wz = 0;
   cue.potted = false; cue.asleep = true;
