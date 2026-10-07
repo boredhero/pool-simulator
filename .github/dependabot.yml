@@ -3,7 +3,7 @@ updates:
   - package-ecosystem: npm
     directory: /frontend
     schedule: { interval: weekly, day: monday }
-    target-branch: [main]
+    target-branch: "main"
     groups:
       frontend:
         patterns: ["*"]
@@ -12,7 +12,7 @@ updates:
   - package-ecosystem: uv
     directory: /backend
     schedule: { interval: weekly, day: monday }
-    target-branch: [main]
+    target-branch: "main"
     groups:
       backend:
         patterns: ["*"]
@@ -21,7 +21,7 @@ updates:
   - package-ecosystem: docker
     directory: /
     schedule: { interval: weekly, day: monday }
-    target-branch: [main]
+    target-branch: "main"
     groups:
       images:
         patterns: ["*"]
@@ -30,7 +30,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly, day: monday }
-    target-branch: [main]
+    target-branch: "main"
     groups:
       actions:
         patterns: ["*"]

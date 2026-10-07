@@ -37,17 +37,15 @@ function ballTexture(n: number): THREE.CanvasTexture {
   return t;
 }
 
-export interface AimGhost { gx: number; gy: number; ox: number; oy: number; hasHit: boolean }
-
 export interface SceneHandle {
   renderer: THREE.WebGLRenderer;
   controls: OrbitControls;
   /** Sync ball meshes from sim state. */
   setBalls(list: Array<{ n: number | null; x: number; y: number; potted: boolean }>): void;
-  /** Aim line + ghost ball. Angles in sim plane radians. */
-  setAim(visible: boolean, cx: number, cy: number, angle: number, ghost: AimGhost): void;
   /** Cue stick. pull in meters of drawback. */
   setCue(visible: boolean, cx: number, cy: number, angle: number, pull: number): void;
+  /** Ball-in-hand placement preview: legal-zone outline + cursor ring. */
+  setPlace(visible: boolean, x: number, y: number, legal: boolean): void;
   /** Raycast pointer to felt plane, sim coords or null. */
   pickFelt(clientX: number, clientY: number): [number, number] | null;
   onFrame(cb: () => void): void;
@@ -97,17 +95,20 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
   const wood = new THREE.MeshStandardMaterial({ color: 0x4a2c14, roughness: 0.6 });
   const railLong = new THREE.BoxGeometry(TABLE_W + RAIL_W * 2, 0.07, RAIL_W);
   const railShort = new THREE.BoxGeometry(RAIL_W, 0.07, TABLE_H);
+  const rails: THREE.Mesh[] = [];
   for (const z of [-TABLE_H / 2 - RAIL_W / 2, TABLE_H / 2 + RAIL_W / 2]) {
     const r = new THREE.Mesh(railLong, wood);
     r.position.set(0, 0.015, z);
     r.castShadow = r.receiveShadow = true;
     scene.add(r);
+    rails.push(r);
   }
   for (const x of [-TABLE_W / 2 - RAIL_W / 2, TABLE_W / 2 + RAIL_W / 2]) {
     const r = new THREE.Mesh(railShort, wood);
     r.position.set(x, 0.015, 0);
     r.castShadow = r.receiveShadow = true;
     scene.add(r);
+    rails.push(r);
   }
   const pocketMat = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 1 });
   for (const [px, pz] of [
@@ -138,28 +139,40 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
     return m;
   };
 
-  // Aim line + ghost ball + object direction tick.
-  const aimMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 });
-  const aimLine = new THREE.Line(new THREE.BufferGeometry(), aimMat);
-  aimLine.frustumCulled = false;
-  scene.add(aimLine);
-  const ghost = new THREE.Mesh(
-    new THREE.SphereGeometry(BALL_R, 16, 12),
-    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35 }),
+  // Ball-in-hand placement preview: legal-zone outline + cursor ring.
+  const zonePts: Array<[number, number, number]> = [];
+  {
+    const m = 0.035;
+    const corners: Array<[number, number]> = [
+      [m, m], [TABLE_W - m, m], [TABLE_W - m, TABLE_H - m], [m, TABLE_H - m],
+    ];
+    for (const [sx, sy] of corners) {
+      const [rx, rz] = toRender(sx, sy);
+      zonePts.push([rx, 0.002, rz]);
+    }
+  }
+  const zoneLine = new THREE.LineLoop(
+    new THREE.BufferGeometry().setFromPoints(zonePts.map(([x, y, z]) => new THREE.Vector3(x, y, z))),
+    new THREE.LineBasicMaterial({ color: 0x4caf50, transparent: true, opacity: 0.5 }),
   );
-  scene.add(ghost);
-  const tickLine = new THREE.Line(new THREE.BufferGeometry(), aimMat.clone());
-  tickLine.frustumCulled = false;
-  scene.add(tickLine);
+  zoneLine.visible = false;
+  scene.add(zoneLine);
+  const ringMat = new THREE.MeshBasicMaterial({ color: 0x4caf50, transparent: true, opacity: 0.8 });
+  const ring = new THREE.Mesh(new THREE.RingGeometry(BALL_R * 0.9, BALL_R * 1.25, 32), ringMat);
+  ring.rotation.x = -Math.PI / 2;
+  ring.visible = false;
+  scene.add(ring);
 
-  // Cue stick.
+  // Cue stick. Shaft rescales to avoid clipping rails/balls behind the cue ball.
+  const SHAFT_LEN = 1.1;
+  const SHAFT_Z0 = BALL_R + 0.014;
   const cueGroup = new THREE.Group();
   const shaft = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.006, 0.009, 1.1, 12),
+    new THREE.CylinderGeometry(0.006, 0.009, SHAFT_LEN, 12),
     new THREE.MeshStandardMaterial({ color: 0x8a5a2b, roughness: 0.5 }),
   );
   shaft.rotation.x = Math.PI / 2;
-  shaft.position.z = 0.55 + BALL_R + 0.01;
+  shaft.position.z = SHAFT_Z0 + SHAFT_LEN / 2;
   cueGroup.add(shaft);
   const tip = new THREE.Mesh(
     new THREE.CylinderGeometry(0.0062, 0.0062, 0.012, 12),
@@ -182,11 +195,6 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
     const hit = ray.intersectObject(feltHit, false)[0];
     if (!hit) return null;
     return toSim(hit.point.x, hit.point.z);
-  };
-
-  const setPoints = (line: THREE.Line, pts: Array<[number, number, number]>) => {
-    line.geometry.dispose();
-    line.geometry = new THREE.BufferGeometry().setFromPoints(pts.map(([x, y, z]) => new THREE.Vector3(x, y, z)));
   };
 
   const resize = () => {
@@ -226,22 +234,13 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
         m.visible = !b.potted;
       }
     },
-    setAim(visible, cx, cy, angle, g) {
-      aimLine.visible = visible;
-      ghost.visible = visible && g.hasHit;
-      tickLine.visible = visible && g.hasHit;
+    setPlace(visible, x, y, legal) {
+      zoneLine.visible = visible;
+      ring.visible = visible;
       if (!visible) return;
-      const [cxr, czr] = toRender(cx, cy);
-      const dx = Math.cos(angle), dy = Math.sin(angle);
-      const len = g.hasHit ? Math.hypot(g.gx - cx, g.gy - cy) : 1.2;
-      const [exr, ezr] = toRender(cx + dx * len, cy + dy * len);
-      setPoints(aimLine, [[cxr, BALL_R, czr], [exr, BALL_R, ezr]]);
-      if (g.hasHit) {
-        const [gxr, gzr] = toRender(g.gx, g.gy);
-        ghost.position.set(gxr, BALL_R, gzr);
-        const [oxr, ozr] = toRender(g.gx + g.ox * 0.18, g.gy + g.oy * 0.18);
-        setPoints(tickLine, [[gxr, BALL_R, gzr], [oxr, BALL_R, ozr]]);
-      }
+      const [rx, rz] = toRender(x, y);
+      ring.position.set(rx, 0.004, rz);
+      ringMat.color.set(legal ? 0x4caf50 : 0xf44336);
     },
     setCue(visible, cx, cy, angle, pull) {
       cueGroup.visible = visible;
@@ -251,6 +250,23 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
       // Stick extends local +z; point it back along -aim, shifted by pull-back.
       cueGroup.rotation.y = Math.atan2(-dx, -dy);
       cueGroup.position.set(rx - dx * pull, BALL_R, rz - dy * pull);
+      // Clip the shaft at the first rail/ball behind the cue ball.
+      ray.set(
+        new THREE.Vector3(rx, BALL_R, rz),
+        new THREE.Vector3(-dx, 0, -dy).normalize(),
+      );
+      const colliders: THREE.Object3D[] = [...rails];
+      for (const m of meshes.values()) if (m.visible && m !== meshes.get('cue')) colliders.push(m);
+      let len = SHAFT_LEN;
+      const hits = ray.intersectObjects(colliders, false);
+      for (const h of hits) {
+        if (h.distance > 0.06) {
+          len = Math.max(0.28, Math.min(SHAFT_LEN, h.distance - 0.05 - pull));
+          break;
+        }
+      }
+      shaft.scale.y = len / SHAFT_LEN;
+      shaft.position.z = SHAFT_Z0 + len / 2;
     },
     pickFelt,
     onFrame(cb) { cbs.push(cb); },
