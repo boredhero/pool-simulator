@@ -1,7 +1,7 @@
 # Frontend build -> Python runtime, single container.
 # CI builds frontend/ then Dockerfile copies frontend/dist into the image
 # (same pattern as hole-finder: COPY frontend/dist/ static/).
-FROM node:22-slim AS web
+FROM node:25-slim AS web
 WORKDIR /web
 COPY frontend/package.json frontend/package-lock.json* frontend/pnpm-lock.yaml* ./
 RUN if [ -f pnpm-lock.yaml ]; then npm install -g pnpm && pnpm install; elif [ -f package-lock.json ]; then npm ci; else npm install; fi
