@@ -12,16 +12,34 @@ html,body{margin:0;height:100%;overscroll-behavior:none;background:#0b1020;color
 .hud{position:fixed;inset:0;pointer-events:none;padding:calc(8px + env(safe-area-inset-top)) calc(8px + env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-left));display:flex;flex-direction:column;justify-content:space-between}
 .row{display:flex;gap:8px;align-items:center}
 .row>*{pointer-events:auto}
-#msg{background:rgba(0,0,0,.55);padding:6px 10px;border-radius:8px;font-size:14px;flex:1}
-#turn{background:rgba(0,0,0,.55);padding:6px 10px;border-radius:8px;font-size:14px;white-space:nowrap}
-#version{font-size:12px;opacity:.7;pointer-events:none}
-button{min-height:44px;min-width:44px;touch-action:manipulation;border-radius:10px;border:1px solid #555;background:#1c2742;color:#fff;font-size:14px;padding:0 12px}
-button:disabled{opacity:.4}
+.chip{background:rgba(12,16,30,.62);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.14);padding:6px 12px;border-radius:999px;font-size:13px;white-space:nowrap}
+#msg{flex:1;overflow:hidden;text-overflow:ellipsis}
+#turn{font-weight:600}
+#turn.me{border-color:#4caf50}
+button{min-height:44px;min-width:44px;touch-action:manipulation;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:rgba(20,28,52,.78);backdrop-filter:blur(8px);color:#fff;font-size:14px;padding:0 12px}
 button.on{background:#2c5a2c;border-color:#4caf50}
-#onlinepanel{position:fixed;top:calc(56px + env(safe-area-inset-top));right:calc(8px + env(safe-area-inset-right));background:rgba(10,14,28,.95);border:1px solid #555;border-radius:12px;padding:12px;display:none;flex-direction:column;gap:8px;pointer-events:auto;z-index:5}
+#version{font-size:11px;opacity:.6;pointer-events:none}
+#scorecard{position:fixed;top:calc(60px + env(safe-area-inset-top));right:calc(8px + env(safe-area-inset-right));display:flex;flex-direction:column;gap:8px;pointer-events:none;z-index:4}
+.pcard{background:rgba(12,16,30,.66);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:8px 10px;min-width:118px}
+.pcard.active{border-color:#4caf50}
+.pcard .pname{font-size:12px;font-weight:600;margin-bottom:6px;display:flex;justify-content:space-between;gap:6px}
+.pcard .pname .grp{opacity:.75;font-weight:400}
+.pcard .balls{display:flex;flex-wrap:wrap;gap:4px;max-width:132px}
+.pball{width:20px;height:20px;border-radius:50%;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;color:#111;background:#f8f8f8}
+.pball.out{opacity:.28;filter:saturate(.4)}
+.pball.eight{background:#111;color:#f8f8f8}
+#settingspanel{position:fixed;top:calc(60px + env(safe-area-inset-top));left:calc(8px + env(safe-area-inset-left));background:rgba(10,14,28,.95);border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:12px;display:none;flex-direction:column;gap:10px;pointer-events:auto;z-index:5;max-width:230px}
+#settingspanel.open{display:flex}
+#settingspanel .swatches{display:flex;gap:6px;flex-wrap:wrap}
+.swatch{width:34px;height:34px;border-radius:50%;border:2px solid transparent;cursor:pointer}
+.swatch.sel{border-color:#fff}
+#settingspanel label{font-size:12px;opacity:.8}
+#settingspanel input[type=color]{width:100%;height:40px;border:none;background:none;padding:0}
+#onlinepanel{position:fixed;top:calc(60px + env(safe-area-inset-top));right:calc(8px + env(safe-area-inset-right));background:rgba(10,14,28,.95);border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:12px;display:none;flex-direction:column;gap:8px;pointer-events:auto;z-index:5}
 #onlinepanel.open{display:flex}
 #onlinepanel input{min-height:44px;border-radius:8px;border:1px solid #555;background:#111;color:#fff;padding:0 10px;width:150px}
 #roominfo{font-size:12px;opacity:.8}
+#onlinepanel.has-score{top:calc(210px + env(safe-area-inset-top))}
 #chargebar{height:6px;border-radius:3px;background:rgba(255,255,255,.15);flex:1;max-width:280px;overflow:hidden}
 #chargefill{height:100%;width:0%;border-radius:3px;background:linear-gradient(90deg,#4caf50,#ffc107,#f44336)}
 #spin{width:64px;height:64px;border-radius:50%;background:radial-gradient(circle at center,#f8f8f8 18%,#c33 19%,#c33 26%,#eee 27%);position:relative;touch-action:none;flex:none}
@@ -29,22 +47,38 @@ button.on{background:#2c5a2c;border-color:#4caf50}
 .spacer{flex:1;pointer-events:none}
 #app{height:100dvh}
 .hint{font-size:12px;opacity:.65;text-align:center;pointer-events:none}
-@media (pointer:coarse){button{font-size:15px}#msg{font-size:13px}}
+@media (pointer:coarse){button{font-size:15px}.pcard{min-width:96px}.pcard .balls{max-width:108px}}
 </style>
 </head>
 <body>
 <div id="app"><canvas id="game-canvas"></canvas>
 <div class="hud">
-  <div class="row"><div id="msg">…</div><div id="turn">…</div><span id="version"></span><button id="onlinebtn">Online</button></div>
-  <div class="hint">drag to aim · press &amp; hold to charge · release to shoot</div>
+  <div class="row">
+    <div class="chip" id="msg">…</div>
+    <div class="chip" id="turn">…</div>
+    <span id="version"></span>
+    <button id="settingsbtn" title="Table settings">⚙</button>
+    <button id="onlinebtn">Online</button>
+  </div>
+  <div class="hint">drag to aim · press &amp; hold to charge · release to shoot · right-drag to orbit</div>
   <div class="row">
     <div id="chargebar"><div id="chargefill"></div></div>
     <div id="spin" title="Tip offset (english)"></div>
     <div class="spacer"></div>
-    <button id="orbitbtn">Orbit</button>
     <button id="aibtn">vs AI</button>
     <button id="rack">Rack</button>
   </div>
+</div>
+<div id="scorecard"></div>
+<div id="settingspanel">
+  <label>Felt</label>
+  <div class="swatches" id="feltsw"></div>
+  <label>Rails</label>
+  <div class="swatches" id="woodsw"></div>
+  <label>Custom felt</label>
+  <input type="color" id="feltcustom" value="#0a6c2f" />
+  <label>Custom rails</label>
+  <input type="color" id="woodcustom" value="#4a2c14" />
 </div>
 <div id="onlinepanel">
   <input id="pname" placeholder="your name" maxlength="24" />
