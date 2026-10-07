@@ -12,6 +12,7 @@ FROM python:3.13-slim
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 WORKDIR /srv
+COPY info.yml ./info.yml
 COPY backend/pyproject.toml backend/uv.lock backend/README.md* ./
 COPY backend/ ./backend/
 RUN uv sync --frozen --no-dev --directory backend || uv sync --no-dev --directory backend
