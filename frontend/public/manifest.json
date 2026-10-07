@@ -1,0 +1,13 @@
+{
+  "name": "pool-simulator",
+  "short_name": "pool",
+  "description": "GPU-accelerated browser pool",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b1020",
+  "theme_color": "#0a6c2f",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

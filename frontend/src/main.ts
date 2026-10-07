@@ -1,8 +1,11 @@
-import { init } from './render/scene';
+import { Game } from './ui/game';
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
-init(canvas);
+const game = new Game(canvas);
+(window as unknown as { __pool: Game }).__pool = game;
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+}
 fetch('/api/version').then(r => r.json()).then(({ version }) => {
   const el = document.getElementById('version');
   if (el && version) el.textContent = `v${version}`;
 }).catch(() => {});
-console.log('pool-simulator scaffold ok');
