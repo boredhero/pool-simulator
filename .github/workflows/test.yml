@@ -10,6 +10,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Ruff check
+        run: uvx ruff check backend/
+
+      - name: Ruff format check
+        run: uvx ruff format --check backend/
+
   test:
     runs-on: ubuntu-latest
     steps:
@@ -27,10 +45,6 @@ jobs:
       - name: Install backend deps
         working-directory: backend
         run: uv sync --frozen || uv sync
-
-      - name: Lint
-        working-directory: backend
-        run: uvx ruff check . || uv run ruff check .
 
       - name: Run backend tests
         working-directory: backend
