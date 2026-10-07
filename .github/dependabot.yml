@@ -1,0 +1,37 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule: { interval: weekly, day: monday }
+    target-branch: [main]
+    groups:
+      frontend:
+        patterns: ["*"]
+    commit-message: { prefix: "chore(deps):" }
+
+  - package-ecosystem: uv
+    directory: /backend
+    schedule: { interval: weekly, day: monday }
+    target-branch: [main]
+    groups:
+      backend:
+        patterns: ["*"]
+    commit-message: { prefix: "chore(deps):" }
+
+  - package-ecosystem: docker
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    target-branch: [main]
+    groups:
+      images:
+        patterns: ["*"]
+    commit-message: { prefix: "chore(deps):" }
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    target-branch: [main]
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message: { prefix: "chore(deps):" }
