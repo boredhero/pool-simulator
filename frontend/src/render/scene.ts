@@ -46,6 +46,8 @@ export interface SceneHandle {
   setCue(visible: boolean, cx: number, cy: number, angle: number, pull: number): void;
   /** Ball-in-hand placement preview: legal-zone outline + cursor ring. */
   setPlace(visible: boolean, x: number, y: number, legal: boolean): void;
+  /** Felt + wood theme colors (css color strings). */
+  setTheme(felt: string, wood: string): void;
   /** Raycast pointer to felt plane, sim coords or null. */
   pickFelt(clientX: number, clientY: number): [number, number] | null;
   onFrame(cb: () => void): void;
@@ -71,6 +73,17 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
   controls.maxPolarAngle = Math.PI * 0.49;
   controls.minDistance = 0.6;
   controls.maxDistance = 6;
+  // Left press is shoot/aim (game handles it); orbit on right-drag + wheel + two fingers.
+  controls.mouseButtons = {
+    LEFT: -1 as unknown as THREE.MOUSE,
+    MIDDLE: THREE.MOUSE.DOLLY,
+    RIGHT: THREE.MOUSE.ROTATE,
+  };
+  controls.touches = {
+    ONE: -1 as unknown as THREE.TOUCH,
+    TWO: THREE.TOUCH.DOLLY_PAN,
+  };
+  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
   scene.add(new THREE.HemisphereLight(0xffffff, 0x223311, 0.5));
   const sun = new THREE.DirectionalLight(0xffffff, 1.6);
@@ -80,10 +93,8 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
   Object.assign(sun.shadow.camera, { left: -1.8, right: 1.8, top: 1.2, bottom: -1.2, far: 8 });
   scene.add(sun);
 
-  const felt = new THREE.Mesh(
-    new THREE.BoxGeometry(TABLE_W, 0.04, TABLE_H),
-    new THREE.MeshStandardMaterial({ color: 0x0a6c2f, roughness: 0.95 }),
-  );
+  const feltMat = new THREE.MeshStandardMaterial({ color: 0x0a6c2f, roughness: 0.95 });
+  const felt = new THREE.Mesh(new THREE.BoxGeometry(TABLE_W, 0.04, TABLE_H), feltMat);
   felt.position.y = -0.02;
   felt.receiveShadow = true;
   scene.add(felt);
@@ -92,19 +103,19 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
   feltHit.rotation.x = -Math.PI / 2;
   scene.add(feltHit);
 
-  const wood = new THREE.MeshStandardMaterial({ color: 0x4a2c14, roughness: 0.6 });
+  const woodMat = new THREE.MeshStandardMaterial({ color: 0x4a2c14, roughness: 0.6 });
   const railLong = new THREE.BoxGeometry(TABLE_W + RAIL_W * 2, 0.07, RAIL_W);
   const railShort = new THREE.BoxGeometry(RAIL_W, 0.07, TABLE_H);
   const rails: THREE.Mesh[] = [];
   for (const z of [-TABLE_H / 2 - RAIL_W / 2, TABLE_H / 2 + RAIL_W / 2]) {
-    const r = new THREE.Mesh(railLong, wood);
+    const r = new THREE.Mesh(railLong, woodMat);
     r.position.set(0, 0.015, z);
     r.castShadow = r.receiveShadow = true;
     scene.add(r);
     rails.push(r);
   }
   for (const x of [-TABLE_W / 2 - RAIL_W / 2, TABLE_W / 2 + RAIL_W / 2]) {
-    const r = new THREE.Mesh(railShort, wood);
+    const r = new THREE.Mesh(railShort, woodMat);
     r.position.set(x, 0.015, 0);
     r.castShadow = r.receiveShadow = true;
     scene.add(r);
@@ -233,6 +244,10 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
         m.position.set(rx, BALL_R, rz);
         m.visible = !b.potted;
       }
+    },
+    setTheme(felt, wood) {
+      feltMat.color.set(felt);
+      woodMat.color.set(wood);
     },
     setPlace(visible, x, y, legal) {
       zoneLine.visible = visible;
