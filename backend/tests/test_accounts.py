@@ -1,3 +1,4 @@
+import secrets
 import time
 
 from fastapi.testclient import TestClient
@@ -7,7 +8,8 @@ from app.models.db import Account, LoginSession, Session
 from app.services.auth import COOKIE
 
 HEADERS = {"X-Pool-Request": "1"}
-PASSWORD = "a sufficiently long pool password"
+# Disposable credentials for the isolated test database, never shared accounts.
+PASSWORD = secrets.token_urlsafe(24)
 
 
 def signup(client, name="Pool_Player"):
@@ -63,13 +65,14 @@ def test_unique_casefolded_names_and_validation_do_not_echo_passwords():
             ).status_code
             == 422
         )
+    short_password = secrets.token_urlsafe(6)
     response = client.post(
         "/api/account/register",
         headers=HEADERS,
-        json={"username": "valid", "password": "secret-short"},
+        json={"username": "valid", "password": short_password},
     )
     assert response.status_code == 422
-    assert "secret-short" not in response.text
+    assert short_password not in response.text
 
 
 def test_recovery_rotates_code_revokes_all_sessions_and_requires_new_login():
@@ -83,7 +86,7 @@ def test_recovery_rotates_code_revokes_all_sessions_and_requires_new_login():
         ).status_code
         == 200
     )
-    new_password = "a completely different long password"
+    new_password = secrets.token_urlsafe(24)
     payload = {
         "username": "POOL_PLAYER",
         "password": new_password,
