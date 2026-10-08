@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
 import logging
 import math
@@ -11,6 +12,7 @@ import secrets
 import time
 from dataclasses import dataclass, field
 
+from anyio import CancelScope
 from fastapi import HTTPException, WebSocket, WebSocketDisconnect
 
 from app.services.auth import COOKIE, account_for_token, allowed_origin, rate_limit
@@ -115,6 +117,7 @@ class Room:
             "code": self.code,
             "names": self.names,
             "ready": all(self.players) and not self.closed,
+            "busy": self.busy,
             "registered": [account is not None for account in self.accounts],
             "balls": ball_dump(self.gs.balls),
             "return_order": self.gs.return_order,
@@ -132,6 +135,10 @@ class Room:
             "winner": self.gs.winner,
             "message": self.gs.message,
         }
+
+    async def reject(self, ws: WebSocket, reason: str) -> None:
+        # gs remains the last committed table throughout simulation.
+        await ws.send_json({"t": "error", "error": reason, "state": self.state_msg()})
 
     async def broadcast(self, msg: dict, exclude: int = -1) -> None:
         for i, ws in enumerate(self.players):
@@ -224,7 +231,10 @@ async def handle(ws: WebSocket) -> None:
                 continue
             typ = msg.get("t")
             if not valid_message(msg):
-                await ws.send_json({"t": "error", "error": "Invalid message fields"})
+                if room and typ in ("shot", "place"):
+                    await room.reject(ws, "Invalid message fields")
+                else:
+                    await ws.send_json({"t": "error", "error": "Invalid message fields"})
                 continue
             if identity and await asyncio.to_thread(account_for_token, token) is None:
                 await ws.send_json({"t": "error", "error": "Session ended. Sign in again."})
@@ -286,35 +296,32 @@ async def handle(ws: WebSocket) -> None:
                 return
 
             elif typ in ("shot", "place") and msg.get("revision") != room.revision:
-                await ws.send_json({"t": "error", "error": "stale table state"})
-                await ws.send_json(room.state_msg())
+                await room.reject(ws, "stale table state")
 
             elif typ == "shot":
                 if not all(room.players) or not room.match_id:
-                    await ws.send_json(
-                        {"t": "error", "error": "Waiting for your opponent to join."}
-                    )
+                    await room.reject(ws, "Waiting for your opponent to join.")
                     continue
                 if seat != room.gs.current or room.gs.winner is not None or room.busy:
-                    await ws.send_json({"t": "error", "error": "not your turn"})
+                    await room.reject(ws, "not your turn")
                     continue
                 s = msg.get("shot", {})
                 try:
                     aim, power = float(s["aim"]), float(s["power"])
                     tip_x, tip_y = float(s.get("tipX", 0)), float(s.get("tipY", 0))
                 except (KeyError, TypeError, ValueError):
-                    await ws.send_json({"t": "error", "error": "bad shot"})
+                    await room.reject(ws, "bad shot")
                     continue
                 cue = room.gs.balls[0]
                 if cue.potted or room.gs.ball_in_hand:
-                    await ws.send_json({"t": "error", "error": "cue ball in hand — place it first"})
+                    await room.reject(ws, "cue ball in hand — place it first")
                     continue
                 if (
                     not all(math.isfinite(v) for v in (aim, power, tip_x, tip_y))
                     or not 0 < power <= 1
                     or math.hypot(tip_x, tip_y) > 0.55
                 ):
-                    await ws.send_json({"t": "error", "error": "bad shot"})
+                    await room.reject(ws, "bad shot")
                     continue
                 called_ball, called_pocket = s.get("calledBall"), s.get("calledPocket")
                 if call_required(room.gs) and (
@@ -322,57 +329,76 @@ async def handle(ws: WebSocket) -> None:
                     or type(called_pocket) is not int
                     or not 0 <= called_pocket < 6
                 ):
-                    await ws.send_json({"t": "error", "error": "call a legal ball and pocket"})
+                    await room.reject(ws, "call a legal ball and pocket")
                     continue
                 if lobby.simulations >= 4:
-                    await ws.send_json({"t": "error", "error": "Server busy. Try again shortly."})
+                    await room.reject(ws, "Server busy. Try again shortly.")
                     continue
-                begin_shot(room.gs, called_ball, called_pocket)
-                room.started = True
-                room.busy = True
-                vmax = room.gs.rules["breakMax" if room.gs.break_shot else "normalMax"]
-                elevation = cue_elevation(cue.x, cue.y, aim, 0, room.gs.balls)
-                shot = {
-                    "aim": aim,
-                    "power": power,
-                    "tipX": tip_x,
-                    "tipY": tip_y,
-                    "elevation": elevation,
-                    "vmax": vmax,
-                    "calledBall": called_ball,
-                    "calledPocket": called_pocket,
-                }
-                strike(cue, math.cos(aim), math.sin(aim), power, tip_x, tip_y, vmax, elevation)
-                await room.broadcast({"t": "shot", "by": seat, "shot": shot})
                 lobby.simulations += 1
+                room.busy = True
                 try:
-                    server_ev = await asyncio.to_thread(simulate_shot, room.gs.balls, 0)
+                    next_state = copy.deepcopy(room.gs)
+                    cue = next_state.balls[0]
+                    begin_shot(next_state, called_ball, called_pocket)
+                    room.started = True
+                    vmax = next_state.rules["breakMax" if next_state.break_shot else "normalMax"]
+                    elevation = cue_elevation(cue.x, cue.y, aim, 0, next_state.balls)
+                    shot = {
+                        "aim": aim,
+                        "power": power,
+                        "tipX": tip_x,
+                        "tipY": tip_y,
+                        "elevation": elevation,
+                        "vmax": vmax,
+                        "calledBall": called_ball,
+                        "calledPocket": called_pocket,
+                    }
+                    strike(cue, math.cos(aim), math.sin(aim), power, tip_x, tip_y, vmax, elevation)
+                    await room.broadcast({"t": "shot", "by": seat, "shot": shot})
+                    worker = asyncio.create_task(
+                        asyncio.to_thread(simulate_shot, next_state.balls, 0)
+                    )
+                    try:
+                        server_ev = await asyncio.shield(worker)
+                    except asyncio.CancelledError:
+                        # A cancelled await does not stop its worker thread; keep its slot reserved.
+                        with CancelScope(shield=True):
+                            await asyncio.shield(worker)
+                        raise
+                    if room.closed:
+                        return
+                    apply_shot(next_state, server_ev)
+                    facts = ev_dump(server_ev)
+                    foul = (
+                        next_state.ball_in_hand
+                        or next_state.message.startswith("Illegal break")
+                        or (next_state.winner is not None and next_state.winner != seat)
+                    )
+                    await asyncio.to_thread(
+                        record_shot,
+                        room.match_id,
+                        room.revision + 1,
+                        seat,
+                        shot,
+                        facts,
+                        next_state.winner,
+                        foul,
+                    )
+                    if room.closed:
+                        return
+                    room.gs = next_state
+                    room.revision += 1
+                    result = {
+                        **room.state_msg(),
+                        "busy": False,
+                        "t": "result",
+                        "ev": facts,
+                        "corrected": True,
+                    }
                 finally:
                     lobby.simulations -= 1
-                if room.closed:
-                    return
-                apply_shot(room.gs, server_ev)
-                room.revision += 1
-                facts = ev_dump(server_ev)
-                foul = (
-                    room.gs.ball_in_hand
-                    or room.gs.message.startswith("Illegal break")
-                    or (room.gs.winner is not None and room.gs.winner != seat)
-                )
-                await asyncio.to_thread(
-                    record_shot,
-                    room.match_id,
-                    room.revision,
-                    seat,
-                    shot,
-                    facts,
-                    room.gs.winner,
-                    foul,
-                )
-                room.busy = False
-                await room.broadcast(
-                    {**room.state_msg(), "t": "result", "ev": facts, "corrected": True}
-                )
+                    room.busy = False
+                await room.broadcast(result)
 
             elif typ == "done":
                 pass  # Playback acknowledgement is not evidence and cannot create statistics.
@@ -410,13 +436,15 @@ async def handle(ws: WebSocket) -> None:
             room.closed = True
             lobby.rooms.pop(room.code, None)
             if room.match_id:
-                await asyncio.to_thread(
-                    abandon_match,
-                    room.match_id,
-                    seat,
-                    room.started,
-                    server_failure or lobby.draining,
-                )
+                # Socket cancellation must not skip the durable disconnect outcome.
+                with CancelScope(shield=True):
+                    await asyncio.to_thread(
+                        abandon_match,
+                        room.match_id,
+                        seat,
+                        room.started,
+                        server_failure or lobby.draining,
+                    )
             await room.broadcast(
                 {
                     "t": "left",

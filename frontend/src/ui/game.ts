@@ -987,7 +987,7 @@ export class Game {
     this.gs.ballInHand = s.ball_in_hand;
     this.gs.winner = s.winner === 1 ? 1 : s.winner === 0 ? 0 : null;
     this.gs.message = s.message;
-    this.mode = s.winner !== null ? 'over' : s.ball_in_hand && s.current === this.seat ? 'place' : 'aim';
+    this.mode = s.winner !== null ? 'over' : s.busy ? 'wait' : s.ball_in_hand && s.current === this.seat ? 'place' : 'aim';
     this.pulling = false; this.pressPt = null;
     if(wasPlacing&&!s.ball_in_hand&&s.winner===null&&placementCamera&&placementCamera.room===this.room&&Math.hypot(this.cue().x-placementCamera.x,this.cue().y-placementCamera.y)<.002&&placementCamera.seat===this.seat&&s.current===this.seat&&placementCamera.revision===this.scene.cameraRig.revision)this.frameBalls(false,true);
     const toss=s as RoomState&{break_starter?:number|null};
