@@ -5,9 +5,10 @@ import ipaddress
 import json
 import math
 import os
+import random
 import secrets
 import time
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -19,9 +20,9 @@ from app.api.privacy import require_terms
 from app.models.db import JevGame, JevUsage, Session
 from app.net.rooms import Room
 from app.services.auth import current_account, digest, mutation_guard, rate_limit
-from app.sim.cpu import candidates, fallback
 from app.sim.cue import cue_elevation
 from app.sim.physics import Ball, simulate_shot, strike
+from app.sim.planner import plan_shots
 from app.sim.rules import (
     GameState,
     ShotContext,
@@ -38,19 +39,17 @@ MODEL = "jev-1.13.0"
 active_games: set[str] = set()
 
 
-class Candidate(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
-    ball: int = Field(ge=1, le=15)
-    pocket: int = Field(ge=0, le=5)
-    cutDegrees: float = Field(ge=0, le=65, allow_inf_nan=False)
-    cueDistance: float = Field(ge=0, le=5, allow_inf_nan=False)
-    pocketDistance: float = Field(ge=0, le=5, allow_inf_nan=False)
-    power: float = Field(ge=0, le=1, allow_inf_nan=False)
+@dataclass
+class Selection:
+    candidates: list[dict]
+    state: dict
 
 
-class Selection(BaseModel):
-    candidates: list[Candidate]
-    remaining: int
+@dataclass
+class Evaluation:
+    candidate_id: str | None
+    input_tokens: int | None
+    output_tokens: int | None
 
 
 class HumanShot(BaseModel):
@@ -213,43 +212,135 @@ async def start_game(
         return public_game(game, premium)
 
 
-async def evaluate(payload: Selection, key: str) -> tuple[int, int, int]:
-    criteria = {str(i): candidate.model_dump() for i, candidate in enumerate(payload.candidates)}
+def decision_context(gs: GameState) -> dict:
+    """Only server-owned game facts; never account identity or client descriptions."""
+    return {
+        "phase": "break" if gs.break_shot else "open table" if gs.open else "assigned groups",
+        "group": gs.groups[gs.current],
+        "legal_targets": legal_targets(gs),
+        "ball_in_hand": gs.ball_in_hand,
+        "placement_zone": gs.placement,
+        "called_shot_rule": gs.rules["calls"],
+        "opponent_remaining": sum(
+            1
+            for b in gs.balls
+            if not b.potted
+            and b.n is not None
+            and b.n != 8
+            and (gs.open or ("solid" if b.n < 8 else "stripe") == gs.groups[1 - gs.current])
+        ),
+    }
+
+
+def describe_plan(plan: dict) -> dict:
+    """Expose consequences, not an invitation for the model to invent shot physics."""
+    ev = plan.get("evidence", {})
+    return {
+        "family": plan["family"],
+        "target_ball": plan["calledBall"],
+        "called_pocket": plan["calledPocket"],
+        "placement": "planned legal placement" if plan.get("placement") else "current cue position",
+        "evidence": "settled physics preview"
+        if ev.get("verified")
+        else "geometry only; unverified",
+        "legality": "legal in preview" if ev.get("legal") else "not verified legal",
+        "result": "wins rack"
+        if ev.get("won")
+        else "loses rack"
+        if ev.get("lost")
+        else "retains turn"
+        if ev.get("continues")
+        else "turn passes or outcome unverified",
+        "scratch": "cue scratched"
+        if ev.get("scratch")
+        else "no scratch in preview"
+        if ev.get("verified")
+        else "unknown",
+        "potted": ev.get("potted", []),
+        "next_position": "multiple direct options"
+        if ev.get("nextShots", 0) > 1
+        else "one direct option"
+        if ev.get("nextShots", 0) == 1
+        else "no direct option found",
+        "opponent_reply": "multiple direct options"
+        if ev.get("opponentShots", 0) > 1
+        else "one direct option"
+        if ev.get("opponentShots", 0) == 1
+        else "no direct option found",
+        "cue_region": ev.get("cueRegion", "unknown"),
+    }
+
+
+async def evaluate(payload: Selection, key: str) -> Evaluation:
+    ordered = list(payload.candidates)
+    random.Random(json.dumps(payload.state, sort_keys=True)).shuffle(ordered)
+    criteria = {plan["id"]: describe_plan(plan) for plan in ordered}
+    families = list(dict.fromkeys(plan["family"] for plan in ordered))
+    instructions = (
+        "Choose the offered executable pool plan that best advances winning this rack. "
+        "Use the supplied preview consequences. Prefer winning, legal shots and useful "
+        "continuations; consider defense when an attack leaves the opponent an easy reply. "
+        "A settled preview is one deterministic outcome, not a success probability. "
+        "No direct option found does not prove a snooker. Geometry-only plans are unverified. "
+        "Do not calculate aim, speed or spin. Pocket 1 and 4 are side pockets."
+    )
+    questions = {}
+    if len(families) > 1:
+        questions["tactic"] = {
+            "type": "choice",
+            "instructions": "Which offered shot family best serves this turn? Compare its "
+            "provided plans, including defense, continuation and immediate rack outcomes.",
+            "criteria": {
+                family: {pid: plan for pid, plan in criteria.items() if plan["family"] == family}
+                for family in families
+            },
+        }
+    for family in families:
+        questions["shot_" + family] = {
+            "type": "choice",
+            "instructions": "If using the " + family + " family: " + instructions,
+            "criteria": {pid: plan for pid, plan in criteria.items() if plan["family"] == family},
+        }
     async with asyncio.timeout(8), httpx.AsyncClient(timeout=7) as client:
         response = await client.post(
             "https://api.typesafe.ai/v1/systemone",
             headers={"Authorization": f"Bearer {key}"},
-            json={
-                "model": MODEL,
-                "state": {"legal_targets_remaining": payload.remaining},
-                "questions": {
-                    "shot": {
-                        "type": "choice",
-                        "instructions": (
-                            "Choose the most dependable pot in this 8-Ball turn. "
-                            "Each option is a geometrically clear shot at a legal target. "
-                            "Distances are meters; a smaller cutDegrees is straighter. "
-                            "Balance cut difficulty, cue travel, object travel to pocket "
-                            "and power. Prefer reliable shots over thin cuts and long pots. "
-                            "Pocket 1 and 4 are side pockets; others are corners. "
-                            "Ball 8 is only offered when legal to win. These are geometry "
-                            "estimates, not simulated outcomes or success probabilities."
-                        ),
-                        "criteria": criteria,
-                    }
-                },
-            },
+            json={"model": MODEL, "state": payload.state, "questions": questions},
         )
         response.raise_for_status()
-        answer = response.json()["answers"]["shot"]
-        choice = answer["choice"]
-        if answer["type"] != "choice" or choice not in criteria:
-            raise ValueError("Invalid selection")
-        usage = response.json().get("usage", {})
-        tokens = [usage.get("input_tokens"), usage.get("output_tokens")]
-        if any(type(n) is not int or n < 0 or n > 1000000 for n in tokens):
-            raise ValueError("Missing provider usage")
-        return int(choice), tokens[0], tokens[1]
+        body = response.json()
+        if not isinstance(body, dict):
+            return Evaluation(None, None, None)
+        usage = body.get("usage", {})
+        tokens = (
+            [usage.get("input_tokens"), usage.get("output_tokens")]
+            if isinstance(usage, dict)
+            else []
+        )
+        metered = len(tokens) == 2 and all(type(n) is int and 0 <= n <= 1000000 for n in tokens)
+        # Meter independently of choice validation: invalid answers may still be billed.
+        result = Evaluation(None, tokens[0] if metered else None, tokens[1] if metered else None)
+        answers = body.get("answers", {})
+        if not isinstance(answers, dict):
+            return result
+        family = families[0]
+        if len(families) > 1:
+            tactic = answers.get("tactic", {})
+            if not isinstance(tactic, dict) or tactic.get("type") != "choice":
+                return result
+            family = tactic.get("choice")
+            if not isinstance(family, str) or family not in families:
+                return result
+        answer = answers.get("shot_" + family, {})
+        if isinstance(answer, dict) and answer.get("type") == "choice":
+            choice = answer.get("choice")
+            if (
+                isinstance(choice, str)
+                and choice in criteria
+                and criteria[choice]["family"] == family
+            ):
+                result.candidate_id = choice
+        return result
 
 
 @router.post("/games/{game_id}/turn", dependencies=[Depends(mutation_guard)])
@@ -289,25 +380,16 @@ async def play_turn(
             ):
                 raise HTTPException(422, "Call a legal ball and pocket.")
         else:
-            if gs.ball_in_hand:
-                placed = False
-                for x in range(15, 254, 10):
-                    for y in range(15, 127, 10):
-                        if place_cue(gs, x / 100, y / 100):
-                            placed = True
-                            break
-                    if placed:
-                        break
-                if not placed:
-                    raise HTTPException(409, "No legal cue placement.")
-            options = [] if gs.break_shot else candidates(gs)
-            s = options[0] if options else fallback(gs)
+            # Planner previews copied state and jointly chooses legal placement plus shot.
+            # CPU work runs off the event loop under the existing admission cap.
+            options = await asyncio.to_thread(plan_shots, gs)
+            if not options:
+                raise HTTPException(409, "No legal shot plan. Resume your game.")
+            s = options[0]
             source = "geometry"
-            if len(options) > 1:
+            if len(options) > 1 and not gs.break_shot:
                 source = "cpu-fallback"
                 try:
-                    # Emergency global paid-call cap. It never ends a player's rack;
-                    # exhausted/provider-down games continue with a visible CPU fallback.
                     rate_limit("jev-global", "all", 1000, 86400)
                     with Session.begin() as db:
                         total = db.get(JevUsage, account["id"])
@@ -318,30 +400,22 @@ async def play_turn(
                         game = db.get(JevGame, game_id)
                         game.requests += 1
                         game.unmetered_requests += 1
-                    selection = Selection(
-                        remaining=len(legal_targets(gs)),
-                        candidates=[
-                            Candidate(
-                                ball=o["calledBall"],
-                                pocket=o["calledPocket"],
-                                cutDegrees=o["cutDegrees"],
-                                cueDistance=o["cueDistance"],
-                                pocketDistance=o["pocketDistance"],
-                                power=o["power"],
-                            )
-                            for o in options
-                        ],
+                    result = await evaluate(
+                        Selection(candidates=options, state=decision_context(gs)),
+                        os.environ["JEV_API_KEY"],
                     )
-                    index, inputs, outputs = await evaluate(selection, os.environ["JEV_API_KEY"])
-                    s = options[index]
-                    source = "jev"
+                    chosen = next((o for o in options if o["id"] == result.candidate_id), None)
                     with Session.begin() as db:
                         game = db.get(JevGame, game_id)
-                        game.input_tokens += inputs
-                        game.output_tokens += outputs
-                        game.estimated_cost_nano += inputs * game.token_price_nano
-                        game.unmetered_requests -= 1
-                        db.get(JevUsage, account["id"]).completed += 1
+                        if result.input_tokens is not None and result.output_tokens is not None:
+                            game.input_tokens += result.input_tokens
+                            game.output_tokens += result.output_tokens
+                            game.estimated_cost_nano += result.input_tokens * game.token_price_nano
+                            game.unmetered_requests -= 1
+                        if chosen is not None:
+                            db.get(JevUsage, account["id"]).completed += 1
+                    if chosen is not None:
+                        s, source = chosen, "jev"
                 except (
                     httpx.HTTPError,
                     TimeoutError,
@@ -350,7 +424,11 @@ async def play_turn(
                     TypeError,
                     HTTPException,
                 ):
-                    pass  # Never expose provider error bodies or credentials.
+                    pass  # Preserve a playable deterministic fallback and private errors.
+            if gs.ball_in_hand:
+                position = s.get("placement")
+                if not position or not place_cue(gs, position["x"], position["y"]):
+                    raise HTTPException(409, "No legal cue placement. Resume your game.")
         cue = gs.balls[0]
         placement = {"x": cue.x, "y": cue.y}
         shot = {k: s[k] for k in ("aim", "power", "tipX", "tipY", "calledBall", "calledPocket")}
@@ -383,6 +461,12 @@ async def play_turn(
             "shot": {**shot, "vmax": vmax, "elevation": elevation},
             "placement": placement,
             "source": source,
+            "family": s.get("family") if by == 1 else None,
+            "intent": ("Jev chose a " if source == "jev" else "CPU chose a ")
+            + s.get("family", "direct")
+            + " shot"
+            if by == 1
+            else None,
         }
     finally:
         active_games.discard(game_id)
