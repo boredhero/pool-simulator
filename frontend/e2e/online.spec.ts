@@ -14,14 +14,14 @@ async function account(page:Page){await page.locator('#onlinebtn').click();await
 test('optional account creation, recovery, session reset, and mobile profile',async({page})=>{
   await open(page);await account(page);await page.locator('#account-register').click();await page.locator('#registeradult').check();
   const name='Player_'+Date.now().toString(36),password='a long pool password for testing';
-  await page.locator('#accountusername').fill(name);await page.locator('#accountpassword').fill(password);
+  await page.locator('#accountusername').fill(name);await page.locator('#accountpassword').fill(password);await page.locator('#accountpasswordconfirm').fill(password);
   await page.locator('#accountsubmit').click();await expect(page.locator('#recoverypanel')).toBeVisible();
   const code=await page.locator('#recoveryvalue').inputValue();expect(code.length).toBe(39);
   await page.keyboard.press('Escape');await expect(page.locator('#accountdialog')).toBeVisible();
   await page.locator('#recoverysaved').click();await expect(page.locator('#accountname')).toHaveText(name);
   await expect(page.locator('#accountstats')).toContainText('Online + Jev matches');
   await page.locator('#accountlogout').click();await page.locator('#account-recover').click();
-  await page.locator('#accountusername').fill(name);await page.locator('#accountpassword').fill(password+' new');
+  await page.locator('#accountusername').fill(name);await page.locator('#accountpassword').fill(password+' new');await page.locator('#accountpasswordconfirm').fill(password+' new');
   await page.locator('#accountrecovery').fill(code);await page.locator('#accountsubmit').click();
   await expect(page.locator('#recoverypanel')).toBeVisible();expect(await page.locator('#recoveryvalue').inputValue()).not.toBe(code);
   await page.locator('#recoverysaved').click();await page.locator('#account-login').click();
@@ -37,7 +37,7 @@ test('optional account creation, recovery, session reset, and mobile profile',as
 test('registered host shares a guest invite and both receive server results',async({browser,page})=>{
   await open(page);await account(page);await page.locator('#account-register').click();await page.locator('#registeradult').check();
   const name='Host_'+Date.now().toString(36);
-  await page.locator('#accountusername').fill(name);await page.locator('#accountpassword').fill('a long secret password for host');
+  await page.locator('#accountusername').fill(name);await page.locator('#accountpassword').fill('a long secret password for host');await page.locator('#accountpasswordconfirm').fill('a long secret password for host');
   await page.locator('#accountsubmit').click();await expect(page.locator('#recoverypanel')).toBeVisible();
   await page.locator('#recoverysaved').click();await page.locator('#accountclose').click();
   await page.locator('#createbtn').click();await expect(page.locator('#roomlink')).toHaveValue(/#join=[A-Z2-9]{8}$/);
@@ -70,7 +70,7 @@ test('registered host shares a guest invite and both receive server results',asy
 test('development proxy supports same-origin account requests and WebSocket rooms',async({page})=>{
   await open(page,'http://127.0.0.1:4174/');await account(page);await page.locator('#account-register').click();await page.locator('#registeradult').check();
   await page.locator('#accountusername').fill('Proxy_'+Date.now().toString(36));
-  await page.locator('#accountpassword').fill('a sufficiently long proxy password');
+  await page.locator('#accountpassword').fill('a sufficiently long proxy password');await page.locator('#accountpasswordconfirm').fill('a sufficiently long proxy password');
   await page.locator('#accountsubmit').click();await expect(page.locator('#recoverypanel')).toBeVisible();
   await page.locator('#recoverysaved').click();await page.locator('#accountclose').click();
   await page.locator('#createbtn').click();await expect(page.locator('#roomlink')).toHaveValue(/^http:\/\/127\.0\.0\.1:4174\/#join=/);

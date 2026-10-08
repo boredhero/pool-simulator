@@ -1,5 +1,15 @@
 [
   {
+    "version": "1.1.1",
+    "date": "2026-10-08",
+    "title": "Password visibility and confirmation",
+    "changes": [
+      "Password fields have accessible eye buttons to show or hide what you type on desktop and mobile.",
+      "Creating an account or resetting a password requires a matching second entry. Sign-in still needs only one password.",
+      "Passwords return to hidden and are cleared when switching forms, closing the account dialog, or completing a submission."
+    ]
+  },
+  {
     "version": "1.1.0",
     "date": "2026-10-08",
     "title": "Monthly Jev allowances and request accounting",
