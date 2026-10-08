@@ -183,7 +183,9 @@ export class Game {
       const edge=whole||this.gs.placement!=='kitchen'?TABLE_W:TABLE_W/4;
       for(const x of [0,edge])for(const y of [0,TABLE_H])points.push({x,y});
     }
-    this.scene.cameraRig.frame(points,!whole&&!this.gs.ballInHand&&!this.cue().potted?this.cue():undefined,targets);
+    const facing=this.scene.cameraRig.frame(points,!whole&&!this.gs.ballInHand&&!this.cue().potted?this.cue():undefined,targets);
+    if(facing!==undefined&&this.humanTurn()&&!this.pulling)
+      this.targetAngle=Math.atan2(-Math.cos(facing),-Math.sin(facing));
   }
 
   setSpin(x: number, y: number): void {
@@ -597,9 +599,9 @@ export class Game {
     this.gs.ballInHand = s.ball_in_hand;
     this.gs.winner = s.winner === 1 ? 1 : s.winner === 0 ? 0 : null;
     this.gs.message = s.message;
-    if(wasPlacing&&!s.ball_in_hand&&s.winner===null&&this.options.autoCamera&&!this.cameraMode)this.frameBalls();
     this.mode = s.winner !== null ? 'over' : s.ball_in_hand && s.current === this.seat ? 'place' : 'aim';
     this.pulling = false; this.pressPt = null;
+    if(wasPlacing&&!s.ball_in_hand&&s.winner===null&&this.options.autoCamera&&!this.cameraMode)this.frameBalls();
     this.lastPotted = this.gs.balls.filter((b) => b.potted).length;
     this.lastSpeed.clear();
     this.hud();

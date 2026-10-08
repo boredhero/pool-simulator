@@ -34,11 +34,14 @@ export function framePose(camera:PerspectiveCamera,target:Vector3,points:Point[]
     const along=center.clone().sub(cue).dot(direction);
     center.copy(cue).addScaledVector(direction,along);
   }
-  orbit.phi=MathUtils.clamp(orbit.phi,.55,1.0);
+  orbit.phi=facing?1.12:MathUtils.clamp(orbit.phi,.55,1.0);
   const probe=camera.clone();probe.clearViewOffset();
   const cx=(safe.left+safe.right)/2,cy=(safe.top+safe.bottom)/2,tan=Math.tan(MathUtils.degToRad(camera.getEffectiveFOV())/2);
   let destination=center.clone();
-  for(let distance=1.0;;distance=Math.min(8,distance*1.08)) {
+  // Fit actual balls instead of empty corners of their overall bounding box.
+  const padding=BALL_R+(facing?.045:.08);
+  const fitPoints=live.flatMap(p=>[-padding,padding].flatMap(dx=>[-padding,padding].flatMap(dz=>[0,BALL_R*2].map(h=>new Vector3(p.x+dx-TABLE_W/2,h,p.y+dz-TABLE_H/2)))));
+  for(let distance=facing?.85:1.0;;distance=Math.min(8,distance*1.08)) {
     orbit.radius=distance;probe.position.copy(center).add(new Vector3().setFromSpherical(orbit));probe.lookAt(center);
     const right=new Vector3(1,0,0).applyQuaternion(probe.quaternion),up=new Vector3(0,1,0).applyQuaternion(probe.quaternion);
     const shift=right.multiplyScalar(-cx*distance*tan*camera.aspect).add(up.multiplyScalar(-cy*distance*tan));
@@ -48,8 +51,8 @@ export function framePose(camera:PerspectiveCamera,target:Vector3,points:Point[]
       const ahead=(probe.position.x-(facing.cue.x-TABLE_W/2))*(-Math.sin(orbit.theta))+(probe.position.z-(facing.cue.y-TABLE_H/2))*(-Math.cos(orbit.theta));
       if(ahead>-.15)fits=false;
     }
-    for(const x of [minX,maxX])for(const z of [minZ,maxZ])for(const h of [0,BALL_R*2]) {
-      const p=new Vector3(x-TABLE_W/2,h,z-TABLE_H/2).project(probe);
+    for(const point of fitPoints) {
+      const p=point.clone().project(probe);
       if(p.x<safe.left||p.x>safe.right||p.y<safe.bottom||p.y>safe.top)fits=false;
     }
     if(fits||distance>=8)break;
@@ -70,7 +73,7 @@ export class CameraRig {
   cancel(manual=false){this.motion=undefined;if(manual)this.revision++;}
   setMode(enabled:boolean){this.cancel(true);this.controls.enablePan=enabled;this.controls.mouseButtons.LEFT=enabled?MOUSE.ROTATE:-1 as MOUSE;this.controls.panSpeed=.6;this.controls.touches.ONE=enabled?TOUCH.ROTATE:-1 as TOUCH;this.controls.touches.TWO=enabled?TOUCH.DOLLY_PAN:TOUCH.DOLLY_ROTATE;}
   zoom(factor:number){this.cancel(true);const offset=this.camera.position.clone().sub(this.controls.target);offset.setLength(MathUtils.clamp(offset.length()*factor,.6,8));this.camera.position.copy(this.controls.target).add(offset);this.controls.update();}
-  frame(points:Point[],cue?:Point,targets:Point[]=[]) {
+  frame(points:Point[],cue?:Point,targets:Point[]=[]):number|undefined {
     this.cancel();
     const rect=this.canvas.getBoundingClientRect(),mobile=rect.width<900;
     const header=document.querySelector('.topbar')!.getBoundingClientRect(),cards=document.getElementById('scorecard')!.getBoundingClientRect(),tray=document.querySelector('.control-tray')!.getBoundingClientRect();
@@ -81,12 +84,13 @@ export class CameraRig {
     const currentTheta=new Spherical().setFromVector3(this.camera.position.clone().sub(this.controls.target)).theta;
     const facing=cue?{cue,theta:majorityFacing(cue,targets,currentTheta)}:undefined;
     const pose=framePose(this.camera,this.controls.target,points,safe,facing);
-    if(pose.target.distanceTo(this.controls.target)<.04&&pose.position.distanceTo(this.camera.position)<.12)return;
+    if(pose.target.distanceTo(this.controls.target)<.04&&pose.position.distanceTo(this.camera.position)<.12)return facing?.theta;
     const orbit=new Spherical().setFromVector3(this.camera.position.clone().sub(this.controls.target));
     const endOrbit=new Spherical().setFromVector3(pose.position.clone().sub(pose.target));
-    // Rotate only the view; shot direction and called pockets remain untouched.
-    if(matchMedia('(prefers-reduced-motion: reduce)').matches){this.controls.target.copy(pose.target);this.camera.position.copy(pose.position);this.camera.lookAt(pose.target);return;}
+    // Return the facing direction so the game can align an idle human cue.
+    if(matchMedia('(prefers-reduced-motion: reduce)').matches){this.controls.target.copy(pose.target);this.camera.position.copy(pose.position);this.camera.lookAt(pose.target);return facing?.theta;}
     this.motion={time:performance.now(),target:this.controls.target.clone(),end:pose.target,orbit,endOrbit};
+    return facing?.theta;
   }
   update(now:number){
     const m=this.motion;if(!m)return;

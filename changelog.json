@@ -1,15 +1,24 @@
 [
   {
-    "version": "0.3.0",
+    "version": "0.4.0",
     "date": "2026-10-08",
-    "title": "A better view of the table",
+    "title": "A natural stance and clearer Bar play",
     "changes": [
-      "Automatic camera framing now swings behind the cue toward the majority of the current player\u2019s legal targets, including the final 8-Ball, without changing shot aim.",
+      "Automatic framing uses a lower, closer playing view and tighter bounds around the visible balls. Cue alignment remains adjustable and never overrides a shot being pulled.",
+      "Automatic camera framing now swings behind the cue toward the majority of the current player\u2019s legal targets, including the final 8-Ball, with the idle cue facing forward from the new view.",
       "Bar house rules now keep the layout after an empty break instead of automatically reracking. Players alternate until a legal pot assigns groups; pots made with a scratch stay down without assigning a group.",
       "Turn, foul, and result messages use the AI opponent\u2019s name consistently. Illegal-break reracks now explain the missing pocket and four-rail requirement.",
       "Once groups are assigned, player cards show the 8-Ball after their group, highlighted when it becomes the final target.",
       "Desktop tables open from behind the cue, looking toward the fresh rack.",
       "Pocketed balls visibly fall into deeper pocket wells before entering the return, while scoring updates immediately.",
+      "Release history now includes earlier versions reconstructed from repository history."
+    ]
+  },
+  {
+    "version": "0.3.0",
+    "date": "2026-10-08",
+    "title": "A better view of the table",
+    "changes": [
       "New camera controls: enter Move camera mode to orbit with one finger and pinch or pan with two. Focus balls, Whole table, and zoom buttons make adjusting the view easier.",
       "Optional automatic framing follows the remaining balls after a shot settles. Enabled by default on mobile, disabled on desktop; manual camera movement takes priority.",
       "Click the version badge to read this release history.",

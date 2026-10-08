@@ -348,13 +348,13 @@ test('AI name appears in turn, foul, rolling, and winner messages',async({page})
   }
 });
 
-test('camera faces current player targets and final eight without changing shot aim',async({page})=>{
+test('camera faces current player targets and aligns the idle cue with the final view',async({page})=>{
   await openGame(page);
   const results=await page.evaluate(()=>{
     const g=(window as any).__pool,rig=g.scene.cameraRig,camera=g.scene.controls.object;
     g.gs.open=false;g.gs.groups=['solid','stripe'];g.gs.current=0;
-    let args:any;const frame=rig.frame.bind(rig);rig.frame=(...a:any[])=>{args=a;frame(...a);};
-    const angle=g.angle,targetAngle=g.targetAngle;
+    let args:any;const frame=rig.frame.bind(rig);rig.frame=(...a:any[])=>{args=a;return frame(...a);};
+    g.targetAngle=1.7;
     g.frameBalls();rig.update(performance.now()+1000);
     const solids=args[2].map((b:any)=>b.n),cue=args[1].n;
     g.gs.current=1;g.frameBalls();const stripes=args[2].map((b:any)=>b.n);
@@ -363,11 +363,13 @@ test('camera faces current player targets and final eight without changing shot 
     rig.update(performance.now()+1000);
     const offset=camera.position.clone().sub(g.scene.controls.target),ball=g.gs.balls.find((b:any)=>b.n===8),c=g.cue();
     const alignment=(offset.x*(ball.x-c.x)+offset.z*(ball.y-c.y))/Math.hypot(offset.x,offset.z)/Math.hypot(ball.x-c.x,ball.y-c.y);
+    const cueAlignment=(Math.cos(g.targetAngle)*offset.x+Math.sin(g.targetAngle)*offset.z)/Math.hypot(offset.x,offset.z);
+    const angle=g.targetAngle;
     g.gs.ballInHand=true;g.frameBalls();const placement=args[1]===undefined;
-    return{solids,stripes,eight,cue,alignment,placement,aimUnchanged:g.angle===angle&&g.targetAngle===targetAngle};
+    return{solids,stripes,eight,cue,alignment,placement,cueAlignment,placementKeepsAim:g.targetAngle===angle};
   });
   expect(results.solids.sort((a:number,b:number)=>a-b)).toEqual([1,2,3,4,5,6,7]);
   expect(results.stripes.sort((a:number,b:number)=>a-b)).toEqual([9,10,11,12,13,14,15]);
   expect(results.eight).toEqual([8]);expect(results.cue).toBeNull();expect(results.alignment).toBeCloseTo(-1);
-  expect(results.placement).toBe(true);expect(results.aimUnchanged).toBe(true);
+  expect(results.placement).toBe(true);expect(results.cueAlignment).toBeCloseTo(-1);expect(results.placementKeepsAim).toBe(true);
 });

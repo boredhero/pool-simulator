@@ -263,3 +263,5 @@ Flow: work on `develop`, PR to `main` (protected: PR + `ci` check), merge to shi
 - Camera interaction research: https://www.w3.org/WAI/WCAG21/Understanding/pointer-gestures and https://threejs.org/docs/pages/OrbitControls.html.
 
 Camera direction uses sorted cue-relative bearings and a wrapped sliding window of floor(n/2)+1 targets. Near-ties prefer the smallest rotation; azimuth interpolates over the shortest arc. Group eligibility comes from legalTargets rather than shot-selection AI. Whole-table and placement views retain the existing azimuth. Reference: https://threejs.org/docs/pages/Spherical.html and https://threejs.org/docs/pages/MathUtils.html.
+
+Auto-framing refinement: use a 26-degree elevation above the cloth, fit padded bounds around individual balls, and align the idle human cue with the final view. Do not align during a pull, placement, AI turn, or opponent turn.
