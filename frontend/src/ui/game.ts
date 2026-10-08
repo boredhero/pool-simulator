@@ -71,6 +71,7 @@ export class Game {
   power = 0.5; // last fired power (drives cue rest offset)
   tipX = 0; tipY = 0;
   roomNames: string[] | null = null;
+  private roomNotice = 'No room connected';
   ev: ShotEvents = freshEv();
   contact = { v: false };
   el: Record<string, HTMLElement>;
@@ -134,7 +135,8 @@ export class Game {
     if(invitation&&/^[A-Z2-9]{8}$/i.test(invitation)){
       (this.el.rcode as HTMLInputElement).value=invitation.toUpperCase();
       this.el.onlinepanel.classList.add('open');document.getElementById('helppanel')!.classList.remove('open');
-      this.el.roominfo.textContent='You are invited. Choose a name and join—no account needed.';
+      this.roomNotice='You are invited. Choose a name and join—no account needed.';
+      this.el.roominfo.textContent=this.roomNotice;
     }
     new ResizeObserver(entries => {
       const bar = entries[0].target.getBoundingClientRect();
@@ -890,7 +892,7 @@ export class Game {
     this.el.msg.textContent = (this.coinPending()&&this.coin.status?this.coin.status:msg).replace(/\bPlayer ([12])\b/g,(_,seat)=>this.playerName(Number(seat)-1));
     this.el.turn.textContent = this.gs.winner !== null ? 'Game over' : this.playerName(this.gs.current);
     this.el.turn.classList.toggle('me', !this.room || this.seat === this.gs.current);
-    this.el.roominfo.textContent = this.room ? (this.room.code ? `Room ${this.room.code} · ${this.room.ready?'Connected · your seat '+((this.seat??0)+1):'Waiting for your friend'}`:'Connecting…') : 'No room connected';
+    this.el.roominfo.textContent = this.room ? (this.room.code ? `Room ${this.room.code} · ${this.room.ready?'Connected · your seat '+((this.seat??0)+1):'Waiting for your friend'}`:'Connecting…') : this.roomNotice;
     if(this.room&&!this.room.ready)this.el.msg.textContent='Waiting for your friend · open Online to share the invite link';
     document.getElementById('roomentry')!.hidden=!!this.room;
     document.getElementById('roomsharing')!.hidden=!this.room?.code;
@@ -1005,6 +1007,7 @@ export class Game {
   }
 
   leaveRoom(message:string):void {
+    this.roomNotice=message;
     this.room?.close();this.room=null;this.seat=null;this.roomNames=null;this.pendingNetwork=[];
     this.jevRequest?.abort();this.jevRequest=null;this.jevOpponent=false;this.el.jevbtn.classList.remove('on');
     this.el.opponentstatus.textContent='';
@@ -1018,7 +1021,8 @@ export class Game {
     const name = ((this.el.pname as HTMLInputElement).value || 'Player').slice(0, 24);
     const code = (this.el.rcode as HTMLInputElement).value.trim().toUpperCase();
     if (!create && !/^[A-Z2-9]{8}$/.test(code)) {
-      this.el.roominfo.textContent = 'Enter an 8-character room code to join.';
+      this.roomNotice='Enter an 8-character room code to join.';
+      this.el.roominfo.textContent=this.roomNotice;
       return;
     }
     this.jevRequest?.abort();this.jevRequest=null;this.jevGame=null;this.jevOpponent=false;

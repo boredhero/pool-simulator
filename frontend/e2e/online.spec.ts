@@ -60,6 +60,8 @@ test('registered host shares a guest invite and both receive server results',asy
     expect(guestState).toEqual(hostState);
     const stats=await page.request.get('/api/account');expect((await stats.json()).stats.shots).toBe(breaker===0?1:0);
     await page.locator('#leaveroom').click();await expect(guest.locator('#roominfo')).toContainText('closed');
+    await waitForOpening(guest);await guest.evaluate(()=>(window as any).__pool.hud());
+    await expect(guest.locator('#roominfo')).toContainText('closed');
     await expect(page.locator('#createbtn')).toBeVisible();
     await expect.poll(async()=>{const r=await page.request.get('/api/account');return (await r.json()).stats.losses;}).toBe(1);
   } finally {await guestContext.close();}
