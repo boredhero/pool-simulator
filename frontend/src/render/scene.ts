@@ -1,3 +1,4 @@
+import { constrainTableCamera } from './cameraBounds';
 import { createCabinet, returnPosition } from './cabinet';
 import { feltTextures, woodTextures } from './surfaceTextures';
 import * as THREE from 'three';
@@ -381,6 +382,7 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
   const frame = () => {
     if (!running) return;
     controls.update();
+    constrainTableCamera(camera, controls);
     for (const cb of cbs) cb();
     if (kitchen.visible) {
       const anchor=kitchenAnchor.clone().project(camera), rect=canvas.getBoundingClientRect();

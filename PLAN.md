@@ -197,3 +197,9 @@ Flow: work on `develop`, PR to `main` (protected: PR + `ci` check), merge to shi
   [waitForFunction signature](https://playwright.dev/docs/api/class-page#page-wait-for-function),
   [parallelism](https://playwright.dev/docs/test-parallel), and
   [GitHub PR event branch filters](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request).
+
+## Camera/table clearance
+- Orbit elevation is constrained by zoom distance and the camera near-plane
+  extent. Close zoom raises the lowest permitted viewing angle, keeping the
+  eye and near-plane corners above the rail tops without changing zoom or yaw.
+  The guard runs after orbit damping before drawing, for mouse and touch alike.

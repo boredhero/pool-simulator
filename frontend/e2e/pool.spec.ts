@@ -204,3 +204,17 @@ test('queued network results wait for local playback and stop at the next shot',
   });
   expect(result.during).toEqual([]);expect(result.order).toEqual(['result','next shot']);expect(result.queued).toBe(1);expect(result.mode).toBe('rolling');
 });
+
+test('close zoom cannot orbit the camera inside the table',async({page})=>{
+  await openGame(page);
+  const result=await page.evaluate(async()=>{
+    const controls=(window as any).__pool.scene.controls,camera=controls.object;
+    controls.target.set(0,-.16,0);camera.position.set(.36,-.16,.48);
+    controls.maxPolarAngle=Math.PI*.49;
+    await new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));
+    return {height:camera.position.y,distance:camera.position.distanceTo(controls.target),angle:controls.maxPolarAngle};
+  });
+  expect(result.height).toBeGreaterThan(.12);
+  expect(result.distance).toBeCloseTo(.6,6);
+  expect(result.angle).toBeLessThan(Math.PI/2);
+});
