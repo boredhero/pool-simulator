@@ -4,6 +4,9 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <link rel="manifest" href="/manifest.json" />
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-title" content="Pool Simulator" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
 <link rel="icon" href="/icon.svg" type="image/svg+xml" />
 <title>Pool Simulator</title>
 <link rel="preload" href="/fonts/AtkinsonHyperlegible-Regular.woff2" as="font" type="font/woff2" crossorigin>
@@ -166,6 +169,7 @@ body:has(#tutorial:not([hidden])) .privacy-notice{display:none}
   <header class="settings-header"><h2 id="settings-title">Settings <span id="settingspremium" class="premium-badge" hidden>Premium</span></h2><button class="icon-close" id="closesettings" type="button" aria-label="Close settings" title="Close settings">×</button></header>
   <div class="settings-body">
   <button id="adminbtn" hidden type="button">Admin settings</button>
+  <button id="installapp" data-install-app type="button">Install app</button><p id="installappstatus" role="status"></p>
   <h2>Table &amp; rules</h2>
   <label for="rulespreset">Game</label><select id="rulespreset"><option value="bar">8-Ball (Bar)</option><option value="tournament">8-Ball (Tourny)</option><option value="custom">8-Ball (Custom)</option></select>
   <p class="guide-note" id="rulesnotice">Preset rules are locked. Choose Custom to make them your own.</p>

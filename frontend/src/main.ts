@@ -1,3 +1,4 @@
+import {setupInstallApp} from './ui/installApp';
 import './ui/closeButton.css';
 import { initPrivacy } from './ui/privacy';
 import { needsWelcome, setupWelcome } from './ui/welcome';
@@ -6,6 +7,7 @@ import { Game } from './ui/game';
 import { setupDraggablePanels } from './ui/draggablePanel';
 import { setupMobileHud } from './ui/mobileHud';
 import { setupCameraFly } from './ui/cameraFlyControls';
+setupInstallApp();
 setupChangelog();
 initPrivacy({deferNotice:needsWelcome()});
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
