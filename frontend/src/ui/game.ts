@@ -211,7 +211,7 @@ export class Game {
 
   /** Human may act only on their own turn (CPU turns are driven by cpuMove). */
   humanTurn(): boolean {
-    if(this.cameraMode || this.cameraGesture || this.jevRequest)return false;
+    if(this.cameraMode || this.cameraGesture || this.scene.cameraRig.interacting || this.jevRequest)return false;
     if (!this.canShoot()) return false;
     if (this.cpuOpponent && this.gs.current === 1) return false;
     return true;
@@ -272,17 +272,20 @@ export class Game {
       this.hud();
     };
     canvas.addEventListener('pointermove', (e) => {
-      if (this.cameraMode || this.cameraGesture || this.pointers.size > 1) return;
+      if (this.cameraMode || this.cameraGesture || this.scene.cameraRig.interacting || this.pointers.size > 1) return;
       if (e.pointerType === 'mouse' && e.buttons !== 0 && e.buttons !== 1) return;
       const p = this.scene.pickFelt(e.clientX, e.clientY);
       if (!p) return;
       this.hoverPt = p;
       if (!this.pulling && (e.pointerType === 'mouse' || this.touchAim)) aimAt(p[0], p[1]); // aim locks once the pull starts
     });
+    canvas.tabIndex=0;
+    canvas.setAttribute('aria-label','Pool table. Enter takes a shot; Space raises the camera, Left Shift lowers it.');
     canvas.addEventListener('pointerdown', (e) => {
+      if(!document.querySelector('dialog[open]'))canvas.focus({preventScroll:true});
       this.sfx.unlock();
       this.pointers.add(e.pointerId);
-      if(this.cameraMode || this.pointers.size>1){this.cameraGesture=true;this.touchAim=false;this.pulling=false;this.pressPt=null;this.placementPress=null;return;}
+      if(this.cameraMode || this.scene.cameraRig.interacting || this.pointers.size>1){this.cameraGesture=true;this.touchAim=false;this.pulling=false;this.pressPt=null;this.placementPress=null;return;}
       if(this.cameraGesture)return;
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       const p = this.scene.pickFelt(e.clientX, e.clientY);
@@ -353,16 +356,16 @@ export class Game {
       document.getElementById('morecontrols')!.setAttribute('aria-expanded',String(open));
     });
     addEventListener('keydown', (e) => {
-      if ((e.target as HTMLElement)?.closest('input,select,button,textarea')) return;
+      if (document.querySelector('dialog[open]') || e.isComposing || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      if ((e.target as HTMLElement)?.closest('input,select,button,a,textarea,summary,[role="button"],[contenteditable],dialog,[role="dialog"]')) return;
       if(this.cameraMode)return;
       if (e.code === 'ArrowLeft') this.targetAngle += 0.03;
       if (e.code === 'ArrowRight') this.targetAngle -= 0.03;
-      if (e.code === 'Space') {
+      if (e.code === 'Enter' && document.activeElement===canvas) {
         e.preventDefault();
-        if (!e.repeat && this.humanTurn()) this.fire(0.4);
+        if (!e.repeat && this.humanTurn()) {this.angle=this.targetAngle;this.fire(0.4);}
       }
     });
-    addEventListener('keyup', (_e) => { /* space fires on keydown */ });
     const spin = this.el.spin;
     const setTip = (e: PointerEvent) => {
       const r=spin.getBoundingClientRect();

@@ -7,3 +7,8 @@
 .camera-fly-hint{grid-column:1 / -1;font-size:12px;color:#e2cfaa;text-align:center}
 .camera-fly-forward{grid-column:2;grid-row:2}.camera-fly-left{grid-column:1;grid-row:3}.camera-fly-backward{grid-column:2;grid-row:3}.camera-fly-right{grid-column:3;grid-row:3}
 @media(max-width:900px){#camera-fly-hud{right:10px}#camera-fly-toggle{font-size:13px}}
+#camera-input-profile{max-width:250px;min-height:44px;padding:0 10px;border:1px solid #8d795c;border-radius:8px;background:#211d18;color:#f2e8d6;font:inherit;font-size:14px}
+#camera-input-hint{max-width:260px;font-size:11px;line-height:1.4;text-align:right;color:#e2cfaa;background:#211d18e8;padding:3px 6px;border-radius:4px}
+@media(hover:none) and (pointer:coarse){#camera-input-profile,#camera-input-hint{display:none}}
+
+.camera-fly-rise{grid-column:1;grid-row:2}.camera-fly-lower{grid-column:3;grid-row:2}.camera-fly-turn-left{grid-column:1;grid-row:4}.camera-fly-turn-right{grid-column:3;grid-row:4}

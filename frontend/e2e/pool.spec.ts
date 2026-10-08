@@ -431,7 +431,7 @@ test('touch drag aims and pinch followed by parallel drag orbits without firing'
   expect((await state()).mode).toBe('rolling');
 });
 
-test('compact mobile scores expand and trackpad shift-scroll orbits',async({page})=>{
+test('compact mobile scores expand and explicit trackpad scrolling orbits',async({page})=>{
   await page.setViewportSize({width:390,height:844});await openGame(page);
   await page.evaluate(()=>{const g=(window as any).__pool;g.gs.groups=['solid','stripe'];g.gs.open=false;g.hud();});
   await expect(page.locator('.pcard')).toHaveCount(2);
@@ -447,7 +447,8 @@ test('compact mobile scores expand and trackpad shift-scroll orbits',async({page
   await page.locator('#morecontrols').click();
   await expect(page.locator('#spin')).toBeVisible();
   const before=await page.evaluate(()=>(window as any).__pool.scene.controls.getAzimuthalAngle());
-  await page.locator('#game-canvas').dispatchEvent('wheel',{deltaY:80,shiftKey:true,bubbles:true,cancelable:true});
+  await page.locator('#camera-input-profile').selectOption('trackpad');
+  await page.locator('#game-canvas').dispatchEvent('wheel',{deltaX:80,bubbles:true,cancelable:true});
   const after=await page.evaluate(()=>{const g=(window as any).__pool;return {theta:g.scene.controls.getAzimuthalAngle(),mode:g.mode};});
   expect(Math.abs(after.theta-before)).toBeGreaterThan(.01);expect(after.mode).toBe('aim');
   await page.screenshot({path:'/tmp/pool-060-mobile.png'});
@@ -578,7 +579,8 @@ test('optional interactive tutorial responds to controls and stays dismissed',as
   await expect(page.locator('#tutorialprogress')).toContainText('worked');
   await page.locator('#resetspin').click();
   await page.locator('#tutorialnext').click();
-  await page.mouse.move(point.x,point.y);await page.keyboard.down('Shift');await page.mouse.wheel(100,0);await page.keyboard.up('Shift');
+  await page.locator('#camera-input-profile').selectOption('trackpad');
+  await page.mouse.move(point.x,point.y);await page.mouse.wheel(100,0);
   await expect(page.locator('#tutorialprogress')).toContainText('worked');
   await page.locator('#tutorialnext').click();
   await expect(page.locator('#tutorialbody')).toContainText('real shot');
