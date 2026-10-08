@@ -176,12 +176,14 @@ export class Game {
   }
 
   frameBalls(whole=false): void {
-    const points=this.gs.balls.filter(b=>!b.potted).map(b=>({x:b.x,y:b.y}));
+    const eligible=legalTargets(this.gs);
+    const targets=this.gs.balls.filter(b=>!b.potted&&b.n!==null&&eligible.includes(b.n));
+    const points=this.gs.balls.filter(b=>!b.potted&&(whole||b.n===null||eligible.includes(b.n))).map(b=>({x:b.x,y:b.y}));
     if(whole || this.gs.ballInHand) {
       const edge=whole||this.gs.placement!=='kitchen'?TABLE_W:TABLE_W/4;
       for(const x of [0,edge])for(const y of [0,TABLE_H])points.push({x,y});
     }
-    this.scene.cameraRig.frame(points);
+    this.scene.cameraRig.frame(points,!whole&&!this.gs.ballInHand&&!this.cue().potted?this.cue():undefined,targets);
   }
 
   setSpin(x: number, y: number): void {
@@ -213,6 +215,7 @@ export class Game {
         if (this.seat === this.gs.current) this.room.place(cx, cy);
       } else if (placeCue(this.gs, cx, cy)) {
         this.mode = 'aim';
+        if(this.options.autoCamera)this.frameBalls();
       }
       this.hud();
     };
@@ -575,6 +578,7 @@ export class Game {
   }
 
   applyServerState(s: RoomState): void {
+    const wasPlacing=this.gs.ballInHand;
     for (const sb of s.balls) {
       const b = this.gs.balls.find((q) => q.id === sb.id);
       if (!b) continue;
@@ -593,6 +597,7 @@ export class Game {
     this.gs.ballInHand = s.ball_in_hand;
     this.gs.winner = s.winner === 1 ? 1 : s.winner === 0 ? 0 : null;
     this.gs.message = s.message;
+    if(wasPlacing&&!s.ball_in_hand&&s.winner===null&&this.options.autoCamera&&!this.cameraMode)this.frameBalls();
     this.mode = s.winner !== null ? 'over' : s.ball_in_hand && s.current === this.seat ? 'place' : 'aim';
     this.pulling = false; this.pressPt = null;
     this.lastPotted = this.gs.balls.filter((b) => b.potted).length;

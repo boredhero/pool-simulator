@@ -4,6 +4,7 @@
     "date": "2026-10-08",
     "title": "A better view of the table",
     "changes": [
+      "Automatic camera framing now swings behind the cue toward the majority of the current player\u2019s legal targets, including the final 8-Ball, without changing shot aim.",
       "Bar house rules now keep the layout after an empty break instead of automatically reracking. Players alternate until a legal pot assigns groups; pots made with a scratch stay down without assigning a group.",
       "Turn, foul, and result messages use the AI opponent\u2019s name consistently. Illegal-break reracks now explain the missing pocket and four-rail requirement.",
       "Once groups are assigned, player cards show the 8-Ball after their group, highlighted when it becomes the final target.",

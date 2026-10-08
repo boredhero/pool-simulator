@@ -42,3 +42,26 @@ it('frames all remaining balls within HUD space while preserving viewing directi
     expect(clustered.position.distanceTo(clustered.target)).toBeLessThan(pose.position.distanceTo(pose.target));
   }
 });
+
+import { majorityFacing, angleDelta } from '../src/render/cameraRig';
+it('faces the angular majority, ignores a lone opposite target, and handles wraparound',()=>{
+  const cue={x:0,y:0};
+  const theta=majorityFacing(cue,[{x:1,y:-.1},{x:1,y:0},{x:1,y:.1},{x:-2,y:0}],0);
+  expect(Math.abs(angleDelta(theta,-Math.PI/2))).toBeLessThan(.11);
+  const wrap=majorityFacing(cue,[{x:.01,y:-1},{x:-.01,y:-1},{x:0,y:1}],Math.PI);
+  expect(Math.abs(angleDelta(wrap,0))).toBeLessThan(.02);
+  expect(majorityFacing(cue,[],1)).toBe(1);
+  expect(angleDelta(Math.PI-.01,-Math.PI+.01)).toBeCloseTo(.02);
+  expect(Math.abs(angleDelta(majorityFacing(cue,[{x:0,y:1}],0),Math.PI))).toBeLessThan(1e-8);
+});
+it('frames eligible balls behind the cue with the cue centered in usable screen space',()=>{
+  const camera=new PerspectiveCamera(50,.6,.05,50);camera.position.set(-2,3,2);
+  const cue={x:.3,y:.5},targets=[{x:2,y:.4},{x:2.1,y:.6},{x:1.8,y:.7}];
+  const theta=majorityFacing(cue,targets,0),safe={left:-.8,right:.8,top:.55,bottom:-.55};
+  const pose=framePose(camera,new Vector3(),[cue,...targets],safe,{cue,theta});
+  const ahead=(pose.position.x-(cue.x-TABLE_W/2))*(-Math.sin(theta))+(pose.position.z-(cue.y-TABLE_H/2))*(-Math.cos(theta));
+  expect(ahead).toBeLessThan(0);
+  camera.position.copy(pose.position);camera.lookAt(pose.target);camera.updateMatrixWorld();
+  for(const p of [cue,...targets]){const screen=new Vector3(p.x-TABLE_W/2,BALL_R,p.y-TABLE_H/2).project(camera);expect(screen.x).toBeGreaterThan(safe.left);expect(screen.x).toBeLessThan(safe.right);expect(screen.y).toBeGreaterThan(safe.bottom);expect(screen.y).toBeLessThan(safe.top);}
+  expect(new Vector3(cue.x-TABLE_W/2,BALL_R,cue.y-TABLE_H/2).project(camera).x).toBeCloseTo(0);
+});

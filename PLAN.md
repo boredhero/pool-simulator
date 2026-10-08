@@ -258,6 +258,8 @@ Flow: work on `develop`, PR to `main` (protected: PR + `ci` check), merge to shi
 
 ### 0.3.0 camera and release history
 - Explicit mobile camera mode separates one-finger orbit and two-finger pinch/pan from shooting; placement commits on tap release to avoid pinch gestures placing the cue ball.
-- Optional post-shot group framing preserves azimuth, includes all remaining balls, respects placement space and HUD, yields to manual input, and honors reduced motion. Defaults on for mobile and off for desktop; preference persists.
+- Optional post-shot group framing swings behind the cue toward the narrowest angular arc containing a strict majority of current-player targets. It fits the cue plus all eligible targets, respects placement space and HUD, yields to manual input, and honors reduced motion. Defaults on for mobile and off for desktop; preference persists.
 - Version badge opens a native dialog backed by root changelog.json; contributor docs require keeping it current.
 - Camera interaction research: https://www.w3.org/WAI/WCAG21/Understanding/pointer-gestures and https://threejs.org/docs/pages/OrbitControls.html.
+
+Camera direction uses sorted cue-relative bearings and a wrapped sliding window of floor(n/2)+1 targets. Near-ties prefer the smallest rotation; azimuth interpolates over the shortest arc. Group eligibility comes from legalTargets rather than shot-selection AI. Whole-table and placement views retain the existing azimuth. Reference: https://threejs.org/docs/pages/Spherical.html and https://threejs.org/docs/pages/MathUtils.html.
