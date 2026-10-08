@@ -418,7 +418,10 @@ export class Game {
     this.el.joinbtn.addEventListener('click', () => this.connectRoom(false));
     document.getElementById('callball')!.addEventListener('change', e => { this.calledBall = Number((e.target as HTMLSelectElement).value); this.calledPocket = null; this.hud(); });
     document.getElementById('clearcall')!.addEventListener('click', () => { this.calledPocket = null; this.hud(); });
-    this.el.rack.addEventListener('click', () => this.reset());
+    this.el.rack.addEventListener('click', () => {
+      if(this.jevGame && this.account?.premium)void this.startJev(true);
+      else this.reset();
+    });
     this.el.cpubtn.addEventListener('click', () => {
       if (this.room) return;
       this.cpuOpponent = this.jevOpponent || !this.cpuOpponent;
@@ -441,21 +444,24 @@ export class Game {
     });
   }
 
-  async startJev(): Promise<void> {
+  async startJev(fresh=false): Promise<void> {
     if(this.jevRequest)return;
     const controller=new AbortController();this.jevRequest=controller;
-    this.el.opponentstatus.textContent='Starting or resuming your daily Jev game…';
+    this.el.opponentstatus.textContent=fresh?'Starting a new Jev game…':'Starting or resuming your Jev game…';
     try {
-      const game=await jevRequest('/games',{},controller.signal);
+      const game=await jevRequest('/games',fresh?{new_game:true}:{},controller.signal);
       if(controller.signal.aborted||this.room)return;
       this.reset();
+      this.pendingNetwork=[];
       this.jevOpponent=true;this.cpuOpponent=true;
       this.jevGame={id:game.id,revision:game.state.revision};
       this.el.jevbtn.classList.add('on');this.el.jevbtn.setAttribute('aria-pressed','true');
       this.el.cpubtn.classList.remove('on');this.el.cpubtn.setAttribute('aria-pressed','false');
       this.el.cpubtn.textContent='Play vs CPU';
       this.applyJevState(game.state);
-      this.el.opponentstatus.textContent='Daily Jev game · resets at midnight UTC · select Jev again to resume';
+      this.el.opponentstatus.textContent=game.expiresAt===null
+        ? 'Premium · Unlimited Jev AI · New rack starts another game'
+        : 'Daily Jev game · resets at midnight UTC · select Jev again to resume';
     } catch(error) {
       if(!controller.signal.aborted)this.el.opponentstatus.textContent=error instanceof Error?error.message:'Jev unavailable';
     } finally {if(this.jevRequest===controller)this.jevRequest=null;}
@@ -489,7 +495,8 @@ export class Game {
       this.pendingNetwork.push(()=>{if(this.jevGame===game)this.applyJevState(result.state);});
       this.el.opponentstatus.textContent=result.source==='jev'?'Jev AI selected this shot':
         result.source==='cpu-fallback'?'Jev AI unavailable or capacity reached · CPU took this shot':
-        result.source==='geometry'?'Jev AI · geometry shot (no model choice needed)':'Daily Jev game';
+        result.source==='geometry'?'Jev AI · geometry shot (no model choice needed)':
+        result.expiresAt===null?'Premium · Unlimited Jev AI':'Daily Jev game';
     } catch(error) {
       if(!controller.signal.aborted){
         // Do not retry an ambiguous paid turn automatically. The server persists

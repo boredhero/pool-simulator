@@ -4,7 +4,16 @@ from __future__ import annotations
 
 import os
 
-from sqlalchemy import ForeignKey, Integer, String, Text, UniqueConstraint, create_engine
+from sqlalchemy import (
+    Boolean,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    create_engine,
+    false,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./pool.db")
@@ -44,6 +53,10 @@ def init_db() -> None:
         except FileExistsError:
             pass
     Base.metadata.create_all(engine)
+    from app.models.migrations import upgrade_premium
+
+    with engine.begin() as connection:
+        upgrade_premium(connection)
 
 
 class Account(Base):
@@ -54,6 +67,7 @@ class Account(Base):
     password_hash: Mapped[str] = mapped_column(Text)
     recovery_hash: Mapped[str] = mapped_column(Text)
     created_at: Mapped[int] = mapped_column(Integer)
+    premium: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
 
 
 class LoginSession(Base):
@@ -123,7 +137,8 @@ class JevGame(Base):
     )
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
     account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), index=True)
-    day: Mapped[int] = mapped_column(Integer, index=True)
+    # Free allowance day; NULL exempts premium games from the daily unique keys.
+    day: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     network_hash: Mapped[str] = mapped_column(String(64), index=True)
     started_at: Mapped[int] = mapped_column(Integer)
     updated_at: Mapped[int] = mapped_column(Integer)

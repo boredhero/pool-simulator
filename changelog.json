@@ -1,5 +1,15 @@
 [
   {
+    "version": "0.7.1",
+    "date": "2026-10-08",
+    "title": "Premium accounts and unlimited Jev games",
+    "changes": [
+      "Premium accounts have a badge in Settings and Account, with unlimited Jev games and no midnight expiry.",
+      "While playing Jev with Premium, New rack starts another server-owned game. Selecting Jev resumes your active game.",
+      "Added an operator command to enable or disable Premium. Existing accounts and game records are preserved during the database upgrade."
+    ]
+  },
+  {
     "version": "0.7.0",
     "date": "2026-10-08",
     "title": "Daily Jev AI games and privacy controls",

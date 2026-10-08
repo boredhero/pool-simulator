@@ -79,7 +79,12 @@ def register(payload: Credentials, request: Request, response: Response) -> dict
                 TermsAcceptance(account_id=user.id, version=VERSION, accepted_at=int(time.time()))
             )
             set_session(db, response, request, user.id)
-            result = {"id": user.id, "username": user.username, "createdAt": user.created_at}
+            result = {
+                "id": user.id,
+                "username": user.username,
+                "createdAt": user.created_at,
+                "premium": user.premium,
+            }
     except IntegrityError as exc:
         raise HTTPException(409, "That username is already taken.") from exc
     return {"account": result, "recovery": code}
@@ -111,7 +116,14 @@ def login(payload: Credentials, request: Request, response: Response) -> dict:
         if old:
             db.execute(delete(LoginSession).where(LoginSession.token_hash == digest(old)))
         set_session(db, response, request, user.id)
-        return {"account": {"id": user.id, "username": user.username, "createdAt": user.created_at}}
+        return {
+            "account": {
+                "id": user.id,
+                "username": user.username,
+                "createdAt": user.created_at,
+                "premium": user.premium,
+            }
+        }
 
 
 @router.post("/logout", dependencies=[Depends(mutation_guard)])
