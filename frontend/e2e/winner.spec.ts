@@ -78,3 +78,11 @@ test('tutorial and unfinished playback cannot show a winner dialog',async({page}
   await page.evaluate(()=>{const g=(window as any).__pool;g.mode='over';g.gs.balls[0].asleep=false;g.gs.balls[0].vx=.2;g.hud();g.frame();});
   await expect(page.locator('#winnerdialog')).not.toBeVisible();
 });
+
+for(const width of [1440,390])test(`celebration graphic stays centered with finite sparkles at ${width}px`,async({page},testInfo)=>{
+  await page.setViewportSize({width,height:900});await open(page);await finish(page,'local',0);
+  await expect(page.locator('.winner-confetti i')).toHaveCount(56);
+  const geometry=await page.locator('.winner-eight svg path').evaluate(element=>{const shape=(element as SVGGraphicsElement).getBBox();return{x:shape.x+shape.width/2,y:shape.y+shape.height/2};});expect(geometry.x).toBe(20);expect(geometry.y).toBe(20);
+  await page.waitForTimeout(450);await page.screenshot({path:testInfo.outputPath('winner-celebration.png')});
+  await expect(page.locator('.winner-confetti i')).toHaveCount(0,{timeout:4000});await expect(page.locator('#winnerreplay')).toBeInViewport();
+});

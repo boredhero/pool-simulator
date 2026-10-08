@@ -196,3 +196,17 @@ test('legal links and privacy control share one visual family',async({page})=>{
   const footer=(await page.locator('.legal-links').boundingBox())!,tray=(await page.locator('.control-tray').boundingBox())!;
   expect(footer.y).toBeGreaterThan(tray.y+tray.height);
 });
+
+test('footer selector stacks above its label and camera chevron and neutral spin are centered',async({page},testInfo)=>{
+  const selector=(await page.locator('#camera-input-profile').boundingBox())!,label=(await page.locator('#camera-profile-dock label').boundingBox())!;
+  expect(selector.y+selector.height).toBeLessThanOrEqual(label.y);
+  const button=(await page.locator('#camera-fly-toggle').boundingBox())!,chevron=(await page.locator('.camera-toggle-chevron').boundingBox())!;
+  expect(Math.abs(chevron.y+chevron.height/2-button.y-button.height/2)).toBeLessThan(.1);
+  await page.evaluate(()=>{const g=(window as any).__pool;g.setSpin(0,0,true);});
+  await page.screenshot({path:testInfo.outputPath('controls-desktop.png')});
+  for(const width of [1280,390]){
+    await page.setViewportSize({width,height:844});
+    const offset=await page.locator('#spin').evaluate(element=>{const size=element.getBoundingClientRect(),dot=getComputedStyle(element,'::after'),matrix=new DOMMatrix(dot.transform);return{x:parseFloat(dot.left)+matrix.m41+parseFloat(dot.width)/2-size.width/2,y:parseFloat(dot.top)+matrix.m42+parseFloat(dot.height)/2-size.height/2};});
+    expect(Math.abs(offset.x)).toBeLessThan(.1);expect(Math.abs(offset.y)).toBeLessThan(.1);
+  }
+});
