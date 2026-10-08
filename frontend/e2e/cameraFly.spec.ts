@@ -1,4 +1,4 @@
-import { acceptWelcomeBeforeLoad } from './welcomeFixture';
+import { acceptWelcomeBeforeLoad, waitForOpening } from './welcomeFixture';
 import { expect, test, type Page } from '@playwright/test';
 
 async function position(page: Page) {
@@ -19,6 +19,7 @@ test.beforeEach(async ({ page }) => {
     });
   });
   await page.goto('/');
+  await waitForOpening(page);
   await expect(page.locator('#camera-fly-toggle')).toBeVisible();
   if (await page.locator('#privacynotice').isVisible()) await page.locator('#privacyessential').click();
   if (await page.locator('#helppanel').isVisible()) await page.locator('#closehelp').click();

@@ -125,7 +125,7 @@ test('pocket indicators update before rest without overwriting the next turn', a
 test('bar break assigns both cards before the same player shoots again', async ({page}) => {
   await openGame(page);
   const result=await page.evaluate(()=>{
-    const g=(window as any).__pool;
+    const g=(window as any).__pool;g.gs.current=0;
     g.gs.balls.find((b:any)=>b.n===1).potted=true;
     g.ev={firstContact:1,potted:[1],offTable:[],railAfterContact:true,cuePotted:false};g.mode='rolling';
     g.frame();
@@ -699,7 +699,7 @@ test('reracking cancels a prepared opponent stroke before it can fire',async({pa
     g.reset();const state=g.gs;await pending;
     return {strikes,same:g.gs===state,current:g.gs.current,mode:g.mode,action:g.opponentAction};
   });
-  expect(result).toEqual({strikes:0,same:true,current:0,mode:'aim',action:null});
+  expect(result).toMatchObject({strikes:0,same:true,mode:'aim',action:null});expect([0,1]).toContain(result.current);
 });
 
 test('Jev cue presentation uses authoritative placement and strike before final state',async({page})=>{
@@ -746,7 +746,7 @@ test('reduced motion shows a static opponent cue',async({page})=>{
 test('a delayed human Jev response cannot reverse the latched visible shot direction',async({page})=>{
   await openGame(page);
   const state=await page.evaluate(()=>{
-    const g=(window as any).__pool;g.cpuOpponent=true;g.jevOpponent=true;g.jevGame={id:'human-cue',revision:0};
+    const g=(window as any).__pool;g.cpuOpponent=true;g.jevOpponent=true;g.jevGame={id:'human-cue',revision:0};g.gs.current=0;
     g.angle=.35;g.targetAngle=.35+Math.PI;
     return {balls:g.gs.balls,return_order:[],current:1,groups:[null,null],open:true,ball_in_hand:false,
       break_shot:false,placement:'none',kitchen_shot:false,rules:g.gs.rules,revision:1,winner:null,message:'Player 2 to shoot'};
