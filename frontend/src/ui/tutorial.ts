@@ -5,8 +5,8 @@ interface PracticeHooks {begin():boolean;stage(action:TutorialAction):void;end()
 const actions:TutorialAction[]=['aim','spin','camera','shot'];
 const titles=['Line up the yellow ball','Try spin, then reset','Move your view','Take the practice shot'];
 const copy:Record<TutorialProfile,string[]>={
-  mouse:['Move over the felt to aim at the yellow ball.','Drag the white-ball dot, then Reset to center it.','Right-drag the felt to orbit. Scroll to zoom.','Press on the felt, pull back, then release. Or use Shoot below.'],
-  trackpad:['Move your pointer over the felt toward the yellow ball.','Drag the white-ball dot, then Reset to center it.','Two-finger scroll to orbit. Pinch to zoom; Option-scroll pans.','Click and drag back on the felt, then release. Or use Shoot below.'],
+  mouse:['Move over the felt to aim at the yellow ball.','Drag the white-ball dot, then Reset to center it.','Right-drag the felt to orbit. Scroll to zoom.','Press and hold on the felt, pull back to set power, then release to shoot. Pull farther for a stronger shot.'],
+  trackpad:['Move your pointer over the felt toward the yellow ball.','Drag the white-ball dot, then Reset to center it.','Two-finger scroll to orbit. Pinch to zoom; Option-scroll pans.','Click and hold on the felt, drag back to set power, then release to shoot. Pull farther for a stronger shot.'],
   touch:['Drag one finger on the felt toward the yellow ball, then lift.','Drag the white-ball dot, then tap Reset.','Move two fingers together to orbit. Pinch to zoom.','Set power below, then tap Shoot. This table is only for practice.'],
 };
 export class Tutorial {
@@ -51,10 +51,13 @@ export class Tutorial {
     document.getElementById('tutorialnext')!.textContent=this.index===actions.length-1?'Finish':'Next';
   }
   private refreshCopy(){
-    this.profile=document.documentElement.classList.contains('touch-input')||matchMedia('(pointer: coarse)').matches?'touch':
+    this.profile=document.documentElement.classList.contains('touch-input')?'touch':
       (document.getElementById('camera-input-profile') as HTMLSelectElement|null)?.value==='trackpad'?'trackpad':'mouse';
     const panel=document.getElementById('tutorial')!;panel.dataset.profile=this.profile;
     document.getElementById('tutorialbody')!.textContent=copy[this.profile][this.index];
+    document.querySelectorAll('.tutorial-focus').forEach(e=>e.classList.remove('tutorial-focus'));
+    const target=this.action==='spin'?'#spincontrols':this.action==='shot'?(this.profile==='touch'?'.touch-shot':'.power-control'):null;
+    if(target)document.querySelector(target)?.classList.add('tutorial-focus');
   }
   private reframe(){
     cancelAnimationFrame(this.frameId);
@@ -70,8 +73,6 @@ export class Tutorial {
     (document.getElementById('tutorialback') as HTMLButtonElement).disabled=this.index===0;
     document.querySelectorAll('.tutorial-focus').forEach(e=>e.classList.remove('tutorial-focus'));
     this.refreshCopy();this.staging=true;this.hooks?.stage(actions[this.index]);this.staging=false;this.reframe();
-    const target=actions[this.index]==='spin'?'spincontrols':actions[this.index]==='shot'&&this.profile==='touch'?'touchshoot':null;
-    if(target)document.getElementById(target)?.classList.add('tutorial-focus');
   }
   close(){
     if(!this.active)return;
