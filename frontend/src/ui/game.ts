@@ -1,4 +1,5 @@
 import type { PerspectiveCamera } from 'three';
+import { WinnerDialog } from './winner';
 import { animateOpponentCue, cuePresentation, freezeShot, type SelectedShot, type CuePhase } from './opponentCue';
 import { Tutorial, type TutorialAction } from './tutorial';
 import { practiceTable } from './tutorialPractice';
@@ -44,6 +45,7 @@ const freshEv = (): ShotEvents => ({
 
 export class Game {
   tutorial = new Tutorial();
+  winnerDialog = new WinnerDialog(()=>this.restartAfterWin());
   gs: GameState;
   options: TableOptions;
   calledBall: number | null = null;
@@ -803,10 +805,30 @@ export class Game {
     } else {
       this.scene.setPlace(false, 0, 0, false);
     }
+    this.showWinner();
   }
 
   playerName(seat:number): string {
-    return this.roomNames?.[seat] ?? (seat===1 && this.cpuOpponent && !this.room ? (this.jevOpponent ? 'Jev AI' : 'CPU') : `Player ${seat+1}`);
+    return this.roomNames?.[seat] ?? (seat===1 && this.cpuOpponent && !this.room ? (this.jevOpponent ? 'Jev AI' : 'CPU') : seat===0&&!this.room&&this.account?this.account.username:`Player ${seat+1}`);
+  }
+
+  private showWinner():void {
+    if(this.tutorial.active||this.mode!=='over'||this.gs.winner===null){this.winnerDialog.sync(null);return;}
+    const online=!!this.room,jev=!!this.jevGame;
+    this.winnerDialog.sync({game:this.gs,name:this.playerName(this.gs.winner),
+      detail:this.gs.message.replace(/\bPlayer ([12])\b/g,(_,seat)=>this.playerName(Number(seat)-1)),
+      action:online?'New online session':jev?(this.account?.premium?'Play Jev again':'Play a local rack'):'Play again',
+      note:online?'Start a fresh room and share its new invite with your friend.':jev&&!this.account?.premium?'Your daily Jev game is complete. You can keep playing locally.':''});
+  }
+
+  private async restartAfterWin():Promise<void> {
+    if(this.room){
+      this.leaveRoom('Starting a new online session.');
+      this.el.onlinepanel.classList.add('open');this.connectRoom(true);
+    } else if(this.jevGame&&this.account?.premium){
+      const previous=this.jevGame.id;await this.startJev(true);
+      if(this.jevGame?.id===previous)throw new Error(this.el.opponentstatus.textContent||'Could not start another Jev game.');
+    } else this.reset();
   }
 
   hud(): void {
