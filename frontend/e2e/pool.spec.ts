@@ -204,3 +204,56 @@ test('queued network results wait for local playback and stop at the next shot',
   });
   expect(result.during).toEqual([]);expect(result.order).toEqual(['result','next shot']);expect(result.queued).toBe(1);expect(result.mode).toBe('rolling');
 });
+
+test('close zoom cannot orbit the camera inside the table',async({page})=>{
+  await openGame(page);
+  const result=await page.evaluate(async()=>{
+    const controls=(window as any).__pool.scene.controls,camera=controls.object;
+    controls.target.set(0,-.16,0);camera.position.set(.36,-.16,.48);
+    controls.maxPolarAngle=Math.PI*.49;
+    await new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));
+    return {height:camera.position.y,distance:camera.position.distanceTo(controls.target),angle:controls.maxPolarAngle};
+  });
+  expect(result.height).toBeGreaterThan(.12);
+  expect(result.distance).toBeCloseTo(.6,6);
+  expect(result.angle).toBeLessThan(Math.PI/2);
+});
+
+test('cue ball markings persist without changing the physical ball state',async({page})=>{
+  await openGame(page);await page.locator('#settingsbtn').click();
+  const before=await page.evaluate(()=>JSON.stringify((window as any).__pool.gs.balls));
+  for(const style of ['red-ring','blue-dot','black-triangles','plain','red-spots'])await page.locator('#cueappearance').selectOption(style);
+  expect(await page.evaluate(()=>JSON.stringify((window as any).__pool.gs.balls))).toBe(before);
+  await openGame(page,true);
+  expect(await page.locator('#cueappearance').inputValue()).toBe('red-spots');
+  expect(await page.evaluate(()=>localStorage.getItem('pool:cue-style'))).toBe('red-spots');
+});
+
+test('head-string tip stays dismissed after reload while its tutorial remains available',async({page})=>{
+  await page.setViewportSize({width:1440,height:900});await openGame(page);
+  const kitchen=()=>page.evaluate(()=>{const g=(window as any).__pool;g.gs.ballInHand=true;g.gs.placement='kitchen';g.gs.kitchenShot=true;g.mode='place';g.frame();});
+  await kitchen();await expect(page.locator('#headstringguide')).toBeVisible();
+  await page.locator('#dismissheadstring').click();await expect(page.locator('#headstringguide')).toBeHidden();
+  await openGame(page,true);await kitchen();
+  await expect(page.locator('#headstringguide')).toBeHidden();
+  await expect(page.locator('#kitchenhelp')).toContainText('behind the dashed line');
+  expect(await page.evaluate(()=>localStorage.getItem('pool:headstring-dismissed'))).toBe('1');
+});
+
+test('spin resets both axes and supports keyboard adjustments on desktop and mobile',async({page})=>{
+  await openGame(page);const spin=page.locator('#spin'),reset=page.locator('#resetspin');
+  await expect(reset).toBeDisabled();
+  const size=(await spin.boundingBox())!;
+  await spin.click({position:{x:size.width*.8,y:size.height*.25}});
+  await expect(reset).toBeEnabled();
+  const before=await page.evaluate(()=>{const g=(window as any).__pool;return[g.tipX,g.tipY];});
+  expect(before[0]).toBeGreaterThan(0);expect(before[1]).toBeGreaterThan(0);
+  await reset.click();
+  expect(await page.evaluate(()=>{const g=(window as any).__pool;return[g.tipX,g.tipY];})).toEqual([0,0]);
+  await expect(spin).toHaveAttribute('aria-label','Cue ball spin control: centered');
+  await spin.focus();await page.keyboard.press('ArrowLeft');await page.keyboard.press('Shift+ArrowDown');
+  expect(await page.evaluate(()=>{const g=(window as any).__pool;return[g.tipX,g.tipY];})).toEqual([-.025,-.005]);
+  await page.keyboard.press('Home');await expect(reset).toBeDisabled();
+  await page.setViewportSize({width:390,height:844});await expect(reset).toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});

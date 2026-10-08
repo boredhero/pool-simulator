@@ -23,7 +23,11 @@ export function createCabinet(wood:THREE.Material):THREE.Group {
   // Window spans 1.18 m. Its top/bottom and side pieces never occlude the balls.
   box('Front apron upper',1.2,.085,.13,0,-.1275,side);
   box('Front apron lower',1.2,.077,.13,0,-.3215,side);
-  box('Return back wall',1.2,.12,.012,0,-.225,side-.083,dark);
+  box('Return back wall',1.22,.14,.018,0,-.225,side-.083,dark,.001);
+  // A closed display box: end reveals overlap the back and front apron,
+  // preventing oblique views through the cabinet beside the glazing.
+  for(const sign of [-1,1])box('Return end wall',.026,.14,.18,sign*.598,-.225,side-.005,dark,.001);
+  box('Return ceiling',1.22,.018,.18,0,-.16,side-.005,dark,.001);
   box('Return shelf',1.2,.018,.19,0,RETURN_Y-BALL_R-.01,side-.008,dark);
   const glass=new THREE.MeshPhysicalMaterial({color:0xbfd9d7,transparent:true,opacity:.12,roughness:.15,metalness:0,depthWrite:false,side:THREE.DoubleSide});
   const pane=box('Clear ball-view window',1.17,.11,.004,0,-.225,side+.072,glass,.001);pane.castShadow=false;

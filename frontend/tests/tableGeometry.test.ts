@@ -66,3 +66,22 @@ it('keeps the glass return channel open in front of every stored ball', () => {
   }
   expect(cabinet.children.filter(o=>o.name==='Adjustable foot')).toHaveLength(4);
 });
+
+it('closes both side reveals inside the return window',()=>{
+  const cabinet=createCabinet(new THREE.MeshBasicMaterial());cabinet.updateMatrixWorld(true);
+  for(const sign of [-1,1]) {
+    const origin=returnPosition(7);origin.x=0;
+    const hits=new THREE.Raycaster(origin,new THREE.Vector3(sign,0,.03).normalize()).intersectObject(cabinet,true);
+    const opaque=hits.find(hit=>!((hit.object as THREE.Mesh).material as THREE.Material).transparent);
+    expect(opaque?.object.name).toBe('Return end wall');
+    expect(Math.abs(opaque!.point.x)).toBeLessThan(.6);
+  }
+});
+
+it('removes the felt cut edge underneath the leather pocket flange',()=>{
+  const felt=surface(bedGeometry());
+  for(const p of POCKETS)for(let i=0;i<32;i++) {
+    const a=i*Math.PI/16;
+    expect(felt(p.x+(p.r+.003)*Math.cos(a),p.y+(p.r+.003)*Math.sin(a))).toBe(false);
+  }
+});

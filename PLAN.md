@@ -197,3 +197,60 @@ Flow: work on `develop`, PR to `main` (protected: PR + `ci` check), merge to shi
   [waitForFunction signature](https://playwright.dev/docs/api/class-page#page-wait-for-function),
   [parallelism](https://playwright.dev/docs/test-parallel), and
   [GitHub PR event branch filters](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request).
+
+## Camera/table clearance
+- Orbit elevation is constrained by zoom distance and the camera near-plane
+  extent. Close zoom raises the lowest permitted viewing angle, keeping the
+  eye and near-plane corners above the rail tops without changing zoom or yaw.
+  The guard runs after orbit damping before drawing, for mouse and touch alike.
+
+## Pocket and return-window seam cleanup
+- Return-channel side walls and ceiling overlap its back and apron edges,
+  closing oblique sight lines through the cabinet around the glass frame.
+- Recessed felt cutouts, dark cut-edge materials and straight pocket liners
+  remove the green ring formerly exposed behind tapered wells.
+- Each cushion is one closed cloth mesh with rounded ends following the shared
+  jaw outlines. Separate intersecting jaw cylinders have been removed. These
+  are visual geometry changes; collision and capture definitions remain shared.
+- Checked close pocket and window views, plus raycast regressions for cushion
+  face orientation, closed return ends and the recessed felt edge.
+
+## Ball artwork and optional cue markings
+- Replaced 256×128 UV-painted ball artwork with 1024×512 spherical number
+  medallions and antialiased stripe boundaries. Tangent-projected numerals stay
+  legible on both sides; 6/9 have distinguishing underlines. Smooth warm-white
+  resin uses restrained specular/clearcoat highlights, not surface grain or
+  baked lighting. Mesh silhouettes use 48×32 sphere segments.
+- Appearance offers plain, six red spots, red ring, blue dot, and black triangles.
+  The cue preference persists locally; switching disposes the previous texture
+  and changes no simulation state. These are generic markings, not brand logos.
+- Manufacturer references: [Aramith cue-ball variants](https://aramith.com/cue-ball/),
+  [Brunswick blue dot](https://www.brunswickbilliards.com/products/blue-dot-cue-ball),
+  [Predator black triangles](https://predatorcues.com/products/predator-arcos-ii-reserve-cue-ball-with-black-triangles),
+  [resin finish](https://aramith.com/general-specifications/), and
+  [embedded number cores](https://aramith.com/aramith-makes-difference/).
+- The head-string callout has a permanent local dismissal. Its dashed boundary
+  and shaded kitchen remain; the information panel retains the explanation
+  whenever the active rules use kitchen placement (including Custom).
+
+## Spin input and execution research
+- Added Reset beside the spin pad. It clears both offsets and the marker without
+  altering balls already in motion. Arrow keys adjust a focused pad, Shift uses
+  smaller increments, and Home/0 resets. Pointer capture cleans up on release
+  or cancellation; markers fit the desktop/mobile control.
+- Keep deterministic impact physics by default. The existing sim already has
+  squirt, elevation effects and a 0.55-radius offset cap. Real inconsistency is
+  delivery error (contact point, direction, speed), not a random result from
+  identical clean impacts. No reliable population distribution of amateur tip
+  error was found, so no arbitrary random miss penalty was added.
+- A two-axis cue-ball selector is an established approach, not proven uniquely
+  optimal: [Miniclip's spin UI](https://support.miniclip.com/hc/en-us/articles/35451960569361-Advanced-Plays-Spins-8-Ball-Pool)
+  and [Virtual Pool's tip/stroke controls](https://vponline.celeris.com/support/quickstart).
+  [Dr. Dave on grip/miscues](https://drdavepoolinfo.com/faq/squirt/miscue-limit/)
+  and [contact accuracy](https://drdavepoolinfo.com/faq/sidespin/maximum/)
+  distinguish execution precision from repeatable contact physics. Roughly half
+  the ball radius is a practical contact guideline, not a universal threshold.
+- A possible future opt-in execution mode would map stroke gesture to bounded,
+  visible delivery deviation, showing the actual impact point. It needs play
+  testing. Resolve actual shot parameters once for server/replay consistency;
+  never add independent random errors inside the client and server simulators.

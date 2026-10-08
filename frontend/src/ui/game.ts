@@ -1,3 +1,4 @@
+import { cueStyle } from '../render/ballTextures';
 import { advancePlayback } from './playback';
 import { sightStyle } from '../render/railSights';
 import { cueElevation } from '../sim/cue';
@@ -128,6 +129,10 @@ export class Game {
   }
 
   buildThemePanel(): void {
+    const cueSelect=document.getElementById('cueappearance') as HTMLSelectElement;
+    let savedCue:string|null=null;try{savedCue=localStorage.getItem('pool:cue-style');}catch{}
+    cueSelect.value=cueStyle(savedCue);this.scene.setCueStyle(cueStyle(savedCue));
+    cueSelect.addEventListener('change',()=>{const style=cueStyle(cueSelect.value);this.scene.setCueStyle(style);try{localStorage.setItem('pool:cue-style',style);}catch{}});
     const railSelect = document.getElementById('railsights') as HTMLSelectElement;
     railSelect.value = sightStyle(localStorage.getItem('pool:sights'));
     this.scene.setSights(sightStyle(railSelect.value));
@@ -160,6 +165,19 @@ export class Game {
     if (!this.pulling || !this.pressPt || !this.hoverPt) return 0;
     const d = Math.hypot(this.hoverPt[0] - this.pressPt[0], this.hoverPt[1] - this.pressPt[1]);
     return Math.min(1, d / PULL_FULL);
+  }
+
+  setSpin(x: number, y: number): void {
+    const scale=Math.min(1,.55/(Math.hypot(x,y)||1));
+    this.tipX=x*scale;this.tipY=y*scale;
+    const spin=this.el.spin;
+    spin.style.setProperty('--tx',`${this.tipX/.55*38}%`);
+    spin.style.setProperty('--ty',`${-this.tipY/.55*38}%`);
+    const centered=Math.hypot(this.tipX,this.tipY)<1e-9;
+    (document.getElementById('resetspin') as HTMLButtonElement).disabled=centered;
+    const horizontal=Math.abs(this.tipX)<.001?'no sidespin':`${Math.round(Math.abs(this.tipX)/.55*100)}% ${this.tipX<0?'left':'right'}`;
+    const vertical=Math.abs(this.tipY)<.001?'center height':`${Math.round(Math.abs(this.tipY)/.55*100)}% ${this.tipY<0?'backspin':'topspin'}`;
+    spin.setAttribute('aria-label',`Cue ball spin control: ${centered?'centered':horizontal+', '+vertical}`);
   }
 
   wire(canvas: HTMLCanvasElement): void {
@@ -243,22 +261,21 @@ export class Game {
     addEventListener('keyup', (_e) => { /* space fires on keydown */ });
     const spin = this.el.spin;
     const setTip = (e: PointerEvent) => {
-      const r = spin.getBoundingClientRect();
-      this.tipX = Math.max(-0.55, Math.min(0.55, ((e.clientX - r.left) / r.width - 0.5) * 2 * 0.55));
-      this.tipY = Math.max(-0.55, Math.min(0.55, (0.5 - (e.clientY - r.top) / r.height) * 2 * 0.55));
-      const scale = Math.min(1, .55 / (Math.hypot(this.tipX, this.tipY) || 1));
-      this.tipX *= scale; this.tipY *= scale;
-      spin.style.setProperty('--tx', `${(this.tipX / 0.55) * 30}px`);
-      spin.style.setProperty('--ty', `${(-this.tipY / 0.55) * 30}px`);
+      const r=spin.getBoundingClientRect();
+      this.setSpin(Math.max(-.55,Math.min(.55,((e.clientX-r.left)/r.width-.5)*1.1)),Math.max(-.55,Math.min(.55,(.5-(e.clientY-r.top)/r.height)*1.1)));
     };
-    spin.addEventListener('pointerdown', (e) => {
-      e.stopPropagation();
-      (e.target as HTMLElement).setPointerCapture(e.pointerId);
-      setTip(e);
-      const mv = (m: PointerEvent) => setTip(m);
-      spin.addEventListener('pointermove', mv);
-      spin.addEventListener('pointerup', () => spin.removeEventListener('pointermove', mv), { once: true });
+    spin.addEventListener('pointerdown',e=>{
+      if(e.pointerType==='mouse' && e.button!==0)return;
+      e.stopPropagation();spin.setPointerCapture(e.pointerId);setTip(e);
     });
+    spin.addEventListener('pointermove',e=>{if(spin.hasPointerCapture(e.pointerId))setTip(e);});
+    spin.addEventListener('keydown',e=>{
+      const step=e.shiftKey ? .005 : .025;
+      const keys:Record<string,[number,number]>={ArrowLeft:[-step,0],ArrowRight:[step,0],ArrowUp:[0,step],ArrowDown:[0,-step]};
+      if(keys[e.key]){e.preventDefault();e.stopPropagation();this.setSpin(this.tipX+keys[e.key][0],this.tipY+keys[e.key][1]);}
+      else if(e.key==='Home'||e.key==='0'){e.preventDefault();e.stopPropagation();this.setSpin(0,0);}
+    });
+    document.getElementById('resetspin')!.addEventListener('click',()=>this.setSpin(0,0));
     this.el.onlinebtn.addEventListener('click', () => {
       this.el.onlinepanel.classList.toggle('open');
       this.el.settingspanel.classList.remove('open');
@@ -318,8 +335,7 @@ export class Game {
     this.angle = shot.angle;
     this.targetAngle = shot.angle;
     this.power = shot.power;
-    this.tipX = shot.tipX;
-    this.tipY = shot.tipY;
+    this.setSpin(shot.tipX, shot.tipY);
     this.calledBall = shot.ball ?? targets[0] ?? null; this.calledPocket = shot.pocket ?? 0;
     this.fire(shot.power);
   }
