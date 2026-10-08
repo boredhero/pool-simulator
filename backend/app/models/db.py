@@ -144,7 +144,7 @@ class MatchShot(Base):
 
 
 class JevUsage(Base):
-    """Lifetime provider attempts; daily budgets live in durable AuthThrottle windows."""
+    """Lifetime provider attempts, independent of the daily game-start allowance."""
 
     __tablename__ = "jev_usage"
     account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), primary_key=True)
