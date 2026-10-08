@@ -938,3 +938,33 @@ for(const pointer of ['mouse','touch'] as const)test(`${pointer} selects the 8-b
   await page.evaluate(()=>{const g=(window as any).__pool;g.calledPocket=null;g.cpuOpponent=true;g.gs.current=1;g.hud();});
   await expect(page.locator('#msg')).not.toContainText('Select a pocket');
 });
+
+test('touch aim continues beyond the rail while outside-table placement stays rejected',async({page,context})=>{
+  await page.setViewportSize({width:390,height:844});await openGame(page);
+  if(await page.locator('#privacynotice').isVisible())await page.locator('#privacyessential').click();
+  await expect.poll(()=>page.evaluate(()=>(window as any).__pool.scene.cameraRig.moving)).toBe(false);
+  const points=await page.evaluate(()=>{
+    const g=(window as any).__pool;g.cpuOpponent=false;g.gs.current=0;g.mode='aim';g.calledPocket=0;
+    Object.assign(g.cue(),{x:.04,y:.635});g.scene.cameraRig.cancel(true);
+    const inside:any[]=[],outside:any[]=[];
+    for(let y=210;y<innerHeight-190;y+=15)for(let x=15;x<innerWidth-15;x+=15){
+      if(document.elementFromPoint(x,y)?.id!=='game-canvas')continue;
+      const p=g.scene.pickFelt(x,y,true);if(!p)continue;
+      const item={x,y,angle:Math.atan2(p[1]-g.cue().y,p[0]-g.cue().x)};
+      (g.scene.pickFelt(x,y)?inside:outside).push(item);
+    }
+    for(const from of inside)for(const to of outside)if(Math.abs(to.angle-from.angle)>.2)return {from,to};
+    throw new Error('Need exposed cloth and outside-rail points');
+  });
+  const cdp=await context.newCDPSession(page);await cdp.send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:5});
+  const send=(type:'touchStart'|'touchMove'|'touchEnd',point?:{x:number;y:number})=>cdp.send('Input.dispatchTouchEvent',{type,touchPoints:point?[{x:point.x,y:point.y,id:1}]:[]});
+  await send('touchStart',points.from);await send('touchMove',points.to);
+  const aim=await page.evaluate(()=>{const g=(window as any).__pool;return{angle:g.targetAngle,mode:g.mode};});
+  expect(aim.angle).toBeCloseTo(points.to.angle,5);expect(aim.mode).toBe('aim');
+  await send('touchEnd');
+  expect(await page.evaluate(()=>{const g=(window as any).__pool;return {mode:g.mode,speed:Math.hypot(g.cue().vx,g.cue().vy)};})).toEqual({mode:'aim',speed:0});
+  const before=await page.evaluate(()=>{const g=(window as any).__pool;g.gs.ballInHand=true;g.gs.placement='anywhere';g.mode='place';return{x:g.cue().x,y:g.cue().y};});
+  await send('touchStart',points.to);await send('touchEnd');
+  const after=await page.evaluate(()=>{const g=(window as any).__pool;return{x:g.cue().x,y:g.cue().y,mode:g.mode,ballInHand:g.gs.ballInHand};});
+  expect(after).toEqual({...before,mode:'place',ballInHand:true});
+});

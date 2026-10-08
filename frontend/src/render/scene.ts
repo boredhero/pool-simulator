@@ -45,7 +45,7 @@ export interface SceneHandle {
   /** Felt + wood theme colors (css color strings). */
   setTheme(felt: string, wood: string): void;
   /** Raycast pointer to felt plane, sim coords or null. */
-  pickFelt(clientX: number, clientY: number): [number, number] | null;
+  pickFelt(clientX: number, clientY: number, extendForAim?: boolean): [number, number] | null;
   pickPocket(clientX:number,clientY:number):number|null;
   onFrame(cb: () => void): void;
 }
@@ -275,13 +275,19 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
   scene.add(cueGroup);
 
   const ray = new THREE.Raycaster();
-  const pickFelt = (clientX: number, clientY: number): [number, number] | null => {
+  const aimPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  const pickFelt = (clientX: number, clientY: number, extendForAim = false): [number, number] | null => {
     const r = canvas.getBoundingClientRect();
     const nd = new THREE.Vector2(
       ((clientX - r.left) / r.width) * 2 - 1,
       -((clientY - r.top) / r.height) * 2 + 1,
     );
     ray.setFromCamera(nd, camera);
+    // Only an already active touch aim may continue beyond the finite table.
+    if (extendForAim) {
+      const point = ray.ray.intersectPlane(aimPlane, new THREE.Vector3());
+      return point ? toSim(point.x, point.z) : null;
+    }
     const hit = ray.intersectObject(feltHit, false)[0];
     if (!hit) return null;
     return toSim(hit.point.x, hit.point.z);

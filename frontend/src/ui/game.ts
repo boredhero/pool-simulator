@@ -423,7 +423,8 @@ export class Game {
     canvas.addEventListener('pointermove', (e) => {
       if (this.cameraMode || this.cameraGesture || this.scene.cameraRig.interacting || this.pointers.size > 1) return;
       if (e.pointerType === 'mouse' && e.buttons !== 0 && e.buttons !== 1) return;
-      const p = this.scene.pickFelt(e.clientX, e.clientY);
+      const continueTouchAim = e.pointerType !== 'mouse' && this.touchAim && this.humanCueControls();
+      const p = this.scene.pickFelt(e.clientX, e.clientY, continueTouchAim);
       if (!p) return;
       this.hoverPt = p;
       if (!this.pulling && (e.pointerType === 'mouse' || this.touchAim)) aimAt(p[0], p[1]); // aim locks once the pull starts
