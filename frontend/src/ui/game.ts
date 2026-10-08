@@ -102,6 +102,7 @@ export class Game {
     this.gs = newGame((Math.random() * 1e9) | 0, rules);
     this.cameraShotPending=false;this.scene.cameraRig.cancel();
     this.mode = 'aim'; this.pulling = false; this.pressPt = null;
+    this.angle=this.targetAngle=0;
     this.lastPotted = 0; this.lastSpeed.clear(); this.calledBall = this.calledPocket = null;
     this.options.write(rules); this.hud();
   }
@@ -463,7 +464,7 @@ export class Game {
       if(this.mode==='rolling' && (this.ev.potted.length || this.ev.cuePotted))this.el.msg.textContent=this.ev.cuePotted?'Scratch · balls still rolling':`Pocketed ${this.ev.potted.join(', ')} · balls still rolling`;
     }
     const returnOrder = [...new Set([...this.gs.returnOrder, ...(this.mode === 'rolling' || this.mode === 'wait' ? this.ev.potted : [])])].filter(n => this.gs.balls.some(b => b.n === n && b.potted));
-    this.scene.setBalls(this.gs.balls, ballDt, returnOrder);
+    this.scene.setBalls(this.gs.balls, ballDt, returnOrder, fdt);
     // Ease aim toward target (kills mouse jitter twitch), frame-rate independent.
     {
       let d = this.targetAngle - this.angle;
@@ -540,10 +541,11 @@ export class Game {
       const onEight = !this.gs.open && g !== null && !this.gs.balls.some(
         (b) => !b.potted && b.n !== null && b.n !== 8 && GROUP_BALLS[g]?.includes(b.n),
       );
-      if (onEight) nums.push(8);
+
       const left = nums.filter((n) => !this.gs.balls.find((q) => q.n === n)?.potted).length;
       gr.textContent = g === null ? 'Open table · groups unassigned' : onEight ? 'On the 8-Ball' : `${label} · ${left} remaining`;
       if(provisional)gr.textContent = `${label} · pending shot result`;
+      nums.push(8);
       head.appendChild(nm);
       head.appendChild(gr);
       card.appendChild(head);
@@ -552,9 +554,10 @@ export class Game {
       for (const n of nums) {
         const b = this.gs.balls.find((q) => q.n === n);
         const d = document.createElement('div');
-        d.className = 'pball' + (b?.potted ? ' potted' : '');
+        d.className = 'pball' + (b?.potted ? ' potted' : '') + (n===8 ? ' eight-ball'+(onEight?' ready':'') : '');
         d.style.background = ballCss(n);
-        d.title = `Ball ${n}${b?.potted ? ' · pocketed' : ' · remaining'}`;
+        d.title = n===8 ? `8-Ball · ${b?.potted?'pocketed':onEight?'your final ball':'clear your group first'}` : `Ball ${n}${b?.potted ? ' · pocketed' : ' · remaining'}`;
+        d.setAttribute('aria-label',d.title);
         const number = document.createElement('span');
         number.textContent = String(n);
         d.appendChild(number);

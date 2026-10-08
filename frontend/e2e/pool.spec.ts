@@ -298,3 +298,37 @@ test('automatic framing waits for rest and yields to manual camera movement',asy
   });
   expect(result).toEqual({waiting:0,settled:1,once:1,manual:1});
 });
+
+test('cards retain the final 8-Ball objective before and after clearing a group',async({page})=>{
+  await openGame(page);
+  await expect(page.locator('.pcard .eight-ball')).toHaveCount(2);
+  await page.evaluate(()=>{const g=(window as any).__pool;g.gs.open=false;g.gs.groups=['solid','stripe'];g.hud();});
+  await expect(page.locator('.pcard').first().locator('.grp')).toHaveText('Solids · 7 remaining');
+  await expect(page.locator('.pcard').first().locator('.eight-ball')).not.toHaveClass(/ready/);
+  await page.evaluate(()=>{const g=(window as any).__pool;for(const b of g.gs.balls)if(b.n>=1&&b.n<=7)b.potted=true;g.hud();});
+  await expect(page.locator('.pcard').first().locator('.grp')).toHaveText('On the 8-Ball');
+  await expect(page.locator('.pcard').first().locator('.eight-ball')).toHaveClass(/ready/);
+});
+
+test('desktop starts behind the cue facing the rack and renders a captured ball dropping',async({page})=>{
+  await openGame(page);
+  const result=await page.evaluate(()=>{
+    const w=window as any,g=w.__pool,scene=g.scene, camera=scene.controls.object;
+    const direction=camera.position.clone().sub(scene.controls.target);
+    return {x:direction.x,y:direction.y,z:direction.z,angle:g.angle};
+  });
+  expect(result.x).toBeLessThan(0);expect(result.y).toBeGreaterThan(0);expect(result.z).toBeCloseTo(0);expect(result.angle).toBeCloseTo(0);
+  await page.evaluate(()=>{const w=window as any;w.__pool.scene.renderer.render=(s:any,c:any)=>{w.__scene=s;w.__draw(s,c);w.__pool.scene.renderer.render=()=>{};};});
+  await page.waitForFunction(()=>!!(window as any).__scene);
+  await page.screenshot({path:'/tmp/pool-desktop-start.png'});
+  const drop=await page.evaluate(()=>{
+    const w=window as any,g=w.__pool,list=g.gs.balls.map((b:any)=>({...b})),b=list.find((b:any)=>b.n===1);
+    b.x=1.27;b.y=-.026;g.scene.setBalls(list,0,[],.016);
+    b.potted=true;g.scene.setBalls(list,0,[1],.1);
+    const mesh=w.__scene.getObjectByName('ball-b1'),start=mesh.position.y;
+    g.scene.setBalls(list,0,[1],.1);const falling=mesh.position.y;
+    for(let i=0;i<5;i++)g.scene.setBalls(list,0,[1],.1);
+    return{start,falling,stored:mesh.position.y,visible:mesh.visible};
+  });
+  expect(drop.start).toBeGreaterThan(drop.falling);expect(drop.stored).toBeLessThan(-.1);expect(drop.visible).toBe(true);
+});

@@ -1,3 +1,4 @@
+import { PocketDrops } from './pocketDrop';
 import { CameraRig } from './cameraRig';
 import { ballTexture, type CueStyle } from './ballTextures';
 import { cushionGeometry } from './cushionGeometry';
@@ -27,6 +28,7 @@ export interface SceneHandle {
     list: Array<{ n: number | null; x: number; y: number; z: number; potted: boolean; wx: number; wy: number; wz: number }>,
     dt: number,
     returnOrder?: number[],
+    visualDt?: number,
   ): void;
   /** Cue stick. pull in meters of drawback. */
   setCue(visible: boolean, cx: number, cy: number, angle: number, pull: number, tipX?: number, tipY?: number): void;
@@ -163,12 +165,12 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
     rim.position.set(rx, 0.001, rz);
     rim.receiveShadow = true;
     scene.add(rim);
-    const well = new THREE.Mesh(new THREE.CylinderGeometry(p.r - .0005, p.r - .0005, 0.075, 96, 1, true), pocketMat);
-    well.position.set(rx, -0.0375, rz);
+    const well = new THREE.Mesh(new THREE.CylinderGeometry(p.r - .0005, p.r - .0005, 0.24, 96, 1, true), pocketMat);
+    well.position.set(rx, -0.12, rz);
     scene.add(well);
     const bottom = new THREE.Mesh(new THREE.CircleGeometry(p.r, 96), pocketMat);
     bottom.rotation.x = -Math.PI / 2;
-    bottom.position.set(rx, -0.075, rz);
+    bottom.position.set(rx, -0.24, rz);
     scene.add(bottom);
   }
 
@@ -196,6 +198,7 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
   // Ball meshes keyed by number ('cue' for cue ball).
   const ballGeo = new THREE.SphereGeometry(BALL_R, 48, 32);
   const meshes = new Map<string, THREE.Mesh>();
+  const pocketDrops = new PocketDrops();
   let cueAppearance:CueStyle='plain';
   const getMesh = (n: number | null): THREE.Mesh => {
     const key = n === null ? 'cue' : `b${n}`;
@@ -204,6 +207,7 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
       const mat = new THREE.MeshPhysicalMaterial({ map: ballTexture(n,cueAppearance,surfaceAnisotropy), roughness: .34, specularIntensity: .28, clearcoat: .15, clearcoatRoughness: .4 });
       mat.envMapIntensity = 0.25;
       m = new THREE.Mesh(ballGeo, mat);
+      m.name = `ball-${key}`;
       m.castShadow = true;
       m.receiveShadow = true;
       meshes.set(key, m);
@@ -288,18 +292,18 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
     cameraRig.cancel();
     if (orientationChanged) {
       portrait = nextPortrait;
-      controls.target.set(0, portrait ? 0 : -.16, 0);
+      controls.target.set(0, 0, 0);
       if (portrait) camera.position.set(-2.3, 3.4, 0);
-      else camera.position.set(-2.4, 1.9, 2.8);
+      else camera.position.set(-2.4, 1.25, 0);
       camera.lookAt(controls.target);
     }
-    // Fit the whole surround with room for the HUD; retain the current orbit.
-    for (let i = 0; orientationChanged && i < 30; i++) {
+    // Portrait fits the whole surround. Desktop starts closer, behind the cue.
+    for (let i = 0; orientationChanged && portrait && i < 30; i++) {
       camera.updateMatrixWorld();
       let fits = true;
       for (const x of [-TABLE_W / 2 - RAIL_W, TABLE_W / 2 + RAIL_W]) {
         for (const z of [-TABLE_H / 2 - RAIL_W, TABLE_H / 2 + RAIL_W]) {
-          for(const height of portrait ? [.05] : [.05,-.78]) {
+          for(const height of [.05]) {
             const p = new THREE.Vector3(x,height,z).project(camera);
             if (Math.abs(p.x) > .91 || Math.abs(p.y) > .8) fits=false;
           }
@@ -345,13 +349,20 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
     renderer,
     controls,
     cameraRig,
-    setBalls(list, dt, returnOrder = []) {
+    setBalls(list, dt, returnOrder = [], visualDt = dt) {
       cueObstacles = list;
       const axis = new THREE.Vector3();
       for (const b of list) {
         const m = getMesh(b.n);
         const [rx, rz] = toRender(b.x, b.y);
         m.position.set(rx, BALL_R, rz);
+        const drop=pocketDrops.update(b,visualDt);
+        if(drop){
+          const [x,z]=toRender(drop.x,drop.y);
+          m.visible=true;m.position.set(x,drop.height,z);
+          m.rotateZ(visualDt*3);
+          continue;
+        }
         const slot=b.n===null?-1:returnOrder.indexOf(b.n);
         m.visible = !b.potted || slot>=0;
         if (b.potted && slot>=0) {
