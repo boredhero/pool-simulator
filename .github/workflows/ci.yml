@@ -1,7 +1,7 @@
 name: CI
 
 # Single workflow, parallel jobs. `ci` is the only required check in branch
-# protection (it aggregates, so path-skipped jobs never block merges).
+# protection (it aggregates fast checks; advisory browser tests are separate).
 # Triggers: main pushes + PR sync only — no duplicate runs (a develop push
 # with an open PR runs once, as PR synchronize). Keep a PR open while
 # working on develop, or use workflow_dispatch.
@@ -37,8 +37,14 @@ jobs:
           filters: |
             backend:
               - 'backend/**'
+              - 'contracts/**'
+              - 'info.yml'
+              - '.github/workflows/**'
             frontend:
               - 'frontend/**'
+              - 'contracts/**'
+              - 'info.yml'
+              - '.github/workflows/**'
 
   lint:
     name: lint
@@ -86,8 +92,8 @@ jobs:
         working-directory: backend
         run: uv run pytest tests/ -v --tb=short
 
-  e2e:
-    name: e2e
+  frontend:
+    name: frontend
     needs: changes
     if: needs.changes.outputs.frontend == 'true' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -105,52 +111,26 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      - name: Frontend unit tests
+        working-directory: frontend
+        run: npm test
+
       - name: Build frontend
         working-directory: frontend
         run: npm run build
 
-      - name: Cache Playwright browsers
-        id: pw
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
-
-      - name: Browsers + OS deps (cache miss)
-        if: steps.pw.outputs.cache-hit != 'true'
-        working-directory: frontend
-        run: npx playwright install --with-deps chromium
-
-      - name: OS deps only (cache hit)
-        if: steps.pw.outputs.cache-hit == 'true'
-        working-directory: frontend
-        run: npx playwright install-deps chromium && npx playwright install chromium
-
-      - name: Run e2e
-        working-directory: frontend
-        run: npx playwright test
-
   docker:
     name: docker
     needs: changes
-    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true' || github.ref == 'refs/heads/main'
+    # PRs require lint, unit tests and typecheck/build; browsers are advisory.
+    # Container publishing is a release operation, not part of develop iteration.
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Build frontend
-        working-directory: frontend
-        run: npm ci && npm run build
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -176,7 +156,7 @@ jobs:
 
   deploy:
     name: deploy
-    needs: docker
+    needs: [docker, lint, test, frontend]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
@@ -228,9 +208,24 @@ jobs:
   ci:
     name: ci
     if: always()
-    needs: [changes, lint, test, e2e, docker, deploy]
+    needs: [changes, lint, test, frontend, docker, deploy]
     runs-on: ubuntu-latest
     steps:
-      - run: |
-          echo '${{ toJson(needs) }}'
-          if echo '${{ toJson(needs) }}' | grep -qE '"result": "(failure|cancelled)"'; then exit 1; fi
+      - name: Summarize required checks
+        env:
+          JOB_RESULTS: ${{ toJson(needs) }}
+        run: |
+          python - <<'PYTHON'
+          import json, os
+          jobs = json.loads(os.environ["JOB_RESULTS"])
+          failed = []
+          for name, job in jobs.items():
+              result = job["result"]
+              print(f"{name}: {result}")
+              if result in ("failure", "cancelled"):
+                  failed.append(name)
+          if failed:
+              print("::error::Failed checks: " + ", ".join(failed))
+              raise SystemExit(1)
+          print("All required checks passed; intentionally skipped jobs are allowed.")
+          PYTHON

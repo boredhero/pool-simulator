@@ -1,6 +1,6 @@
 # pool-simulator
 
-GPU-accelerated browser pool (8-ball extensible) + Python backend.
+GPU-accelerated browser pool (8-Ball extensible) + Python backend.
 Decisions (Socratic dialog 2026-10-06): online private rooms (anonymous), hybrid physics (client predicts / Python validates), realistic 3D adaptive quality, different controls per device, practice + simple AI, dual sim (TS + Python) with shared golden tests.
 
 ## Layout

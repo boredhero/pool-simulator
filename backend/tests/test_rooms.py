@@ -14,6 +14,7 @@ def test_create_join_shot_flow():
         code = r1["code"]
         assert len(code) == 4
         assert len(r1["state"]["balls"]) == 16
+        assert r1["state"]["return_order"] == []
 
         w2.send_json({"t": "join", "code": code, "name": "B"})
         r2 = w2.receive_json()
@@ -62,3 +63,58 @@ def test_bad_code_and_turn_order():
         # Solo player shoots (allowed, no opponent yet).
         w1.send_json({"t": "shot", "shot": {"aim": 0.0, "power": 0.1, "tipX": 0, "tipY": 0}})
         assert w1.receive_json()["t"] == "shot"
+
+
+def test_room_rules_revision_and_authoritative_calls():
+    with c1.websocket_connect("/ws") as ws:
+        ws.send_json(
+            {"t": "create", "rules": {"preset": "custom", "calls": "all", "normalMax": 4.2}}
+        )
+        msg = ws.receive_json()
+        state = msg["state"]
+        assert state["rules"]["normalMax"] == 4.2
+        assert state["ruleset"] == {"id": "eight-ball", "version": 1}
+        assert state["break_shot"] and state["placement"] == "none"
+        ws.send_json({"t": "shot", "revision": -1, "shot": {"aim": 0, "power": 0.5}})
+        assert ws.receive_json()["error"] == "stale table state"
+        assert ws.receive_json()["revision"] == 0
+        from app.net.rooms import lobby
+
+        room = lobby.get(msg["code"])
+        room.gs.break_shot = False
+        ws.send_json({"t": "shot", "revision": 0, "shot": {"aim": 0, "power": 0.5}})
+        assert ws.receive_json()["error"] == "call a legal ball and pocket"
+        ws.send_json(
+            {
+                "t": "shot",
+                "revision": 0,
+                "shot": {
+                    "aim": 0,
+                    "power": 0.2,
+                    "calledBall": 1,
+                    "calledPocket": 2,
+                    "elevation": 1.5,
+                },
+            }
+        )
+        shot = ws.receive_json()["shot"]
+        assert shot["elevation"] < 0.2  # Server derives clearance, ignoring invented angle.
+        assert shot["vmax"] == 4.2
+        ws.send_json({"t": "done", "ev": {"potted": [8]}})
+        result = ws.receive_json()
+        assert result["revision"] == 1
+        assert result["winner"] is None  # Fake client 8-Ball event cannot decide the match.
+
+
+def test_room_state_carries_capture_order_for_joining_players():
+    from app.net.rooms import Room
+    from app.sim.physics import ShotEvents
+    from app.sim.rules import apply_shot, begin_shot, new_game
+
+    gs = new_game()
+    gs.break_shot = False
+    begin_shot(gs)
+    for n in [12, 3, 10]:
+        next(b for b in gs.balls if b.n == n).potted = True
+    apply_shot(gs, ShotEvents(first_contact=3, potted=[12, 3, 10], rail_after_contact=True))
+    assert Room(code="TEST", gs=gs).state_msg()["return_order"] == [12, 3, 10]

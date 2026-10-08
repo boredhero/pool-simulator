@@ -4,7 +4,7 @@ import { BALL_R, POCKETS, TABLE_H, TABLE_W } from './table';
 import type { Ball } from './physics';
 import { groupOf } from './rules';
 
-export interface AiShot { angle: number; power: number; tipX: number; tipY: number }
+export interface AiShot { angle: number; power: number; tipX: number; tipY: number; ball?: number; pocket?: number }
 
 function segClear(
   x1: number, y1: number, x2: number, y2: number, balls: Ball[], ignore: number[], margin = 0.004,
@@ -33,7 +33,7 @@ export function chooseShot(
 ): AiShot | null {
   const cue = balls[0];
   const sigma = difficulty === 'easy' ? (2.5 * Math.PI) / 180 : difficulty === 'hard' ? (0.3 * Math.PI) / 180 : (1.0 * Math.PI) / 180;
-  interface Cand { angle: number; power: number; score: number }
+  interface Cand { angle: number; power: number; score: number; ball: number; pocket: number }
   const cands: Cand[] = [];
   for (const b of balls) {
     if (b.id === 0 || b.potted || b.n === null || !targets.includes(b.n)) continue;
@@ -41,8 +41,8 @@ export function chooseShot(
       const pdx = b.x - p.x, pdy = b.y - p.y;
       const pd = Math.hypot(pdx, pdy) || 1;
       // Ghost: cue center position at contact, 2R from target along pocket line.
-      const gx = b.x - (pdx / pd) * BALL_R * 2;
-      const gy = b.y - (pdy / pd) * BALL_R * 2;
+      const gx = b.x + (pdx / pd) * BALL_R * 2;
+      const gy = b.y + (pdy / pd) * BALL_R * 2;
       const aimX = gx - cue.x, aimY = gy - cue.y;
       const aimLen = Math.hypot(aimX, aimY) || 1;
       // Angle between cue travel and object travel (cut angle).
@@ -53,13 +53,13 @@ export function chooseShot(
       if (!segClear(b.x, b.y, p.x, p.y, balls, [0, b.id])) continue;
       const dist = aimLen + pd;
       const score = (1 - cut / Math.PI) * 2 - dist / (TABLE_W + TABLE_H) + (p.corner ? 0.1 : 0);
-      cands.push({ angle: Math.atan2(aimY, aimX), power: Math.min(0.9, Math.max(0.15, 0.15 + dist * 0.22)), score });
+      cands.push({ angle: Math.atan2(aimY, aimX), power: Math.min(0.9, Math.max(0.15, 0.15 + dist * 0.22)), score, ball: b.n, pocket: POCKETS.indexOf(p) });
     }
   }
   if (cands.length === 0) return null;
   cands.sort((a, b) => b.score - a.score);
   const best = cands[0];
-  return { angle: best.angle + gauss(rnd) * sigma, power: best.power, tipX: 0, tipY: 0 };
+  return { angle: best.angle + gauss(rnd) * sigma, power: best.power, tipX: 0, tipY: 0, ball: best.ball, pocket: best.pocket };
 }
 
 /** Break fallback: full power at the apex ball. */

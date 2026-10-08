@@ -1,1 +1,53 @@
-{"$schema":"http://json-schema.org/draft-07/schema#","title":"ShotEvent","type":"object","required":["shotId","aim","power","tipX","tipY"],"properties":{"shotId":{"type":"string"},"aim":{"type":"number"},"power":{"type":"number","minimum":0,"maximum":1},"tipX":{"type":"number"},"tipY":{"type":"number"}}}
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ShotEvent",
+  "type": "object",
+  "required": [
+    "shotId",
+    "aim",
+    "power",
+    "tipX",
+    "tipY"
+  ],
+  "properties": {
+    "shotId": {
+      "type": "string"
+    },
+    "aim": {
+      "type": "number"
+    },
+    "power": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "tipX": {
+      "type": "number"
+    },
+    "tipY": {
+      "type": "number"
+    },
+    "elevation": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1.5708,
+      "description": "Assisted angle in radians; authority derives it from table geometry."
+    },
+    "calledBall": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1,
+      "maximum": 15
+    },
+    "calledPocket": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 5
+    }
+  }
+}

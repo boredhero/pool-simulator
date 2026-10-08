@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { applyShot, groupOf, newGame, placeCue, type GameState } from '../src/sim/rules';
+import { applyShot, beginShot, groupOf, newGame, placeCue } from '../src/sim/rules';
 import { allAsleep, simulateShot } from '../src/sim/physics';
+import fixtures from '../../contracts/rules-fixtures.json';
+import { matchConfig } from '../src/sim/config';
 import type { ShotEvents } from '../src/sim/physics';
 
 const ev = (p: Partial<ShotEvents>): ShotEvents => ({
@@ -26,84 +28,17 @@ describe('rack', () => {
   });
 });
 
-describe('fouls', () => {
-  it('no contact is a foul with ball in hand', () => {
+describe('placement policy', () => {
+  it('requires ball in hand, rejects kitchen boundary, overlap, and nonfinite input', () => {
     const gs = newGame();
-    applyShot(gs, ev({ firstContact: null }));
-    expect(gs.current).toBe(1);
-    expect(gs.ballInHand).toBe(true);
-  });
-
-  it('wrong group first contact is a foul once grouped', () => {
-    const gs = newGame();
-    // Player 0 pots a solid -> grouped solids.
-    applyShot(gs, ev({ firstContact: 2, potted: [2], railAfterContact: true }));
-    expect(gs.open).toBe(false);
-    expect(gs.groups[0]).toBe('solid');
-    // Player 0 (shoots again) hits a stripe first -> foul.
-    applyShot(gs, ev({ firstContact: 9, railAfterContact: true }));
-    expect(gs.current).toBe(1);
-    expect(gs.ballInHand).toBe(true);
-  });
-
-  it('scratch passes turn with ball in hand', () => {
-    const gs = newGame();
-    applyShot(gs, ev({ firstContact: 1, potted: [1], railAfterContact: true, cuePotted: true }));
-    expect(gs.current).toBe(1);
-    expect(gs.ballInHand).toBe(true);
-  });
-
-  it('no rail and no pot is a foul', () => {
-    const gs = newGame();
-    applyShot(gs, ev({ firstContact: 3, potted: [], railAfterContact: false }));
-    expect(gs.ballInHand).toBe(true);
-  });
-});
-
-describe('win/loss', () => {
-  const cleared = (gs: GameState, player: 0 | 1) => {
-    const g = player === 0 ? 'solid' : 'stripe';
-    gs.groups = player === 0 ? ['solid', 'stripe'] : ['stripe', 'solid'];
-    gs.open = false;
-    for (const b of gs.balls) {
-      if (b.n !== null && b.n !== 8 && groupOf(b.n) === g) b.potted = true;
-    }
-    gs.current = player;
-  };
-  it('legal 8-ball after clearing wins', () => {
-    const gs = newGame();
-    cleared(gs, 0);
-    applyShot(gs, ev({ firstContact: 8, potted: [8], railAfterContact: true }));
-    expect(gs.winner).toBe(0);
-  });
-  it('early 8-ball loses (after the break)', () => {
-    const gs = newGame();
-    applyShot(gs, ev({ firstContact: 1, potted: [1], railAfterContact: true })); // break, assigns solids
-    applyShot(gs, ev({ firstContact: 2, potted: [2, 8], railAfterContact: true })); // early 8
-    expect(gs.winner).toBe(1);
-  });
-  it('8-ball on a legal break respots, no loss', () => {
-    const gs = newGame();
-    applyShot(gs, ev({ firstContact: 1, potted: [1, 8], railAfterContact: true }));
-    expect(gs.winner).toBe(null);
-    expect(gs.balls.find((b) => b.n === 8)!.potted).toBe(false);
-  });
-  it('foul on the 8 loses', () => {
-    const gs = newGame();
-    cleared(gs, 1);
-    applyShot(gs, ev({ firstContact: 8, potted: [8], railAfterContact: true, cuePotted: true }));
-    expect(gs.winner).toBe(0);
-  });
-});
-
-describe('placeCue', () => {
-  it('rejects off-table and overlapping spots', () => {
-    const gs = newGame();
-    expect(placeCue(gs, -1, -1)).toBe(false);
-    const blocker = gs.balls[1];
-    expect(placeCue(gs, blocker.x, blocker.y)).toBe(false);
-    expect(placeCue(gs, 1.0, 0.635)).toBe(true);
-    expect(gs.balls[0].potted).toBe(false);
+    expect(placeCue(gs, .3, .6)).toBe(false);
+    gs.ballInHand = true; gs.placement = 'kitchen';
+    expect(placeCue(gs, .635, .6)).toBe(false);
+    expect(placeCue(gs, NaN, .6)).toBe(false);
+    expect(placeCue(gs, gs.balls[1].x, gs.balls[1].y)).toBe(false);
+    expect(placeCue(gs, .3, .6)).toBe(true);
+    expect(gs.kitchenShot).toBe(true);
+    expect(gs.ballInHand).toBe(false);
   });
 });
 
@@ -128,4 +63,16 @@ describe('full break containment', () => {
     }
     expect(allAsleep(gs.balls)).toBe(true);
   });
+});
+
+for (const f of fixtures) it(f.name, () => {
+  const gs = newGame(1, matchConfig({preset: f.preset === 'tournament' ? 'tournament' : 'bar'}));
+  Object.assign(gs, f.state);
+  for (const b of gs.balls) if (b.n !== null && f.pottedBefore?.includes(b.n)) b.potted = true;
+  beginShot(gs, f.call?.[0] ?? null, f.call?.[1] ?? null);
+  const facts = ev(f.ev);
+  for (const b of gs.balls) if (b.n !== null && (facts.potted.includes(b.n) || facts.offTable.includes(b.n))) b.potted = true;
+  applyShot(gs, facts);
+  expect(gs).toMatchObject(f.expected);
+  for (const n of f.respot ?? []) expect(gs.balls.find(b => b.n === n)?.potted).toBe(false);
 });

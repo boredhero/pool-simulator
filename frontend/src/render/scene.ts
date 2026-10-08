@@ -1,8 +1,12 @@
+import { createCabinet, returnPosition } from './cabinet';
+import { feltTextures, woodTextures } from './surfaceTextures';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
-import { cueElevation, CUE_LENGTH } from './cuePose';
+import { cueElevation } from './cuePose';
+import { createCue } from './cueModel';
+import { createRailSights, type SightStyle } from './railSights';
 import { RAIL_W, CUSHION_W, bedGeometry, surroundGeometry } from './tableGeometry';
 import { BALL_R, POCKETS, TABLE_H, TABLE_W, cushions, jaws } from '../sim/table';
 
@@ -44,13 +48,17 @@ export interface SceneHandle {
   controls: OrbitControls;
   /** Sync ball meshes from sim state (rolls them by their spin state). */
   setBalls(
-    list: Array<{ n: number | null; x: number; y: number; potted: boolean; wx: number; wy: number; wz: number }>,
+    list: Array<{ n: number | null; x: number; y: number; z: number; potted: boolean; wx: number; wy: number; wz: number }>,
     dt: number,
+    returnOrder?: number[],
   ): void;
   /** Cue stick. pull in meters of drawback. */
-  setCue(visible: boolean, cx: number, cy: number, angle: number, pull: number): void;
+  setCue(visible: boolean, cx: number, cy: number, angle: number, pull: number, tipX?: number, tipY?: number): void;
   /** Ball-in-hand placement preview: legal-zone outline + cursor ring. */
-  setPlace(visible: boolean, x: number, y: number, legal: boolean): void;
+  setPlace(visible: boolean, x: number, y: number, legal: boolean, zone?: string): void;
+  setSights(style: SightStyle): void;
+  setKitchen(visible: boolean, placed?: boolean): void;
+  setCall(pocket: number | null, visible: boolean): void;
   /** Felt + wood theme colors (css color strings). */
   setTheme(felt: string, wood: string): void;
   /** Raycast pointer to felt plane, sim coords or null. */
@@ -67,6 +75,7 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x100e0c);
+  scene.fog = new THREE.Fog(0x100e0c,8,22);
   const pmrem = new THREE.PMREMGenerator(renderer);
   const environment = new RoomEnvironment();
   scene.environment = pmrem.fromScene(environment, 0.04).texture;
@@ -92,7 +101,7 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
   };
   controls.touches = {
     ONE: -1 as unknown as THREE.TOUCH,
-    TWO: THREE.TOUCH.DOLLY_PAN,
+    TWO: THREE.TOUCH.DOLLY_ROTATE,
   };
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
@@ -121,94 +130,13 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
     scene.add(bulb, bulb.target);
   }
 
-  // --- Procedural textures: felt nap + wood grain (no downloads). ---
-  const shade = (hex: string, f: number): string => {
-    const n = parseInt(hex.slice(1), 16);
-    const r = Math.min(255, Math.max(0, Math.round(((n >> 16) & 255) * f)));
-    const g = Math.min(255, Math.max(0, Math.round(((n >> 8) & 255) * f)));
-    const b = Math.min(255, Math.max(0, Math.round((n & 255) * f)));
-    return `rgb(${r},${g},${b})`;
-  };
-  let seed = 12345;
-  const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
-
-  /** Woven cloth: base + per-pixel nap noise + faint directional streaks. */
-  function feltTextures(base: string): { map: THREE.CanvasTexture; bump: THREE.CanvasTexture } {
-    const S = 512;
-    const c = document.createElement('canvas');
-    c.width = c.height = S;
-    const g = c.getContext('2d')!;
-    g.fillStyle = base;
-    g.fillRect(0, 0, S, S);
-    // Nap speckle.
-    for (let i = 0; i < 30000; i++) {
-      const x = rnd() * S, y = rnd() * S;
-      g.fillStyle = rnd() < 0.5 ? shade(base, 0.82 + rnd() * 0.1) : shade(base, 1.06 + rnd() * 0.14);
-      g.globalAlpha = 0.3 + rnd() * 0.35;
-      g.fillRect(x, y, 2, 2);
-    }
-    // Nap direction streaks (along x).
-    g.globalAlpha = 1;
-    for (let i = 0; i < 130; i++) {
-      const y = rnd() * S;
-      g.strokeStyle = rnd() < 0.5 ? shade(base, 0.92) : shade(base, 1.08);
-      g.globalAlpha = 0.05 + rnd() * 0.06;
-      g.lineWidth = 0.8 + rnd() * 1.6;
-      g.beginPath();
-      g.moveTo(0, y);
-      g.bezierCurveTo(S * 0.3, y + (rnd() - 0.5) * 6, S * 0.7, y + (rnd() - 0.5) * 6, S, y);
-      g.stroke();
-    }
-    g.globalAlpha = 1;
-    const map = new THREE.CanvasTexture(c);
-    map.colorSpace = THREE.SRGBColorSpace;
-    map.wrapS = map.wrapT = THREE.RepeatWrapping;
-    map.repeat.set(2, 1);
-    map.anisotropy = 4;
-    const bump = new THREE.CanvasTexture(c);
-    bump.wrapS = bump.wrapT = THREE.RepeatWrapping;
-    bump.repeat.set(2, 1);
-    return { map, bump };
-  }
-
-  /** Lacquered wood: long grain streaks + dark pores over base. */
-  function woodTexture(base: string): THREE.CanvasTexture {
-    const W = 512, H = 128;
-    const c = document.createElement('canvas');
-    c.width = W; c.height = H;
-    const g = c.getContext('2d')!;
-    g.fillStyle = base;
-    g.fillRect(0, 0, W, H);
-    for (let i = 0; i < 90; i++) {
-      const y = rnd() * H;
-      g.strokeStyle = rnd() < 0.6 ? shade(base, 0.72 + rnd() * 0.15) : shade(base, 1.12 + rnd() * 0.12);
-      g.globalAlpha = 0.16 + rnd() * 0.22;
-      g.lineWidth = 0.7 + rnd() * 2.2;
-      g.beginPath();
-      g.moveTo(0, y);
-      for (let x = 0; x <= W; x += 32) g.lineTo(x, y + Math.sin(x * 0.02 + i) * 3 + (rnd() - 0.5) * 3);
-      g.stroke();
-    }
-    // Pores.
-    g.globalAlpha = 1;
-    for (let i = 0; i < 900; i++) {
-      g.fillStyle = shade(base, 0.6 + rnd() * 0.2);
-      g.globalAlpha = 0.2 + rnd() * 0.25;
-      g.fillRect(rnd() * W, rnd() * H, 2.2, 1);
-    }
-    g.globalAlpha = 1;
-    const t = new THREE.CanvasTexture(c);
-    t.colorSpace = THREE.SRGBColorSpace;
-    t.wrapS = t.wrapT = THREE.RepeatWrapping;
-    t.anisotropy = 4;
-    return t;
-  }
-
-  let feltTex = feltTextures('#0a6c2f');
+  // Color maps use sRGB; independent height/roughness maps use linear data.
+  const surfaceAnisotropy=Math.min(4,renderer.capabilities.getMaxAnisotropy());
+  let feltTex = feltTextures('#0a6c2f',surfaceAnisotropy);
   const feltMat = new THREE.MeshPhysicalMaterial({
-    color: 0xffffff, map: feltTex.map, bumpMap: feltTex.bump, bumpScale: 0.0006,
-    roughness: 0.96, sheen: 0.3, sheenColor: new THREE.Color(0x8fae9a),
-    sheenRoughness: 0.42, envMapIntensity: 0.15,
+    color: 0xffffff, map: feltTex.map, bumpMap: feltTex.bump, bumpScale: 0.00018,
+    roughness: 0.96, sheen: 0.14, sheenColor: new THREE.Color('#0a6c2f').lerp(new THREE.Color('white'),.15),
+    sheenRoughness: 0.82, envMapIntensity: 0.15,
   });
   const bedGeo = bedGeometry();
   const felt = new THREE.Mesh(bedGeo, feltMat);
@@ -219,14 +147,18 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
   feltHit.rotation.x = -Math.PI / 2;
   scene.add(feltHit);
 
-  let woodTex = woodTexture('#4a2c14');
+  let woodTex = woodTextures('#4a2c14',surfaceAnisotropy);
   const woodMat = new THREE.MeshPhysicalMaterial({
-    color: 0xffffff, map: woodTex, roughness: 0.7, envMapIntensity: 0.2, specularIntensity: 0.3,
+    color: 0xffffff, map: woodTex.map, bumpMap: woodTex.bump, bumpScale: .00008, roughnessMap: woodTex.roughness, roughness: 0.76, envMapIntensity: 0.2, specularIntensity: 0.3,
   });
   const surroundGeo = surroundGeometry();
   const frameMesh = new THREE.Mesh(surroundGeo, woodMat);
   frameMesh.castShadow = frameMesh.receiveShadow = true;
   scene.add(frameMesh);
+  scene.add(createCabinet(woodMat));
+  const floor=new THREE.Mesh(new THREE.PlaneGeometry(30,30),new THREE.MeshStandardMaterial({color:0x211c16,roughness:.98}));
+  floor.name='Room floor';floor.rotation.x=-Math.PI/2;floor.position.y=-.78;floor.receiveShadow=true;scene.add(floor);
+
 
   // Cushion noses use the collision segments, so all six mouths line up.
   // The bed and cushion cloth share textures, finish, and theme updates.
@@ -278,37 +210,8 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
   jawMesh.instanceMatrix.needsUpdate = true;
   jawMesh.castShadow = jawMesh.receiveShadow = true;
   scene.add(jawMesh);
-  // Diamond sights: mother-of-pearl dots at 1/8th points, skipping pockets.
-  // One InstancedMesh for all 18 (single draw call).
-  {
-    const spots: Array<[number, number]> = [];
-    for (let i = 1; i < 8; i++) {
-      const fx = -TABLE_W / 2 + (TABLE_W * i) / 8;
-      if (Math.abs(fx) < 0.1) continue; // side pocket
-      if (TABLE_W / 2 - Math.abs(fx) < 0.12) continue; // corners
-      spots.push([fx, -TABLE_H / 2 - RAIL_W / 2]);
-      spots.push([fx, TABLE_H / 2 + RAIL_W / 2]);
-    }
-    for (let i = 1; i < 4; i++) {
-      const fz = -TABLE_H / 2 + (TABLE_H * i) / 4;
-      if (TABLE_H / 2 - Math.abs(fz) < 0.12) continue; // corners
-      spots.push([-TABLE_W / 2 - RAIL_W / 2, fz]);
-      spots.push([TABLE_W / 2 + RAIL_W / 2, fz]);
-    }
-    const dia = new THREE.InstancedMesh(
-      new THREE.CircleGeometry(0.008, 12),
-      new THREE.MeshStandardMaterial({ color: 0xe8e4da, roughness: 0.65, envMapIntensity: 0.35 }),
-      spots.length,
-    );
-    const m4 = new THREE.Matrix4();
-    const rot = new THREE.Matrix4().makeRotationX(-Math.PI / 2);
-    spots.forEach(([x, z], i) => {
-      m4.copy(rot).setPosition(x, 0.054, z);
-      dia.setMatrixAt(i, m4);
-    });
-    dia.instanceMatrix.needsUpdate = true;
-    scene.add(dia);
-  }
+  const sights = createRailSights();
+  scene.add(sights.group);
   // Recessed wells, with open tops and leather lips, remain visible while
   // orbiting. Their bottoms sit below the cut bed instead of over the felt.
   const pocketCenters: Array<[number, number, number]> = [];
@@ -322,12 +225,12 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
     rim.position.set(rx, 0.001, rz);
     rim.receiveShadow = true;
     scene.add(rim);
-    const well = new THREE.Mesh(new THREE.CylinderGeometry(p.r, p.r * 0.85, 0.13, 48, 1, true), pocketMat);
-    well.position.set(rx, -0.065, rz);
+    const well = new THREE.Mesh(new THREE.CylinderGeometry(p.r, p.r * 0.85, 0.075, 48, 1, true), pocketMat);
+    well.position.set(rx, -0.0375, rz);
     scene.add(well);
     const bottom = new THREE.Mesh(new THREE.CircleGeometry(p.r * 0.85, 48), pocketMat);
     bottom.rotation.x = -Math.PI / 2;
-    bottom.position.set(rx, -0.13, rz);
+    bottom.position.set(rx, -0.075, rz);
     scene.add(bottom);
   }
 
@@ -396,27 +299,29 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
   ring.visible = false;
   scene.add(ring);
 
-  // Full-length cue, automatically elevated over obstacles.
-  const SHAFT_LEN = CUE_LENGTH;
-  const SHAFT_Z0 = BALL_R + 0.014;
-  const cueGroup = new THREE.Group();
-  const shaft = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.006, 0.009, SHAFT_LEN, 12),
-    new THREE.MeshStandardMaterial({ color: 0x8a5a2b, roughness: 0.5 }),
-  );
-  shaft.rotation.x = Math.PI / 2;
-  shaft.position.z = SHAFT_Z0 + SHAFT_LEN / 2;
-  shaft.castShadow = true;
-  cueGroup.add(shaft);
-  const tip = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.0062, 0.0062, 0.012, 12),
-    new THREE.MeshStandardMaterial({ color: 0x2244aa, roughness: 0.8 }),
-  );
-  tip.rotation.x = Math.PI / 2;
-  tip.position.z = BALL_R + 0.008;
-  tip.castShadow = true;
-  cueGroup.add(tip);
-  cueGroup.position.y = BALL_R;
+  const kitchen = new THREE.Group(); kitchen.name = 'Head string placement guide'; kitchen.visible=false;
+  const kitchenShade = new THREE.Mesh(new THREE.PlaneGeometry(TABLE_W/4-.04,TABLE_H-.04),new THREE.MeshBasicMaterial({color:0xf4cc83,transparent:true,opacity:.12,depthWrite:false}));
+  kitchenShade.rotation.x=-Math.PI/2; kitchenShade.position.set(-TABLE_W*3/8,.003,0);kitchen.add(kitchenShade);
+  const boundary = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(-TABLE_W/4,.005,-TABLE_H/2),new THREE.Vector3(-TABLE_W/4,.005,TABLE_H/2),
+  ]), new THREE.LineDashedMaterial({color:0xffdf9f,dashSize:.035,gapSize:.022,depthTest:false}));
+  boundary.computeLineDistances();boundary.renderOrder=3;kitchen.add(boundary);
+  scene.add(kitchen);
+  // Keep text in CSS pixels so the guide stays readable when the table zooms out.
+  const kitchenLabel=document.createElement('div');kitchenLabel.id='headstringguide';kitchenLabel.className='kitchen-guide';kitchenLabel.hidden=true;
+  kitchenLabel.innerHTML='<strong>Head string</strong><span>Place inside the shaded kitchen</span>';
+  document.body.appendChild(kitchenLabel);
+  let kitchenPlaced=false;
+  const kitchenAnchor=new THREE.Vector3(-TABLE_W/4,.006,-TABLE_H*.27);
+
+  const callRings = pocketCenters.map(([x, z, radius]) => {
+    const material = new THREE.MeshBasicMaterial({color: 0xf5cc79, transparent:true, opacity:.65, depthTest:false});
+    const mesh = new THREE.Mesh(new THREE.RingGeometry(radius * 1.04, radius * 1.20, 48), material);
+    mesh.rotation.x = -Math.PI / 2; mesh.position.set(x,.058,z); mesh.visible=false; mesh.renderOrder=5;
+    scene.add(mesh); return mesh;
+  });
+
+  const cueGroup = createCue();
   scene.add(cueGroup);
 
   const ray = new THREE.Raycaster();
@@ -441,9 +346,9 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
     const nextPortrait = w < h;
     if (portrait !== nextPortrait) {
       portrait = nextPortrait;
-      controls.target.set(0, 0, 0);
+      controls.target.set(0, portrait ? 0 : -.16, 0);
       if (portrait) camera.position.set(-2.3, 3.4, 0);
-      else camera.position.set(-1.8, 2.5, 2.0);
+      else camera.position.set(-2.4, 1.9, 2.8);
       camera.lookAt(controls.target);
     }
     // Fit the whole surround with room for the HUD; retain the current orbit.
@@ -452,8 +357,10 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
       let fits = true;
       for (const x of [-TABLE_W / 2 - RAIL_W, TABLE_W / 2 + RAIL_W]) {
         for (const z of [-TABLE_H / 2 - RAIL_W, TABLE_H / 2 + RAIL_W]) {
-          const p = new THREE.Vector3(x, 0.05, z).project(camera);
-          if (Math.abs(p.x) > 0.91 || Math.abs(p.y) > 0.8) fits = false;
+          for(const height of portrait ? [.05] : [.05,-.78]) {
+            const p = new THREE.Vector3(x,height,z).project(camera);
+            if (Math.abs(p.x) > .91 || Math.abs(p.y) > .8) fits=false;
+          }
         }
       }
       if (fits) break;
@@ -475,23 +382,41 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
     if (!running) return;
     controls.update();
     for (const cb of cbs) cb();
+    if (kitchen.visible) {
+      const anchor=kitchenAnchor.clone().project(camera), rect=canvas.getBoundingClientRect();
+      kitchenLabel.hidden=anchor.z>1 || anchor.z < -1;
+      const half=kitchenLabel.offsetWidth/2;
+      const x=Math.max(half+12,Math.min(innerWidth-half-12,rect.left+(anchor.x+1)*rect.width/2));
+      const y=rect.top+(1-anchor.y)*rect.height/2;
+      kitchenLabel.style.left=`${x}px`;kitchenLabel.style.top=`${Math.max(100,y-30)}px`;
+    }
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
   };
   frame();
 
+  const storedPositions = new Map<number,THREE.Vector3>();
   let cueObstacles: Parameters<typeof cueElevation>[4] = [];
   return {
     renderer,
     controls,
-    setBalls(list, dt) {
+    setBalls(list, dt, returnOrder = []) {
       cueObstacles = list;
       const axis = new THREE.Vector3();
       for (const b of list) {
         const m = getMesh(b.n);
         const [rx, rz] = toRender(b.x, b.y);
         m.position.set(rx, BALL_R, rz);
-        m.visible = !b.potted;
+        const slot=b.n===null?-1:returnOrder.indexOf(b.n);
+        m.visible = !b.potted || slot>=0;
+        if (b.potted && slot>=0) {
+          const target=returnPosition(slot);
+          let position=storedPositions.get(b.n!);
+          if(!position){position=target.clone().add(new THREE.Vector3(.075,0,0));storedPositions.set(b.n!,position);}
+          position.lerp(target,1-Math.exp(-dt*9));m.position.copy(position);
+          m.rotation.set(0,0,0);continue;
+        }
+        if(b.n!==null)storedPositions.delete(b.n);
         if (!b.potted) {
           // Lip dip: balls sink as their center crosses into the pocket mouth.
           let dip = 0;
@@ -499,7 +424,7 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
             const d = Math.hypot(rx - px, rz - pz);
             if (d < pr * 1.5) dip = Math.max(dip, 1 - d / (pr * 1.5));
           }
-          m.position.y = BALL_R - dip * dip * 0.024;
+          m.position.y = BALL_R + b.z - (b.z < .005 ? dip * dip * 0.024 : 0);
         }
         if (!b.potted && dt > 0) {
           // Sim (x right, y plan, z up) -> render (x right, y up, z plan):
@@ -512,36 +437,53 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
     },
     setTheme(felt, wood) {
       const oldMap = feltMat.map, oldBump = feltMat.bumpMap;
-      feltTex = feltTextures(felt);
+      feltTex = feltTextures(felt,surfaceAnisotropy);
+      feltMat.sheenColor.set(felt).lerp(new THREE.Color('white'),.15);
       feltMat.map = feltTex.map;
       feltMat.bumpMap = feltTex.bump;
       feltMat.needsUpdate = true;
       oldMap?.dispose();
       if (oldBump && oldBump !== oldMap) oldBump.dispose();
-      const oldWood = woodMat.map;
-      woodTex = woodTexture(wood);
-      woodMat.map = woodTex;
+      const oldWood = woodTex;
+      woodTex = woodTextures(wood,surfaceAnisotropy);
+      woodMat.map = woodTex.map; woodMat.bumpMap = woodTex.bump; woodMat.roughnessMap = woodTex.roughness;
       woodMat.needsUpdate = true;
-      oldWood?.dispose();
+      oldWood.map.dispose();oldWood.bump.dispose();oldWood.roughness.dispose();
     },
-    setPlace(visible, x, y, legal) {
+    setSights: sights.setStyle,
+    setKitchen(visible, placed = false) { if (kitchen.visible === visible && kitchenPlaced === placed) return; kitchenPlaced = placed; kitchen.visible = visible; kitchenLabel.hidden = !visible; kitchenLabel.querySelector('span')!.textContent = placed ? 'Cue ball must leave the kitchen first' : 'Place inside the shaded kitchen'; },
+    setCall(pocket, visible) {
+      callRings.forEach((ring, i) => {
+        ring.visible = visible && (pocket === null || pocket === i);
+        ring.material.opacity = pocket === null ? .5 : 1;
+      });
+    },
+    setPlace(visible, x, y, legal, zone = 'anywhere') {
       zoneLine.visible = visible;
+      const points = zoneLine.geometry.getAttribute('position');
+      const edge = zone === 'kitchen' ? TABLE_W / 4 : TABLE_W - .035;
+      points.setX(1, edge - TABLE_W / 2); points.setX(2, edge - TABLE_W / 2); points.needsUpdate = true;
       ring.visible = visible;
       if (!visible) return;
       const [rx, rz] = toRender(x, y);
       ring.position.set(rx, 0.004, rz);
       ringMat.color.set(legal ? 0x4caf50 : 0xf44336);
     },
-    setCue(visible, cx, cy, angle, pull) {
+    setCue(visible, cx, cy, angle, pull, tipX = 0, tipY = 0) {
       cueGroup.visible = visible;
       if (!visible) return;
       const [rx, rz] = toRender(cx, cy);
       const dx = Math.cos(angle), dy = Math.sin(angle);
-      const elevation = cueElevation(cx, cy, angle, pull, cueObstacles);
+      const elevation = cueElevation(cx, cy, angle, 0, cueObstacles);
       // Local +z is the butt. Tilt up around the ball, then yaw along -aim.
       cueGroup.rotation.set(-elevation, Math.atan2(-dx, -dy), 0, 'YXZ');
-      const setback = pull * Math.cos(elevation);
-      cueGroup.position.set(rx - dx * setback, BALL_R + pull * Math.sin(elevation), rz - dy * setback);
+      const scale = Math.min(1, .55 / (Math.hypot(tipX, tipY) || 1));
+      const tx = tipX * scale, ty = tipY * scale;
+      const c = Math.sqrt(1 - tx * tx - ty * ty), ct = Math.cos(elevation), st = Math.sin(elevation);
+      const along = BALL_R * (ty * st - c * ct) - pull * ct;
+      cueGroup.position.set(rx + dx * along - dy * BALL_R * tx,
+        BALL_R + BALL_R * (ty * ct + c * st) + pull * st,
+        rz + dy * along + dx * BALL_R * tx);
     },
     pickFelt,
     onFrame(cb) { cbs.push(cb); },

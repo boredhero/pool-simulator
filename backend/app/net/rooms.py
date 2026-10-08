@@ -1,7 +1,6 @@
 """Private 1v1 rooms over WebSocket. Turn-based shot-event sync.
 Server is authoritative on rules + turn order + ball state; clients predict
-locally for instant feel and reconcile at rest (loose event-set match, since
-TS and Python sims are not bit-identical).
+locally for instant feel and reconcile to authoritative resting state.
 """
 
 from __future__ import annotations
@@ -13,18 +12,24 @@ from dataclasses import dataclass, field
 
 from fastapi import WebSocket
 
+from app.sim.config import match_config
+from app.sim.cue import cue_elevation
 from app.sim.physics import (
-    VMAX_BREAK,
-    VMAX_NORMAL,
     Ball,
     ShotEvents,
     hash_state,
     simulate_shot,
     strike,
 )
-from app.sim.rules import GameState, apply_shot, new_game, place_cue
-
-POS_TOL = 0.05  # position reconciliation tolerance (m)
+from app.sim.rules import (
+    GameState,
+    apply_shot,
+    begin_shot,
+    call_required,
+    legal_targets,
+    new_game,
+    place_cue,
+)
 
 
 def _code() -> str:
@@ -40,18 +45,6 @@ def ball_dump(balls: list[Ball]) -> list[dict]:
     ]
 
 
-def ball_load(balls: list[Ball], data: list[dict]) -> None:
-    by_id = {b.id: b for b in balls}
-    for d in data:
-        b = by_id.get(d["id"])
-        if b is None:
-            continue
-        b.x, b.y = float(d["x"]), float(d["y"])
-        b.potted = bool(d["potted"])
-        b.vx = b.vy = b.wx = b.wy = b.wz = 0.0
-        b.asleep = True
-
-
 def ev_dump(ev: ShotEvents) -> dict:
     return {
         "first_contact": ev.first_contact,
@@ -59,6 +52,10 @@ def ev_dump(ev: ShotEvents) -> dict:
         "off_table": ev.off_table,
         "rail_after_contact": ev.rail_after_contact,
         "cue_potted": ev.cue_potted,
+        "pockets": ev.pockets,
+        "first_contact_x": ev.first_contact_x,
+        "cue_left_kitchen": ev.cue_left_kitchen,
+        "object_rails": ev.object_rails,
     }
 
 
@@ -68,6 +65,7 @@ class Room:
     gs: GameState = field(default_factory=lambda: new_game(random.randint(1, 1 << 30)))
     players: list[WebSocket | None] = field(default_factory=lambda: [None, None])
     names: list[str] = field(default_factory=lambda: ["Player 1", "Player 2"])
+    revision: int = 0
     busy: bool = False  # shot in flight
 
     def state_msg(self) -> dict:
@@ -75,10 +73,17 @@ class Room:
             "t": "state",
             "code": self.code,
             "balls": ball_dump(self.gs.balls),
+            "return_order": self.gs.return_order,
             "current": self.gs.current,
             "groups": self.gs.groups,
             "open": self.gs.open,
             "ball_in_hand": self.gs.ball_in_hand,
+            "break_shot": self.gs.break_shot,
+            "placement": self.gs.placement,
+            "kitchen_shot": self.gs.kitchen_shot,
+            "rules": self.gs.rules,
+            "ruleset": {"id": "eight-ball", "version": 1},
+            "revision": self.revision,
             "winner": self.gs.winner,
             "message": self.gs.message,
         }
@@ -111,27 +116,6 @@ class Lobby:
 lobby = Lobby()
 
 
-def _events_match(a: ShotEvents, b: ShotEvents) -> bool:
-    return (
-        a.first_contact == b.first_contact
-        and sorted(a.potted) == sorted(b.potted)
-        and sorted(x for x in a.off_table if x is not None)
-        == sorted(x for x in b.off_table if x is not None)
-        and a.cue_potted == b.cue_potted
-    )
-
-
-def _positions_close(balls: list[Ball], data: list[dict]) -> bool:
-    by_id = {b.id: b for b in balls}
-    for d in data:
-        b = by_id.get(d["id"])
-        if b is None or b.potted != bool(d["potted"]):
-            return False
-        if not b.potted and math.hypot(b.x - float(d["x"]), b.y - float(d["y"])) > POS_TOL:
-            return False
-    return True
-
-
 async def handle(ws: WebSocket) -> None:
     await ws.accept()
     room: Room | None = None
@@ -143,6 +127,7 @@ async def handle(ws: WebSocket) -> None:
 
             if typ == "create":
                 room = lobby.create()
+                room.gs.rules = match_config(msg.get("rules"))
                 seat = 0
                 room.players[0] = ws
                 room.names[0] = str(msg.get("name", "Player 1"))[:24]
@@ -171,6 +156,10 @@ async def handle(ws: WebSocket) -> None:
             elif room is None or seat < 0:
                 await ws.send_json({"t": "error", "error": "join a room first"})
 
+            elif typ in ("shot", "place") and msg.get("revision", room.revision) != room.revision:
+                await ws.send_json({"t": "error", "error": "stale table state"})
+                await ws.send_json(room.state_msg())
+
             elif typ == "shot":
                 if seat != room.gs.current or room.gs.winner is not None or room.busy:
                     await ws.send_json({"t": "error", "error": "not your turn"})
@@ -185,12 +174,25 @@ async def handle(ws: WebSocket) -> None:
                 import math as _m
 
                 cue = room.gs.balls[0]
-                if cue.potted:
+                if cue.potted or room.gs.ball_in_hand:
                     await ws.send_json({"t": "error", "error": "cue ball in hand — place it first"})
                     continue
+                if not all(math.isfinite(v) for v in (aim, power, tip_x, tip_y)):
+                    await ws.send_json({"t": "error", "error": "bad shot"})
+                    continue
+                called_ball, called_pocket = s.get("calledBall"), s.get("calledPocket")
+                if call_required(room.gs) and (
+                    called_ball not in legal_targets(room.gs)
+                    or type(called_pocket) is not int
+                    or not 0 <= called_pocket < 6
+                ):
+                    await ws.send_json({"t": "error", "error": "call a legal ball and pocket"})
+                    continue
+                begin_shot(room.gs, called_ball, called_pocket)
                 room.busy = True
-                vmax = VMAX_BREAK if room.gs.break_shot else VMAX_NORMAL
-                strike(cue, _m.cos(aim), _m.sin(aim), power, tip_x, tip_y, vmax)
+                vmax = room.gs.rules["breakMax" if room.gs.break_shot else "normalMax"]
+                elevation = cue_elevation(cue.x, cue.y, aim, 0, room.gs.balls)
+                strike(cue, _m.cos(aim), _m.sin(aim), power, tip_x, tip_y, vmax, elevation)
                 server_ev = simulate_shot(room.gs.balls, 0)
                 room.__dict__["pending_ev"] = server_ev
                 room.__dict__["pending_hash"] = hash_state(room.gs.balls)
@@ -198,7 +200,16 @@ async def handle(ws: WebSocket) -> None:
                     {
                         "t": "shot",
                         "by": seat,
-                        "shot": {"aim": aim, "power": power, "tipX": tip_x, "tipY": tip_y},
+                        "shot": {
+                            "aim": aim,
+                            "power": power,
+                            "tipX": tip_x,
+                            "tipY": tip_y,
+                            "elevation": elevation,
+                            "vmax": vmax,
+                            "calledBall": called_ball,
+                            "calledPocket": called_pocket,
+                        },
                     }
                 )
 
@@ -206,23 +217,12 @@ async def handle(ws: WebSocket) -> None:
                 if seat != room.gs.current or not room.busy:
                     continue
                 server_ev: ShotEvents = room.__dict__.get("pending_ev", ShotEvents())
-                balls_data = msg.get("balls", [])
-                client_ev = msg.get("ev")
+                # Always adjudicate authoritative physical facts and resting positions.
+                final_ev = server_ev
                 use_server = True
-                if isinstance(client_ev, dict) and isinstance(balls_data, list):
-                    ce = ShotEvents(
-                        first_contact=client_ev.get("first_contact"),
-                        potted=list(client_ev.get("potted", [])),
-                        off_table=list(client_ev.get("off_table", [])),
-                        rail_after_contact=bool(client_ev.get("rail_after_contact")),
-                        cue_potted=bool(client_ev.get("cue_potted")),
-                    )
-                    if _events_match(server_ev, ce) and _positions_close(room.gs.balls, balls_data):
-                        ball_load(room.gs.balls, balls_data)  # smoother: keep client's rest pose
-                        use_server = False
-                final_ev = server_ev if use_server else ce
                 room.busy = False
                 apply_shot(room.gs, final_ev)
+                room.revision += 1
                 await room.broadcast(
                     {
                         **room.state_msg(),
@@ -233,14 +233,14 @@ async def handle(ws: WebSocket) -> None:
                 )
 
             elif typ == "place":
-                if seat != room.gs.current or not room.gs.ball_in_hand:
+                if seat != room.gs.current or not room.gs.ball_in_hand or room.busy:
                     continue
                 try:
                     x, y = float(msg["x"]), float(msg["y"])
                 except (KeyError, TypeError, ValueError):
                     continue
                 if place_cue(room.gs, x, y):
-                    room.gs.ball_in_hand = False
+                    room.revision += 1
                     await room.broadcast(room.state_msg())
 
             else:
