@@ -73,7 +73,7 @@ def fallback(gs):
         None,
     )
     if target is None:
-        target = next(b for b in gs.balls if b.id and not b.potted)
+        target = next(b for b in gs.balls if not b.potted and b.n in targets)
     return {
         "aim": math.atan2(target.y - cue.y, target.x - cue.x),
         "power": 1 if gs.break_shot else 0.4,
