@@ -958,13 +958,49 @@ test('touch aim continues beyond the rail while outside-table placement stays re
   });
   const cdp=await context.newCDPSession(page);await cdp.send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:5});
   const send=(type:'touchStart'|'touchMove'|'touchEnd',point?:{x:number;y:number})=>cdp.send('Input.dispatchTouchEvent',{type,touchPoints:point?[{x:point.x,y:point.y,id:1}]:[]});
-  await send('touchStart',points.from);await send('touchMove',points.to);
+  await send('touchStart',points.from);
+  const startAim=await page.evaluate(()=>(window as any).__pool.targetAngle);
+  await send('touchMove',points.to);
   const aim=await page.evaluate(()=>{const g=(window as any).__pool;return{angle:g.targetAngle,mode:g.mode};});
-  expect(aim.angle).toBeCloseTo(points.to.angle,5);expect(aim.mode).toBe('aim');
+  expect(Number.isFinite(aim.angle)).toBe(true);expect(Math.abs(aim.angle-startAim)).toBeGreaterThan(.01);expect(aim.mode).toBe('aim');
   await send('touchEnd');
   expect(await page.evaluate(()=>{const g=(window as any).__pool;return {mode:g.mode,speed:Math.hypot(g.cue().vx,g.cue().vy)};})).toEqual({mode:'aim',speed:0});
   const before=await page.evaluate(()=>{const g=(window as any).__pool;g.gs.ballInHand=true;g.gs.placement='anywhere';g.mode='place';return{x:g.cue().x,y:g.cue().y};});
   await send('touchStart',points.to);await send('touchEnd');
   const after=await page.evaluate(()=>{const g=(window as any).__pool;return{x:g.cue().x,y:g.cue().y,mode:g.mode,ballInHand:g.gs.ballInHand};});
   expect(after).toEqual({...before,mode:'place',ballInHand:true});
+});
+
+
+test('mobile circular touch aiming rotates repeatedly both ways without a foreground gap or shot',async({page,context})=>{
+  await page.setViewportSize({width:390,height:844});await openGame(page);
+  if(await page.locator('#privacynotice').isVisible())await page.locator('#privacyessential').click();
+  const center=await page.evaluate(()=>{
+    const g=(window as any).__pool;g.cpuOpponent=false;g.gs.current=0;g.mode='aim';g.calledPocket=0;g.scene.cameraRig.cancel(true);
+    Object.assign(g.cue(),{x:1.27,y:.635});
+    const camera=g.scene.controls.object;g.scene.controls.enableDamping=false;g.scene.controls.update();
+    g.scene.controls.target.set(0,.028575,0);camera.position.set(0,.7,1.5);camera.lookAt(g.scene.controls.target);camera.updateMatrixWorld();
+    const p=camera.position.clone().set(0,.028575,0).project(camera);
+    const center={x:(p.x+1)*innerWidth/2,y:(1-p.y)*innerHeight/2};
+    for(let i=0;i<48;i++){const t=i*Math.PI/24;if(document.elementFromPoint(center.x+50*Math.cos(t),center.y+50*Math.sin(t))?.id!=='game-canvas')throw new Error('Touch circle obstructed');}
+    return center;
+  });
+  const cdp=await context.newCDPSession(page);await cdp.send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:5});
+  for(const direction of [1,-1]){
+    const point=(i:number)=>({x:center.x+50*Math.cos(direction*i*Math.PI/24),y:center.y+50*Math.sin(direction*i*Math.PI/24),id:1});
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[point(0)]});
+    expect(await page.evaluate(()=>{const g=(window as any).__pool;return {touch:g.touchAim,human:g.humanTurn(),camera:g.cameraMode,gesture:g.cameraGesture,interacting:g.scene.cameraRig.interacting,mode:g.mode};})).toMatchObject({touch:true,human:true,camera:false,gesture:false,interacting:false,mode:'aim'});
+    let previous=await page.evaluate(()=>(window as any).__pool.targetAngle),total=0;
+    for(let i=1;i<=96;i++){
+      await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[point(i)]});
+      // CDP acknowledgement can precede the coalesced browser pointermove.
+      if(i>3)await expect.poll(()=>page.evaluate(()=>(window as any).__pool.targetAngle)).not.toBe(previous);
+      const angle=await page.evaluate(()=>(window as any).__pool.targetAngle);
+      const delta=Math.atan2(Math.sin(angle-previous),Math.cos(angle-previous));
+      expect(Math.abs(delta)).toBeLessThan(.6);total+=delta;previous=angle;
+    }
+    expect(Math.abs(total)).toBeCloseTo(4*Math.PI,2);
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+    expect(await page.evaluate(()=>{const g=(window as any).__pool;return{mode:g.mode,speed:Math.hypot(g.cue().vx,g.cue().vy)};})).toEqual({mode:'aim',speed:0});
+  }
 });

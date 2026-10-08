@@ -1,3 +1,4 @@
+import {touchAimAngle} from '../render/touchAim';
 import {CoinToss,randomBreaker} from './coinToss';
 import {placementLane} from './placementCamera';
 import {mobileShotFocus} from './mobileShotFocus';
@@ -424,6 +425,11 @@ export class Game {
       if (this.cameraMode || this.cameraGesture || this.scene.cameraRig.interacting || this.pointers.size > 1) return;
       if (e.pointerType === 'mouse' && e.buttons !== 0 && e.buttons !== 1) return;
       const continueTouchAim = e.pointerType !== 'mouse' && this.touchAim && this.humanCueControls();
+      if(continueTouchAim && canvas.clientWidth<900 && this.mode==='aim'){
+        const angle=touchAimAngle(this.scene.controls.object as import('three').PerspectiveCamera,canvas.getBoundingClientRect(),this.cue(),e.clientX,e.clientY);
+        if(angle!==null){this.targetAngle=angle;this.tutorial.record('aim');}
+        return;
+      }
       const p = this.scene.pickFelt(e.clientX, e.clientY, continueTouchAim);
       if (!p) return;
       this.hoverPt = p;
@@ -459,6 +465,10 @@ export class Game {
       }
       if (e.pointerType !== 'mouse') {
         this.touchAim=this.humanTurn();
+        if(this.touchAim && canvas.clientWidth<900){
+          const angle=touchAimAngle(this.scene.controls.object as import('three').PerspectiveCamera,canvas.getBoundingClientRect(),this.cue(),e.clientX,e.clientY);
+          if(angle!==null)this.targetAngle=angle;
+        }
         canvas.setPointerCapture(e.pointerId);
         return;
       }
