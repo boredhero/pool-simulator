@@ -410,3 +410,18 @@ sign-in and authenticated activity update it, throttled to once per minute. A
 visible signed-in game sends a minute heartbeat, including local/CPU play. Hidden
 tabs do not send heartbeats. Admin shows creation and last-active timestamps in
 the player table and detail view; this is service activity, not optional analytics.
+
+
+### Installing the app
+
+Choose **Install app** in Settings or on the welcome screen. Browsers that expose
+`beforeinstallprompt` open their native prompt after your click. Other browsers
+show manual installation instructions; iPhone/iPad users use Safari → Share →
+Add to Home Screen (leave Open as Web App enabled when offered). macOS Safari
+uses File → Add to Dock. Browser install eligibility and prompts remain under
+browser control. Installed standalone windows mark the app installed.
+
+The manifest uses the Pool Simulator name, a stable root ID, PNG icons at 192px
+and 512px, and a 180px Apple touch icon. The service worker registers over HTTPS.
+
+The Settings “View source” link uses the unmodified white Invertocat SVG from the [official GitHub logo pack](https://brand.github.com/GitHub_Logos.zip). GitHub marks belong to GitHub, Inc.; see their [brand guidelines](https://brand.github.com/foundations/logo).

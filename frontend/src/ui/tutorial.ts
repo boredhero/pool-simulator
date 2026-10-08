@@ -42,7 +42,7 @@ export class Tutorial {
     document.getElementById('tutorial-unavailable')?.remove();
     document.getElementById('helppanel')!.classList.remove('open');
     document.getElementById('helpbtn')!.setAttribute('aria-expanded','false');
-    for(const id of ['settingspanel','onlinepanel','viewpanel'])document.getElementById(id)?.classList.remove('open');
+    for(const id of ['settingspanel','onlinepanel'])document.getElementById(id)?.classList.remove('open');
     this.index=0;document.body.classList.add('tutorial-practice');this.show();document.getElementById('tutorialclose')!.focus();return true;
   }
   record(action:TutorialAction){

@@ -278,9 +278,10 @@ test('camera preferences adapt to mobile and persist an explicit override',async
   await page.setViewportSize({width:390,height:844});
   await openGame(page,true);
   await expect(page.locator('#autocamera')).toBeChecked();
-  for(const id of ['viewbtn','version','settingsbtn']) {const box=(await page.locator('#'+id).boundingBox())!;expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(390);}
+  for(const id of ['version','settingsbtn']) {const box=(await page.locator('#'+id).boundingBox())!;expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(390);}
+  if(await page.locator('#privacynotice').isVisible()) await page.locator('#privacyessential').click();
   await page.screenshot({path:'/tmp/pool-mobile-camera.png'});
-  await page.locator('#viewbtn').click();
+  await page.locator('#camera-fly-toggle').click();
   await page.getByRole('button',{name:'Move camera',exact:true}).click();
   expect(await page.evaluate(()=>(window as any).__pool.cameraMode)).toBe(true);
   await page.keyboard.press('Escape');

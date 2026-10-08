@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.1.2",
+    "date": "2026-10-08",
+    "title": "Install Pool Simulator",
+    "changes": [
+      "Install app is available in Settings and the welcome screen. Supported browsers open their native install prompt; iPhone and iPad users get Add to Home Screen instructions.",
+      "Updated Pool Simulator app metadata, install icons and Apple Home Screen icon.",
+      "Camera controls now live in the bottom camera panel. The duplicate top View button is removed; framing, zoom, movement, and return-to-play remain available.",
+      "Settings includes a View source link with the official GitHub icon."
+    ]
+  },
+  {
     "version": "1.1.1",
     "date": "2026-10-08",
     "title": "Password visibility and confirmation",

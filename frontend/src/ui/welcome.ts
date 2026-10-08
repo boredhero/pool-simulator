@@ -27,6 +27,7 @@ export async function setupWelcome(startTutorial:()=>void):Promise<void> {
       <div id="welcomeanalyticschoice" class="welcome-choice"><input id="welcomeanalytics" type="checkbox"><label for="welcomeanalytics">Allow optional usage analytics <span>Help improve the game with feature-use sessions and device type. No account identity, IP address, typing, or advertising trackers. You can change this in Privacy choices.</span></label></div>
       <p id="welcomeprivacy-note" class="welcome-small"></p>
       <a class="welcome-privacy-link" href="/privacy.html" target="_blank" rel="noopener">Read the Privacy Notice</a>
+      <button id="welcomeinstall" data-install-app type="button">Install app on this device</button>
       <p id="welcomestatus" role="status" aria-live="polite"></p>
     </div>
     <footer class="welcome-footer"><p>We recommend the tutorial—it’s the easiest way to find your shot.</p><div><button id="welcometutorial" type="submit" disabled>Start quick tutorial</button><button id="welcomeplay" type="button" disabled>Just play</button></div></footer>

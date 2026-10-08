@@ -4,6 +4,9 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <link rel="manifest" href="/manifest.json" />
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-title" content="Pool Simulator" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
 <link rel="icon" href="/icon.svg" type="image/svg+xml" />
 <title>Pool Simulator</title>
 <link rel="preload" href="/fonts/AtkinsonHyperlegible-Regular.woff2" as="font" type="font/woff2" crossorigin>
@@ -87,7 +90,7 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
 #playbackstate{color:#acd2ad;font-size:14px;text-transform:none;letter-spacing:0;margin-left:8px}.live-pots{margin-top:10px;padding-top:8px;border-top:1px solid #70644d;color:#f4dcae;font-size:16px}.pcard.provisional .grp{color:#ffdda1}
 #dismissheadstring{pointer-events:auto;min-height:36px;margin-top:10px;font-size:14px;padding:4px 10px}
 .spin-control{display:grid;grid-template-columns:auto auto;grid-template-rows:auto auto;gap:2px 10px}.spin-control .control-label{grid-column:1;grid-row:1}#spin{grid-column:2;grid-row:1 / span 2}#spin:focus-visible{outline:3px solid #e7c384;outline-offset:4px}#resetspin{grid-column:1;grid-row:2;font-size:15px;min-height:36px;padding:0 8px}#resetspin:disabled{opacity:.45;cursor:default}@media(max-width:600px){#resetspin{min-height:44px}}
-#viewpanel{display:none;position:fixed;z-index:8;right:24px;top:var(--below-header,136px);width:310px;padding:18px;background:#211d18;border:1px solid #75634a;border-radius:16px}#viewpanel.open{display:grid;gap:12px}#viewpanel .row button{flex:1;font-size:16px;padding:0 8px}@media(max-width:600px){#viewpanel{right:12px;width:min(310px,calc(100vw - 24px))}.toolbar{gap:4px}.toolbar button{padding:0 7px}}
+@media(max-width:600px){.toolbar{gap:4px}.toolbar button{padding:0 7px}}
 #changelog{width:min(1050px,94vw);height:88dvh;max-height:94dvh;padding:0;color:#eee5d6;background:#211d18;border:1px solid #75634a;border-radius:20px}#changelog::backdrop{background:#000b;backdrop-filter:blur(5px)}.changelog-header{position:sticky;top:0;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:22px 28px;background:#211d18;border-bottom:1px solid #75634a}.changelog-header h2{margin:0;font-size:28px}#changelog-content{padding:8px 28px 28px;font-size:18px;line-height:1.65}#changelog-content h3{font-size:24px;margin-bottom:0}#changelog-content time{color:#c3b494;font-size:16px}#changelog-content li{margin:12px 0}#version{cursor:pointer}@media(max-width:600px){.status-meta{flex-wrap:wrap}#version{min-height:32px;padding:3px 6px}.changelog-header,#changelog-content{padding:16px}#changelog-content{font-size:17px}.toolbar button{font-size:14px}}
 .pball.eight-ball{margin-left:5px;outline:1px solid #ae9a73;outline-offset:2px}.pball.eight-ball.ready{outline:3px solid #e9cc81;box-shadow:0 0 12px #e9cc8160}
 #settingspanel{padding:0;overflow:hidden;gap:0}.settings-header{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-shrink:0;padding:12px 20px;background:#211d18;border-bottom:1px solid #75634a}.settings-header h2{margin:0}#closesettings{font-size:28px;line-height:1;width:44px;height:44px;padding:0;flex-shrink:0}.settings-body{display:flex;flex-direction:column;gap:12px;padding:20px;overflow-y:auto;min-height:0;overscroll-behavior:contain}.settings-body>*{flex-shrink:0}@media(min-width:900px){.settings-header{padding:14px 26px}.settings-body{padding:26px;gap:14px}}
@@ -108,7 +111,7 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
  .control-tray{bottom:max(8px,env(safe-area-inset-bottom));left:10px;right:10px;padding:8px 10px;display:flex;flex-wrap:wrap;gap:8px}
  .control-tray .power-control,.touch-input .control-tray .touch-shot{order:0;flex:1 0 100%}.control-help{font-size:12px}.control-tray .spin-control{order:1;display:flex;flex:0 0 auto;align-items:center;gap:10px;padding:0;border:0;margin-right:auto}.control-tray .actions{display:none;order:3}.control-tray.expanded .actions{display:flex;flex:1 0 100%;padding:0;border:0}
  #morecontrols{order:2;display:block;padding:0 12px;min-height:44px;font-size:14px}.touch-shot{flex:1}#hint{display:none}#callpanel{bottom:var(--above-controls,166px);max-width:calc(100vw - 24px)}
- #settingspanel,#onlinepanel,#helppanel,#viewpanel{top:var(--below-header,120px);max-height:calc(100dvh - var(--below-header,120px) - 16px);overflow-y:auto;z-index:10}
+ #settingspanel,#onlinepanel,#helppanel{top:var(--below-header,120px);max-height:calc(100dvh - var(--below-header,120px) - 16px);overflow-y:auto;z-index:10}
 }
 #opponentstatus{margin:6px 0 0;font-size:14px;line-height:1.4;color:#ddcba7}#opponentstatus:empty{display:none}.actions{flex-wrap:wrap}
 @media(max-width:900px){.control-tray{bottom:max(36px,env(safe-area-inset-bottom))}}
@@ -116,9 +119,11 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
 #tutorial{position:fixed;right:20px;top:var(--below-header,140px);width:min(340px,calc(100vw - 24px));box-sizing:border-box;padding:16px;border:1px solid #c7b47f;border-radius:16px;background:#211d18f5;color:#eee5d6;z-index:15;font-size:16px;line-height:1.4}#tutorial[hidden]{display:none}#tutorial header{display:flex;align-items:center;gap:10px;justify-content:space-between}#tutorialclose{min-height:40px;width:40px;padding:0;font-size:26px}#tutorialprogress{font-size:14px;color:#bdd8a7}#tutorial button{font-size:15px}#starttutorial{margin-bottom:14px;width:100%}.tutorial-focus{outline:3px solid #e1cf8d!important;outline-offset:3px}.pcard[role=button]{cursor:pointer;pointer-events:auto}.pcard[role=button]:focus-visible{outline:3px solid #e1cf8d}@media(max-width:900px){#tutorial{top:auto;bottom:var(--above-controls,200px);left:12px;right:12px;width:auto;padding:12px}#tutorial p{margin:8px 0}}
 body:has(#tutorial:not([hidden])) .privacy-notice{display:none}
 #tutorial{--tutorial-top:max(var(--below-header,140px),var(--below-scores,140px));left:50%;right:auto;bottom:auto;top:calc((var(--tutorial-top) + 100dvh - var(--above-controls,180px)) / 2);transform:translate(-50%,-50%);width:min(420px,calc(100vw - 24px));max-height:max(80px,calc(100dvh - var(--tutorial-top) - var(--above-controls,180px) - 16px));overflow-y:auto;overscroll-behavior:contain}
+#viewsource{display:flex;align-items:center;justify-content:center;gap:10px;min-height:44px;box-sizing:border-box;padding:10px 16px;border:1px solid #75634a;border-radius:10px;background:#302a21;color:#eee5d6;text-decoration:none;font-size:16px}#viewsource:hover{background:#443b2d;border-color:#b19a70}#viewsource:focus-visible{outline:2px solid #e7c384;outline-offset:2px}#viewsource img{display:block;object-fit:contain;flex:none}
 </style>
 <style>
 .premium-badge{display:inline-block;vertical-align:middle;width:fit-content;padding:3px 9px;border:1px solid #baa065;border-radius:999px;background:#3c321f;color:#f4d88f;font-size:13px;font-weight:700;letter-spacing:.03em}.premium-badge[hidden]{display:none}
+#viewsource{display:flex;align-items:center;justify-content:center;gap:10px;min-height:44px;box-sizing:border-box;padding:10px 16px;border:1px solid #75634a;border-radius:10px;background:#302a21;color:#eee5d6;text-decoration:none;font-size:16px}#viewsource:hover{background:#443b2d;border-color:#b19a70}#viewsource:focus-visible{outline:2px solid #e7c384;outline-offset:2px}#viewsource img{display:block;object-fit:contain;flex:none}
 </style>
 </head>
 <body>
@@ -134,7 +139,6 @@ body:has(#tutorial:not([hidden])) .privacy-notice{display:none}
     <div class="toolbar">
       <button id="helpbtn" aria-label="How to play" aria-expanded="false" aria-controls="helppanel"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.5" r=".9" fill="currentColor" stroke="none"/></svg></button>
       <button id="settingsbtn" title="Table and rules">⚙ <span class="settings-label">Table</span></button>
-      <button id="viewbtn" aria-expanded="false" aria-controls="viewpanel">View</button>
       <button id="onlinebtn">Online</button>
     </div>
   </div>
@@ -154,7 +158,7 @@ body:has(#tutorial:not([hidden])) .privacy-notice{display:none}
   <h2>Aim. Pull. Release.</h2>
 
   <dl id="mouseguide"><dt>01 · Line it up</dt><dd>Move over the felt to aim.</dd><dt>02 · Take the shot</dt><dd>Press, drag back to build power, then release. Your aim locks while pulling.</dd><dt>03 · Find your view</dt><dd>Choose Mouse &amp; Keyboard Mode or Trackpad Mode in the camera HUD. Mouse: right-drag to orbit, scroll to zoom. Trackpad: two-finger scroll to orbit, pinch to zoom, Option-scroll to pan. WASD moves; Space rises, Left Shift descends, Q/E turns. Focus the felt and press Enter for a 40% shot. View → Move camera also allows left-drag orbit.</dd></dl>
-  <dl id="touchguide" hidden><dt>01 · Line it up</dt><dd>Touch the felt to aim. Keep holding and swing your finger sideways to turn the cue.</dd><dt>02 · Take the shot</dt><dd>Lift your finger when lined up. Set the power slider, then tap Shoot. Lifting your aiming finger never fires.</dd><dt>03 · Find your view</dt><dd>Tap View → Move camera for one-finger orbit and two-finger pinch/pan. Return to play when ready. During play, drag two fingers together to orbit, even after pinching to zoom. Lift both fingers before aiming again.</dd></dl>
+  <dl id="touchguide" hidden><dt>01 · Line it up</dt><dd>Touch the felt to aim. Keep holding and swing your finger sideways to turn the cue.</dd><dt>02 · Take the shot</dt><dd>Lift your finger when lined up. Set the power slider, then tap Shoot. Lifting your aiming finger never fires.</dd><dt>03 · Find your view</dt><dd>Tap Move Camera on the bottom bar for one-finger orbit and two-finger pinch/pan. Return to play when ready. During play, drag two fingers together to orbit, even after pinching to zoom. Lift both fingers before aiming again.</dd></dl>
   <p class="guide-note"><strong>Add spin</strong> · Drag the blue dot on the cue ball below. Reset returns it to center. Arrow keys adjust a focused spin control; hold Shift for finer steps. Cue elevation is assisted around obstacles and changes the shot.</p>
   <p class="guide-note"><strong>After a foul</strong> · Tap or click a legal spot inside the tinted outline to place the cue ball. The outline shows your placement area.</p>
   <p class="guide-note"><strong>Call a shot</strong> · When prompted, choose your ball, then tap its destination pocket on the table.</p>
@@ -166,6 +170,8 @@ body:has(#tutorial:not([hidden])) .privacy-notice{display:none}
   <header class="settings-header"><h2 id="settings-title">Settings <span id="settingspremium" class="premium-badge" hidden>Premium</span></h2><button class="icon-close" id="closesettings" type="button" aria-label="Close settings" title="Close settings">×</button></header>
   <div class="settings-body">
   <button id="adminbtn" hidden type="button">Admin settings</button>
+  <button id="installapp" data-install-app type="button">Install app</button><p id="installappstatus" role="status"></p>
+  <a id="viewsource" href="https://github.com/boredhero/pool-simulator" target="_blank" rel="noopener noreferrer" aria-label="View source on GitHub (opens in a new tab)"><img src="/github-mark-white.svg" alt="" width="24" height="24">View source</a>
   <h2>Table &amp; rules</h2>
   <label for="rulespreset">Game</label><select id="rulespreset"><option value="bar">8-Ball (Bar)</option><option value="tournament">8-Ball (Tourny)</option><option value="custom">8-Ball (Custom)</option></select>
   <p class="guide-note" id="rulesnotice">Preset rules are locked. Choose Custom to make them your own.</p>
@@ -203,9 +209,9 @@ body:has(#tutorial:not([hidden])) .privacy-notice{display:none}
   <input type="color" id="woodcustom" value="#4a2c14" />
 </div>
 </div>
-<div id="viewpanel" aria-label="Camera controls">
+<div id="camera-view-actions" hidden>
   <button id="cameramode" aria-pressed="false">Move camera</button>
-  <p class="guide-note">Camera mode: drag one finger to orbit; pinch and drag two fingers to zoom and pan. Shooting is paused until you return to play.</p>
+  <p class="guide-note">Camera mode pauses shooting while you adjust the view. Return to play when ready.</p>
   <div class="row"><button id="focusballs">Focus balls</button><button id="wholetable">Whole table</button></div>
   <div class="row"><button id="zoomin" aria-label="Zoom in">Zoom +</button><button id="zoomout" aria-label="Zoom out">Zoom −</button></div>
 </div>

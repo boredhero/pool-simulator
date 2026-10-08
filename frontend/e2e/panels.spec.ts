@@ -17,7 +17,7 @@ test.beforeEach(async ({ page }) => {
   await expect(page.locator('#settingspanel')).toHaveAttribute('data-draggable', 'true');
 });
 
-for (const [panelId, openerId] of [['settingspanel', 'settingsbtn'], ['viewpanel', 'viewbtn'], ['onlinepanel', 'onlinebtn']]) {
+for (const [panelId, openerId] of [['settingspanel', 'settingsbtn'], ['onlinepanel', 'onlinebtn']]) {
   test(`${panelId} drags from its header and stays within the viewport`, async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.locator(`#${openerId}`).click();
@@ -47,10 +47,10 @@ for (const [panelId, openerId] of [['settingspanel', 'settingsbtn'], ['viewpanel
 
 test('click and keyboard move controls do not change the game aim; reset restores placement', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.locator('#viewbtn').click();
-  const panel = page.locator('#viewpanel');
+  await page.locator('#settingsbtn').click();
+  const panel = page.locator('#settingspanel');
   const before = (await panel.boundingBox())!;
-  const move = panel.getByRole('button', { name: 'Move view panel', exact: true });
+  const move = panel.getByRole('button', { name: 'Move settings panel', exact: true });
   await move.click();
   await panel.getByRole('button', { name: 'Move panel left', exact: true }).click();
   expect((await panel.boundingBox())!.x).toBeLessThan(before.x);
@@ -64,7 +64,7 @@ test('click and keyboard move controls do not change the game aim; reset restore
   expect((await panel.boundingBox())!.x).toBe(before.x);
   await page.keyboard.press('Escape');
   await expect(panel).not.toBeVisible();
-  await expect(page.locator('#viewbtn')).toBeFocused();
+  await expect(page.locator('#settingsbtn')).toBeFocused();
 });
 
 test('panel content remains scrollable on mobile and switching panels keeps aria state synchronized', async ({ page }) => {

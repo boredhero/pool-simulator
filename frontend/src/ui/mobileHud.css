@@ -75,7 +75,7 @@
   html.touch-input body:not(.tutorial-practice) .touch-shot button{grid-column:2;grid-row:2;padding:0 9px}
   html.touch-input body:not(.tutorial-practice) .control-tray .spin-control{flex:none;margin:0;justify-content:space-between}
   html.touch-input body:not(.tutorial-practice) .control-tray.expanded .actions{flex:none;flex-direction:column}
-  #settingspanel,#onlinepanel,#viewpanel,#helppanel{top:8px;max-height:calc(100dvh - 16px)}
+  #settingspanel,#onlinepanel,#helppanel{top:8px;max-height:calc(100dvh - 16px)}
 }
 
 @media(max-width:380px) and (pointer:coarse){

@@ -554,27 +554,17 @@ export class Game {
       else if(e.key==='Home'||e.key==='0'){e.preventDefault();e.stopPropagation();this.setSpin(0,0);}
     });
     document.getElementById('resetspin')!.addEventListener('click',()=>this.setSpin(0,0));
-    const view=document.getElementById('viewpanel')!,viewButton=document.getElementById('viewbtn')!;
-    const closeView=()=>{view.classList.remove('open');viewButton.setAttribute('aria-expanded','false');};
     const setCameraMode=(enabled:boolean)=>{
       this.cameraMode=enabled;cancelPull();this.placementPress=null;this.scene.cameraRig.setMode(enabled);
       const button=document.getElementById('cameramode')!;button.setAttribute('aria-pressed',String(enabled));button.textContent=enabled?'Return to play':'Move camera';
-      viewButton.classList.toggle('on',enabled);viewButton.textContent=enabled?'Camera':'View';
-      if(enabled)closeView();
     };
-    viewButton.addEventListener('click',()=>{
-      const open=!view.classList.contains('open');view.classList.toggle('open',open);viewButton.setAttribute('aria-expanded',String(open));
-      for(const id of ['helppanel','settingspanel','onlinepanel'])document.getElementById(id)!.classList.remove('open');
-      document.getElementById('helpbtn')!.setAttribute('aria-expanded','false');
-    });
     document.getElementById('cameramode')!.addEventListener('click',()=>setCameraMode(!this.cameraMode));
-    document.getElementById('focusballs')!.addEventListener('click',()=>{closeView();this.scene.cameraRig.cancel(true);this.frameBalls();});
-    document.getElementById('wholetable')!.addEventListener('click',()=>{closeView();this.scene.cameraRig.cancel(true);this.frameBalls(true);});
+    document.getElementById('focusballs')!.addEventListener('click',()=>{this.scene.cameraRig.cancel(true);this.frameBalls();});
+    document.getElementById('wholetable')!.addEventListener('click',()=>{this.scene.cameraRig.cancel(true);this.frameBalls(true);});
     document.getElementById('zoomin')!.addEventListener('click',()=>this.scene.cameraRig.zoom(.8));
     document.getElementById('zoomout')!.addEventListener('click',()=>this.scene.cameraRig.zoom(1.25));
     document.getElementById('autocamera')!.addEventListener('change',()=>{if(!this.options.autoCamera)this.scene.cameraRig.cancel();});
-    for(const id of ['helpbtn','settingsbtn','onlinebtn'])document.getElementById(id)!.addEventListener('click',closeView);
-    addEventListener('keydown',e=>{if(e.key==='Escape'){closeView();if(this.cameraMode)setCameraMode(false);}});
+    addEventListener('keydown',e=>{if(e.key==='Escape'){if(this.cameraMode)setCameraMode(false);}});
     this.el.onlinebtn.addEventListener('click', () => {
       this.el.onlinepanel.classList.toggle('open');
       this.el.settingspanel.classList.remove('open');

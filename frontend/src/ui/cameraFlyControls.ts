@@ -26,6 +26,8 @@ export function setupCameraFly(rig: CameraRig): void {
   hint.className = 'camera-fly-hint';
   hint.textContent = 'WASD · Space ↑ · Left Shift ↓ · Q/E turn';
   pad.append(hint);
+  const viewActions=document.getElementById('camera-view-actions')!;
+  viewActions.hidden=false;pad.append(viewActions);
   const header=document.createElement('div');header.className='camera-hud-header';
   hud.append(header,pad);
   const profile=document.createElement('select');
@@ -159,10 +161,13 @@ export function setupCameraFly(rig: CameraRig): void {
     toggle.setAttribute('aria-label',pad.hidden?'Show camera controls':'Hide camera controls');
     toggle.title=pad.hidden?'Show camera controls':'Hide camera controls';
     hud.classList.toggle('expanded',!pad.hidden);
-    if (pad.hidden) stop();
+    if (pad.hidden) {
+      stop();
+      if (modeButton.getAttribute('aria-pressed') === 'true') modeButton.click();
+    }
   });
   window.addEventListener('keydown', event => {
-    if(event.code==='Escape'){stop();return;}
+    if(event.code==='Escape'){stop();if(!mobile.matches&&!pad.hidden)toggle.click();return;}
     if(event.altKey||event.ctrlKey||event.metaKey){stop();return;}
     if (!(event.code in vectors) || event.altKey || event.ctrlKey || event.metaKey || event.isComposing || blocked(event.target)) return;
     event.preventDefault();
