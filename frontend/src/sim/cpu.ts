@@ -259,6 +259,10 @@ export function planCpuTurn(gs: GameState, maxTrials = 12, budgetMs = 120): CpuP
   const seeds=placementSeeds(gs);
   if(!seeds.length) return null;
   const vmax=gs.rules[gs.breakShot?'breakMax':'normalMax'];
+  // Geometry seeds use the default 3.5 m/s calibration; custom caps change
+  // normalized power, not the intended physical energy. Development is already calibrated.
+  if(!gs.breakShot) for(const seed of seeds) if(seed.family!=='development')
+    seed.power=powerForSpeed(shootSpeed(seed.power,3.5),vmax);
   const firm={...seeds[0],power:powerForSpeed(shootSpeed(seeds[0].power,vmax)+.65,vmax)};
   const queue=[...seeds.slice(0,1),...(gs.breakShot?[]:[firm]),...seeds.slice(1,8),...seeds.slice(0,2).flatMap(s=>[
     {...s,power:Math.max(.12,s.power*.7),tipY:.18}, {...s,tipY:-.22},

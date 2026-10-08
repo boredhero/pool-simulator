@@ -4,6 +4,7 @@ const select = (id: string) => el<HTMLSelectElement>(id);
 const input = (id: string) => el<HTMLInputElement>(id);
 
 export class TableOptions {
+  private context:'local'|'room'|'jev'|'jev-premium'='local';
   fastForward = false;
   autoCamera = false;
   constructor(start: (rules: MatchConfig) => void) {
@@ -16,7 +17,7 @@ export class TableOptions {
     input('fastforward').addEventListener('change', () => { this.fastForward = input('fastforward').checked; try { localStorage.setItem('pool:fast-forward', this.fastForward ? '1' : '0'); } catch { /* private storage */ } });
     let dismissed = false;
     try { dismissed = localStorage.getItem('pool:help-dismissed') === '1'; } catch { /* private storage */ }
-    select('rulespreset').addEventListener('change', () => this.write(matchConfig({ preset: select('rulespreset').value as MatchConfig['preset'] })));
+    select('rulespreset').addEventListener('change', () => this.write(matchConfig({ preset: select('rulespreset').value as MatchConfig['preset'] }),this.context));
     el('closesettings').addEventListener('click',()=>{el('settingspanel').classList.remove('open');el('settingsbtn').focus();});
     el('applyrules').addEventListener('click', () => { start(this.read()); el('settingspanel').classList.remove('open'); });
     const show = (open: boolean, remember = false) => {
@@ -39,8 +40,8 @@ export class TableOptions {
     const coarse = matchMedia('(pointer: coarse)');
     tab(coarse.matches);
     coarse.addEventListener('change', e => tab(e.matches));
-    addEventListener('pointerdown', e => tab(e.pointerType !== 'mouse'), {passive: true});
-    addEventListener('pointermove', e => { if (e.pointerType === 'mouse' && (e.movementX || e.movementY)) tab(false); }, {passive: true});
+    addEventListener('pointerdown', e => tab(coarse.matches || e.pointerType !== 'mouse'), {passive: true});
+    addEventListener('pointermove', e => { if (!coarse.matches && e.pointerType === 'mouse' && (e.movementX || e.movementY)) tab(false); }, {passive: true});
     const desktop = matchMedia('(min-width: 1101px)');
     show(desktop.matches && !dismissed);
     desktop.addEventListener('change', e => show(e.matches && !dismissed));
@@ -50,14 +51,16 @@ export class TableOptions {
   read(): MatchConfig {
     return matchConfig({ preset: select('rulespreset').value as MatchConfig['preset'], scratch: select('scratchrule').value as MatchConfig['scratch'], calls: select('callsrule').value as MatchConfig['calls'], eightOnBreak: select('eightbreakrule').value as MatchConfig['eightOnBreak'], scratchOnEightLoss: input('scratch8rule').checked, assignOnBreak: input('assignrule').checked, strictBreak: input('strictbreakrule').checked, normalMax: input('normalspeed').valueAsNumber, breakMax: input('breakspeed').valueAsNumber });
   }
-  write(c: MatchConfig, online = false): void {
+  write(c: MatchConfig, context:typeof this.context='local'): void {
+    this.context=context;const online=context==='room'||context==='jev';
     select('rulespreset').value = c.preset; select('rulespreset').disabled = online;
     select('scratchrule').value = c.scratch; select('callsrule').value = c.calls; select('eightbreakrule').value = c.eightOnBreak;
     input('scratch8rule').checked = c.scratchOnEightLoss; input('assignrule').checked = c.assignOnBreak; input('strictbreakrule').checked = c.strictBreak;
     input('normalspeed').value = String(c.normalMax); input('breakspeed').value = String(c.breakMax);
     el<HTMLFieldSetElement>('rulefields').disabled = online || c.preset !== 'custom';
     el<HTMLButtonElement>('applyrules').disabled = online;
-    el('rulesnotice').textContent = online ? 'This room uses its host’s rules. Start a new room to change them.' : 'Preset rules are locked. Custom changes apply when you start a new rack.';
+    el('applyrules').textContent=context==='jev-premium'?'Start new Jev game with these rules':'Start new rack with these rules';
+    el('rulesnotice').textContent = context==='room'?'This room uses its host’s rules. Start a new room to change them.':context==='jev'?'This Jev game keeps its starting rules. Switch to a local table to choose rules for a future game.':context==='jev-premium'?'Changes apply only when you start a new Jev game. The current game keeps its rules.':'Preset rules are locked. Custom changes apply when you start a new rack.';
   }
   summary(c: MatchConfig): void {
     el('kitchenhelp').hidden=c.scratch!=='kitchen';

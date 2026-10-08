@@ -24,11 +24,15 @@ for(const viewport of [{width:390,height:844},{width:844,height:390}])test(`mobi
       const p=camera.position.clone().set(x-2.54/2,.028575,y-1.27/2).project(camera);
       return{x:(p.x+1)*innerWidth/2,y:(1-p.y)*innerHeight/2};
     });
-    const boxes=['.topbar','#scorecard','.control-tray','#camera-fly-hud'].map(s=>{const r=document.querySelector(s)!.getBoundingClientRect();return{top:r.top,bottom:r.bottom};});
+    const boxes=['.topbar','#scorecard','.control-tray','#camera-fly-hud'].map(s=>{const r=document.querySelector(s)!.getBoundingClientRect();return{top:r.top,bottom:r.bottom,left:r.left,right:r.right,width:r.width,height:r.height};});
     return{distance:camera.position.distanceTo(g.scene.controls.target),points,boxes};
   });
-  const top=Math.max(focused.boxes[0].bottom,focused.boxes[1].bottom),bottom=Math.min(focused.boxes[2].top,focused.boxes[3].top);
-  for(const point of focused.points){expect(point.x).toBeGreaterThan(16);expect(point.x).toBeLessThan(viewport.width-16);expect(point.y).toBeGreaterThan(top+10);expect(point.y).toBeLessThan(bottom-10);}
+  const visible=focused.boxes.filter(b=>b.width>0&&b.height>0),landscape=viewport.width>viewport.height;
+  const top=landscape?0:Math.max(...focused.boxes.slice(0,2).filter(b=>b.height>0).map(b=>b.bottom));
+  const bottom=landscape?viewport.height:Math.min(...focused.boxes.slice(2).filter(b=>b.height>0).map(b=>b.top));
+  const left=landscape?Math.max(...visible.filter(b=>b.right<viewport.width/2).map(b=>b.right))+10:16;
+  const right=landscape?Math.min(...visible.filter(b=>b.left>viewport.width/2).map(b=>b.left))-10:viewport.width-16;
+  for(const point of focused.points){expect(point.x).toBeGreaterThan(left);expect(point.x).toBeLessThan(right);expect(point.y).toBeGreaterThan(top+10);expect(point.y).toBeLessThan(bottom-10);}
   await page.evaluate(async()=>{const g=(window as any).__pool;g.angle=g.targetAngle;g.__cameraShow=true;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));});
   await page.screenshot({path:`/tmp/pool-mobile-camera-${viewport.width}.png`});
   await page.evaluate(()=>{(window as any).__pool.__cameraShow=false;});
@@ -36,6 +40,37 @@ for(const viewport of [{width:390,height:844},{width:844,height:390}])test(`mobi
   expect(whole).toBeGreaterThan(focused.distance*1.15);
   const optedOut=await page.evaluate(()=>{const g=(window as any).__pool;g.options.autoCamera=false;const before=g.scene.controls.object.position.toArray();g.frameBalls(false,true);return{before,after:g.scene.controls.object.position.toArray()};});
   expect(optedOut.after).toEqual(optedOut.before);
+});
+
+for(const viewport of [{width:390,height:844},{width:844,height:390}])test(`rail and corner framing keeps its angle during mobile pinch at ${viewport.width}x${viewport.height}`,async({page})=>{
+  await page.setViewportSize(viewport);await page.emulateMedia({reducedMotion:'reduce'});await prepare(page);
+  for(const [x,y]of [[.04,.5],[.04,.06],[2.5,1.21]]){
+    const before=await page.evaluate(async([x,y])=>{
+      const g=(window as any).__pool;Object.assign(g.cue(),{x,y});g.frameBalls();
+      await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+      const c=g.scene.controls,o=c.object.position.clone().sub(c.target);
+      return{phi:Math.acos(o.y/o.length()),distance:o.length()};
+    },[x,y]);
+    expect(before.phi).toBeCloseTo(1.12,3);
+    // Browser pinch input reaches OrbitControls through real touch pointer events.
+    const session=await page.context().newCDPSession(page);
+    const cy=viewport.height/2,cx=viewport.width/2;
+    await session.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:cx-25,y:cy,id:1},{x:cx+25,y:cy,id:2}]});
+    for(const d of [45,70,100,140])await session.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:cx-d,y:cy,id:1},{x:cx+d,y:cy,id:2}]});
+    await session.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await session.detach();
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    const after=await page.evaluate(()=>{
+      const c=(window as any).__pool.scene.controls,o=c.object.position.clone().sub(c.target);
+      return{phi:Math.acos(o.y/o.length()),distance:o.length(),height:c.object.position.y,moving:(window as any).__pool.scene.cameraRig.moving};
+    });
+    expect(after.phi).toBeCloseTo(before.phi,3);expect(after.distance).toBeLessThan(before.distance);
+    expect(after.height).toBeGreaterThan(.058);expect(after.moving).toBe(false);
+    if(x===.04&&y===.5){
+      await page.evaluate(async()=>{const g=(window as any).__pool;g.angle=g.targetAngle;g.__cameraShow=true;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));});
+      await page.screenshot({path:`/tmp/pool-101-rail-pinch-${viewport.width}.png`});
+      await page.evaluate(()=>{(window as any).__pool.__cameraShow=false;});
+    }
+  }
 });
 });
 test('desktop framing retains all legal targets and manual camera input cancels automatic motion',async({page})=>{

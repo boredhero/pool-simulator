@@ -42,7 +42,56 @@ export function setupCameraFly(rig: CameraRig): void {
   const profileDock=document.createElement('aside');profileDock.id='camera-profile-dock';profileDock.setAttribute('aria-label','Camera input');
   const profileLabel=document.createElement('label');profileLabel.htmlFor=profile.id;profileLabel.textContent='Controls';
   profileDock.append(profileLabel,profile);
-  document.body.append(hud,profileDock);
+  const desktopStack=document.createElement('div');desktopStack.id='desktop-camera-stack';
+  desktopStack.append(hud,profileDock);
+  const legal=document.querySelector('.legal-links');if(legal)desktopStack.append(legal);
+  document.body.append(desktopStack);
+
+  const mobile = matchMedia('(max-width: 900px) and (pointer: coarse)');
+  const modeButton = document.getElementById('cameramode')!;
+  const moveButton = document.createElement('button');
+  moveButton.id = 'mobile-move-camera';
+  moveButton.type = 'button';
+  moveButton.textContent = 'Move Camera';
+  moveButton.setAttribute('aria-controls', 'camera-fly-hud');
+  document.getElementById('morecontrols')!.before(moveButton);
+  moveButton.addEventListener('click', () => modeButton.click());
+  const syncMobileMode = () => {
+    const active = mobile.matches && modeButton.getAttribute('aria-pressed') === 'true';
+    document.body.classList.toggle('mobile-camera-active', active);
+    moveButton.setAttribute('aria-expanded', String(active));
+    if (mobile.matches) {
+      pad.hidden = !active;
+      hud.classList.toggle('expanded', active);
+      toggleLabel.textContent = active ? 'Done' : 'Move Camera';
+      toggle.setAttribute('aria-label', active ? 'Done moving camera' : 'Move Camera');
+      toggle.setAttribute('aria-expanded', String(active));
+      toggle.title = 'Return to shot controls';
+    } else {
+      toggleLabel.textContent = 'Camera';
+      toggle.setAttribute('aria-label', pad.hidden ? 'Show camera controls' : 'Hide camera controls');
+    }
+  };
+  new MutationObserver(syncMobileMode).observe(modeButton, {attributes:true, attributeFilter:['aria-pressed']});
+  mobile.addEventListener('change', () => {
+    if (document.body.classList.contains('mobile-camera-active')) modeButton.click();
+    pad.hidden = true;
+    hud.classList.remove('expanded');
+    toggle.setAttribute('aria-expanded', 'false');
+    syncMobileMode();
+  });
+  syncMobileMode();
+  const updateMobileInset = () => {
+    if (!mobile.matches) return;
+    const active = document.body.classList.contains('mobile-camera-active');
+    const box = (active ? hud : document.querySelector('.control-tray')!).getBoundingClientRect();
+    const sidePanel = innerWidth > innerHeight && !document.body.classList.contains('tutorial-practice');
+    document.documentElement.style.setProperty('--above-controls', `${!sidePanel && box.height ? innerHeight - box.top + 12 : 12}px`);
+  };
+  const insetObserver = new ResizeObserver(updateMobileInset);
+  insetObserver.observe(hud);
+  insetObserver.observe(document.querySelector('.control-tray')!);
+  window.addEventListener('resize', updateMobileInset);
 
   const keys = new Set<string>();
   const vectors: Record<string, [number, number, number, number]> = { KeyW:[1,0,0,0], KeyS:[-1,0,0,0], KeyA:[0,-1,0,0], KeyD:[0,1,0,0], Space:[0,0,1,0], ShiftLeft:[0,0,-1,0], KeyQ:[0,0,0,1], KeyE:[0,0,0,-1] };
@@ -104,6 +153,7 @@ export function setupCameraFly(rig: CameraRig): void {
     pad.append(button);
   }
   toggle.addEventListener('click', () => {
+    if (mobile.matches) { stop(); modeButton.click(); moveButton.focus(); return; }
     pad.hidden = !pad.hidden;
     toggle.setAttribute('aria-expanded', String(!pad.hidden));
     toggle.setAttribute('aria-label',pad.hidden?'Show camera controls':'Hide camera controls');

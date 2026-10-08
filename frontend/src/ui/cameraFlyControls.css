@@ -31,3 +31,54 @@
 
 /* Even-sized marker and a relative transform keep neutral spin centered at every size. */
 #spin::after{width:10px;height:10px;margin:0;transform:translate(-50%,-50%)}
+
+#desktop-camera-stack{display:contents}
+@media(min-width:901px) and (hover:hover) and (pointer:fine){
+  #desktop-camera-stack{position:fixed;right:10px;bottom:4px;display:flex;flex-direction:column;align-items:flex-end;gap:8px;z-index:5}
+  #desktop-camera-stack #camera-fly-hud,#desktop-camera-stack #camera-profile-dock,#desktop-camera-stack .legal-links{position:relative;right:auto;bottom:auto}
+  .control-tray{right:160px}
+  body:has(#camera-fly-hud.expanded) .control-tray{right:302px}
+}
+@media(min-width:901px) and (max-width:1200px) and (hover:hover) and (pointer:fine){
+  body:has(#camera-fly-hud.expanded) .control-tray{flex-wrap:wrap;gap:10px}
+  body:has(#camera-fly-hud.expanded) .control-tray .power-control{flex:1;min-width:160px}
+  body:has(#camera-fly-hud.expanded) .control-tray .actions{flex-basis:100%;justify-content:space-between}
+}
+
+#mobile-move-camera{display:none}
+@media(max-width:900px) and (pointer:coarse){
+  #mobile-move-camera{display:block;order:2;min-height:44px;padding:0 8px;font-size:12px;white-space:nowrap}
+  #camera-fly-hud{display:none}
+  body.mobile-camera-active .control-tray{display:none!important}
+  body.mobile-camera-active #camera-fly-hud.expanded{display:block;left:8px;right:8px;bottom:max(8px,env(safe-area-inset-bottom));width:auto;max-width:none;max-height:calc(100dvh - var(--below-header,100px) - 16px);overflow-y:auto}
+  body.mobile-camera-active .camera-hud-header{min-height:44px;padding:0 8px;justify-content:flex-end}
+  body.mobile-camera-active #camera-fly-toggle{width:auto;min-width:80px;gap:12px}
+  body.mobile-camera-active .camera-toggle-chevron{display:none}
+  body.mobile-camera-active #camera-fly-pad{grid-template-columns:repeat(4,minmax(44px,1fr));grid-template-rows:repeat(2,44px);gap:4px;padding:6px 8px}
+  body.mobile-camera-active #camera-fly-pad button{height:44px}
+  body.mobile-camera-active .camera-fly-forward{grid-column:2;grid-row:1}
+  body.mobile-camera-active .camera-fly-left{grid-column:1;grid-row:2}
+  body.mobile-camera-active .camera-fly-backward{grid-column:2;grid-row:2}
+  body.mobile-camera-active .camera-fly-right{grid-column:3;grid-row:2}
+  body.mobile-camera-active .camera-fly-rise{grid-column:4;grid-row:1}
+  body.mobile-camera-active .camera-fly-lower{grid-column:4;grid-row:2}
+  body.mobile-camera-active .camera-fly-turn-left{grid-column:1;grid-row:1}
+  body.mobile-camera-active .camera-fly-turn-right{grid-column:3;grid-row:1}
+}
+@media(max-width:900px) and (pointer:coarse){
+  body.tutorial-practice[data-tutorial-step=camera]:not(.mobile-camera-active) #camera-fly-hud{display:block;bottom:8px}
+}
+
+body.tutorial-practice #mobile-move-camera{display:none}
+@media(max-width:900px) and (pointer:coarse) and (orientation:landscape){
+  body.mobile-camera-active #camera-fly-hud.expanded{left:auto;right:8px;top:8px;bottom:8px;width:180px;max-height:none}
+  body.mobile-camera-active #camera-fly-pad{grid-template-columns:repeat(3,minmax(44px,1fr));grid-template-rows:repeat(3,44px);padding:6px;gap:4px}
+  body.mobile-camera-active .camera-fly-forward{grid-column:2;grid-row:1}
+  body.mobile-camera-active .camera-fly-left{grid-column:1;grid-row:2}
+  body.mobile-camera-active .camera-fly-backward{grid-column:2;grid-row:2}
+  body.mobile-camera-active .camera-fly-right{grid-column:3;grid-row:2}
+  body.mobile-camera-active .camera-fly-rise{grid-column:1;grid-row:1}
+  body.mobile-camera-active .camera-fly-lower{grid-column:3;grid-row:1}
+  body.mobile-camera-active .camera-fly-turn-left{grid-column:1;grid-row:3}
+  body.mobile-camera-active .camera-fly-turn-right{grid-column:3;grid-row:3}
+}

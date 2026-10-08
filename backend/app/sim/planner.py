@@ -445,6 +445,14 @@ def plan_shots(gs: GameState, *, max_trials=16, budget_seconds=2.0):
     if placement:
         backup["placement"] = placement
     seeds = [backup] if state.break_shot else _seeds(gs)
+    # Geometry powers were tuned at 3.5 m/s. Preserve that physical speed
+    # under custom caps; development seeds already express physical energy.
+    if not state.break_shot:
+        for shot in [backup, *seeds]:
+            if shot["family"] != "development":
+                shot["power"] = _power_for_speed(
+                    shoot_speed(shot["power"], 3.5), state.rules["normalMax"]
+                )
     # Power and follow/draw variants produce different cue leaves. Side spin is
     # deliberately not guessed: it would require matching squirt compensation.
     # Reserve early coverage for energy/development before aim refinements consume

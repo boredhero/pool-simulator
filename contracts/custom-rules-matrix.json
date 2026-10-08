@@ -1,0 +1,394 @@
+{
+  "axes": {
+    "scratch": [
+      "kitchen",
+      "anywhere"
+    ],
+    "calls": [
+      "none",
+      "eight",
+      "all"
+    ],
+    "eightOnBreak": [
+      "win",
+      "spot"
+    ],
+    "scratchOnEightLoss": [
+      false,
+      true
+    ],
+    "assignOnBreak": [
+      false,
+      true
+    ],
+    "strictBreak": [
+      false,
+      true
+    ]
+  },
+  "cases": [
+    {
+      "name": "ordinary scratch placement",
+      "state": {
+        "breakShot": false,
+        "open": false,
+        "groups": [
+          "solid",
+          "stripe"
+        ]
+      },
+      "ev": {
+        "firstContact": 1,
+        "potted": [],
+        "offTable": [],
+        "railAfterContact": true,
+        "cuePotted": true
+      },
+      "variants": [
+        {
+          "when": {
+            "scratch": "kitchen"
+          },
+          "expected": {
+            "winner": null,
+            "current": 1,
+            "placement": "kitchen",
+            "ballInHand": true
+          }
+        },
+        {
+          "when": {
+            "scratch": "anywhere"
+          },
+          "expected": {
+            "winner": null,
+            "current": 1,
+            "placement": "anywhere",
+            "ballInHand": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "scratch while on eight",
+      "state": {
+        "breakShot": false,
+        "open": false,
+        "groups": [
+          "solid",
+          "stripe"
+        ]
+      },
+      "ev": {
+        "firstContact": 8,
+        "potted": [],
+        "offTable": [],
+        "railAfterContact": true,
+        "cuePotted": true
+      },
+      "variants": [
+        {
+          "when": {
+            "scratchOnEightLoss": true
+          },
+          "expected": {
+            "winner": 1
+          }
+        },
+        {
+          "when": {
+            "scratchOnEightLoss": false,
+            "scratch": "kitchen"
+          },
+          "expected": {
+            "winner": null,
+            "current": 1,
+            "placement": "kitchen"
+          }
+        },
+        {
+          "when": {
+            "scratchOnEightLoss": false,
+            "scratch": "anywhere"
+          },
+          "expected": {
+            "winner": null,
+            "current": 1,
+            "placement": "anywhere"
+          }
+        }
+      ],
+      "pottedBefore": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ]
+    },
+    {
+      "name": "uncalled eight pot",
+      "state": {
+        "breakShot": false,
+        "open": false,
+        "groups": [
+          "solid",
+          "stripe"
+        ]
+      },
+      "ev": {
+        "firstContact": 8,
+        "potted": [
+          8
+        ],
+        "offTable": [],
+        "railAfterContact": true,
+        "cuePotted": false,
+        "pockets": [
+          {
+            "n": 8,
+            "pocket": 0
+          }
+        ]
+      },
+      "variants": [
+        {
+          "when": {
+            "calls": "none"
+          },
+          "expected": {
+            "winner": 0
+          }
+        },
+        {
+          "when": {
+            "calls": "eight"
+          },
+          "expected": {
+            "winner": 1
+          }
+        },
+        {
+          "when": {
+            "calls": "all"
+          },
+          "expected": {
+            "winner": 1
+          }
+        }
+      ],
+      "pottedBefore": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ]
+    },
+    {
+      "name": "eight on legal break",
+      "state": {},
+      "ev": {
+        "firstContact": 1,
+        "potted": [
+          8
+        ],
+        "offTable": [],
+        "railAfterContact": true,
+        "cuePotted": false
+      },
+      "variants": [
+        {
+          "when": {
+            "eightOnBreak": "win"
+          },
+          "expected": {
+            "winner": 0
+          }
+        },
+        {
+          "when": {
+            "eightOnBreak": "spot"
+          },
+          "expected": {
+            "winner": null,
+            "breakShot": false
+          }
+        }
+      ],
+      "call": [
+        1,
+        0
+      ]
+    },
+    {
+      "name": "group assignment on break",
+      "state": {},
+      "ev": {
+        "firstContact": 1,
+        "potted": [
+          1
+        ],
+        "offTable": [],
+        "railAfterContact": true,
+        "cuePotted": false,
+        "pockets": [
+          {
+            "n": 1,
+            "pocket": 0
+          }
+        ]
+      },
+      "variants": [
+        {
+          "when": {
+            "assignOnBreak": true
+          },
+          "expected": {
+            "open": false,
+            "groups": [
+              "solid",
+              "stripe"
+            ],
+            "current": 0
+          }
+        },
+        {
+          "when": {
+            "assignOnBreak": false
+          },
+          "expected": {
+            "open": true,
+            "groups": [
+              null,
+              null
+            ],
+            "current": 0
+          }
+        }
+      ],
+      "call": [
+        1,
+        0
+      ]
+    },
+    {
+      "name": "insufficient break rail count",
+      "state": {},
+      "ev": {
+        "firstContact": 1,
+        "potted": [],
+        "offTable": [],
+        "railAfterContact": true,
+        "cuePotted": false,
+        "objectRails": [
+          1
+        ]
+      },
+      "variants": [
+        {
+          "when": {
+            "strictBreak": true
+          },
+          "expected": {
+            "breakShot": true,
+            "current": 1
+          }
+        },
+        {
+          "when": {
+            "strictBreak": false
+          },
+          "expected": {
+            "breakShot": false,
+            "current": 1
+          }
+        }
+      ]
+    },
+    {
+      "name": "uncalled ordinary pot",
+      "state": {
+        "breakShot": false,
+        "open": false,
+        "groups": [
+          "solid",
+          "stripe"
+        ]
+      },
+      "ev": {
+        "firstContact": 1,
+        "potted": [
+          1
+        ],
+        "offTable": [],
+        "railAfterContact": true,
+        "cuePotted": false,
+        "pockets": [
+          {
+            "n": 1,
+            "pocket": 0
+          }
+        ]
+      },
+      "variants": [
+        {
+          "when": {
+            "calls": "all"
+          },
+          "expected": {
+            "current": 1
+          }
+        },
+        {
+          "when": {
+            "calls": "eight"
+          },
+          "expected": {
+            "current": 0
+          }
+        },
+        {
+          "when": {
+            "calls": "none"
+          },
+          "expected": {
+            "current": 0
+          }
+        }
+      ]
+    },
+    {
+      "name": "scratch on break uses kitchen",
+      "state": {},
+      "ev": {
+        "firstContact": 1,
+        "potted": [],
+        "offTable": [],
+        "railAfterContact": true,
+        "cuePotted": true,
+        "objectRails": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "variants": [
+        {
+          "when": {},
+          "expected": {
+            "winner": null,
+            "current": 1,
+            "placement": "kitchen",
+            "ballInHand": true
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { PerspectiveCamera, Vector3 } from 'three';
+import { PerspectiveCamera, Spherical, Vector3 } from 'three';
 import { constrainTableCamera } from '../src/render/cameraBounds';
 
 it('keeps every near-plane corner above the rails at close zoom and low orbit',()=>{
@@ -64,4 +64,34 @@ it('frames eligible balls behind the cue with the cue centered in usable screen 
   camera.position.copy(pose.position);camera.lookAt(pose.target);camera.updateMatrixWorld();
   for(const p of [cue,...targets]){const screen=new Vector3(p.x-TABLE_W/2,BALL_R,p.y-TABLE_H/2).project(camera);expect(screen.x).toBeGreaterThan(safe.left);expect(screen.x).toBeLessThan(safe.right);expect(screen.y).toBeGreaterThan(safe.bottom);expect(screen.y).toBeLessThan(safe.top);}
   expect(new Vector3(cue.x-TABLE_W/2,BALL_R,cue.y-TABLE_H/2).project(camera).x).toBeCloseTo(0);
+});
+
+it('preserves shot inclination after tight zoom toward a HUD-shifted rail or corner target',()=>{
+  for(const aspect of [390/844,844/390])for(const [x,z]of [[-1.24,0],[-1.24,-.6],[1.24,.6]]) {
+    const camera=new PerspectiveCamera(50,aspect,.05,50);
+    const controls={target:new Vector3(x,-.45,z),maxPolarAngle:Math.PI*.49,minDistance:.6};
+    camera.position.copy(controls.target).add(new Vector3().setFromSpherical(new Spherical(.6,1.12,.8)));
+    constrainTableCamera(camera,controls,true);
+    const orbit=new Spherical().setFromVector3(camera.position.clone().sub(controls.target));
+    expect(orbit.phi).toBeCloseTo(1.12,10);
+    expect(orbit.theta).toBeCloseTo(.8,10);
+    expect(orbit.radius).toBeGreaterThan(1);
+    expect(controls.minDistance).toBeCloseTo(orbit.radius,10);
+    for(const x of [-1,1])for(const y of [-1,1])expect(new Vector3(x,y,-1).unproject(camera).y).toBeGreaterThan(.058);
+  }
+});
+
+it('keeps shallow mobile panning within the controls zoom range without changing pitch',()=>{
+  const camera=new PerspectiveCamera(50,844/390,.05,50);
+  const controls={target:new Vector3(1,-.4,-.6),maxPolarAngle:Math.PI*.49,minDistance:.6,maxDistance:8};
+  camera.position.copy(controls.target).add(new Vector3().setFromSpherical(new Spherical(.6,Math.PI*.49,.8)));
+  constrainTableCamera(camera,controls,true);
+  expect(controls.minDistance).toBeLessThanOrEqual(controls.maxDistance);
+  expect(camera.position.distanceTo(controls.target)).toBeCloseTo(8,8);
+  expect(new Spherical().setFromVector3(camera.position.clone().sub(controls.target)).phi).toBeCloseTo(Math.PI*.49,8);
+  for(const x of [-1,1])for(const y of [-1,1])expect(new Vector3(x,y,-1).unproject(camera).y).toBeGreaterThan(.058);
+  const position=camera.position.clone(),target=controls.target.clone();
+  constrainTableCamera(camera,controls,true);
+  expect(camera.position.distanceTo(position)).toBeLessThan(1e-10);
+  expect(controls.target.distanceTo(target)).toBeLessThan(1e-10);
 });
