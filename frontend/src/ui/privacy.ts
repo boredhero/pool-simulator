@@ -54,6 +54,7 @@ export function initPrivacy(options:{deferNotice?:boolean}={}) {
     else void consent(false).catch(()=>{});
   } else notice.hidden=options.deferNotice===true;
   if(optedOut()){enabled=false;notice.hidden=true;void consent(false).catch(()=>{});}
-  const features:Record<string,string>={settingsbtn:'settings',helpbtn:'help',viewbtn:'camera',onlinebtn:'online',cpubtn:'cpu',jevbtn:'jev',rack:'new_rack',resetspin:'spin_reset',version:'changelog'};
+  document.addEventListener('click', e => { if (e.target instanceof Element && e.target.closest('#mobile-move-camera,#camera-fly-toggle')) event('camera'); });
+  const features:Record<string,string>={settingsbtn:'settings',helpbtn:'help',onlinebtn:'online',cpubtn:'cpu',jevbtn:'jev',rack:'new_rack',resetspin:'spin_reset',version:'changelog'};
   for(const [id,name] of Object.entries(features))document.getElementById(id)?.addEventListener('click',()=>event(name));
 }

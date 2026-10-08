@@ -9,5 +9,3 @@
 .panel-move-controls[hidden]{display:none}
 .panel-move-controls button{min-height:44px;font-size:14px;padding:0 10px}
 .panel-position-status{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
-#viewpanel>.panel-drag-handle{padding:0 0 10px;background:transparent}
-#viewpanel>.panel-move-controls{padding:0 0 10px}

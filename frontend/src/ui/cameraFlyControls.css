@@ -82,3 +82,12 @@ body.tutorial-practice #mobile-move-camera{display:none}
   body.mobile-camera-active .camera-fly-turn-left{grid-column:1;grid-row:3}
   body.mobile-camera-active .camera-fly-turn-right{grid-column:3;grid-row:3}
 }
+
+#camera-view-actions{grid-column:1 / -1;grid-row:6;display:grid;gap:6px;border-top:1px solid #62523b;padding-top:8px}
+#camera-fly-pad #camera-view-actions button{font-size:14px;min-height:44px;height:44px}
+#camera-view-actions .row{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+#camera-view-actions .guide-note{margin:0;font-size:12px;line-height:1.4}
+@media(max-width:900px) and (pointer:coarse){#camera-view-actions{grid-row:3}#camera-view-actions #cameramode,#camera-view-actions .guide-note{display:none}}
+@media(max-width:900px) and (pointer:coarse) and (orientation:landscape){#camera-view-actions{grid-row:4}}
+
+#camera-view-actions[hidden]{display:none}

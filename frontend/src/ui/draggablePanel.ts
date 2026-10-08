@@ -4,7 +4,6 @@ import './draggablePanel.css';
 export function setupDraggablePanels(): void {
   for (const [panelId, openerId, title] of [
     ['settingspanel', 'settingsbtn', 'Settings'],
-    ['viewpanel', 'viewbtn', 'View'],
     ['onlinepanel', 'onlinebtn', 'Play online'],
   ]) {
     const panel = document.getElementById(panelId);

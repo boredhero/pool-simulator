@@ -224,3 +224,30 @@ for(const width of [1024,1440])test(`desktop camera stack uses equal gaps and ex
   expect(expanded.y).toBeLessThan(first.y);expect(expanded.y+expanded.height).toBeCloseTo(first.y+first.height,1);expect(expanded.x).toBeGreaterThanOrEqual(tray.x+tray.width);
   expect((await profile.boundingBox())!.y).toBeCloseTo(middle.y,1);await page.screenshot({path:testInfo.outputPath('desktop-camera-stack.png')});
 });
+
+for (const layout of [
+  {name:'desktop',width:1280,height:800,touch:false},
+  {name:'portrait',width:390,height:844,touch:true},
+  {name:'landscape',width:844,height:390,touch:true},
+]) test.describe(`single camera entry ${layout.name}`,()=>{
+  test.use({viewport:{width:layout.width,height:layout.height},hasTouch:layout.touch,isMobile:layout.touch});
+  test('bottom panel retains framing and zoom and returns to play',async({page})=>{
+    await expect(page.locator('#viewbtn')).toHaveCount(0);
+    await page.locator(layout.touch?'#mobile-move-camera':'#camera-fly-toggle').click();
+    for(const id of ['focusballs','wholetable','zoomin','zoomout']){
+      await page.locator(`#${id}`).scrollIntoViewIfNeeded();
+      await expect(page.locator(`#${id}`)).toBeInViewport();
+    }
+    await page.locator('#wholetable').click();
+    const initial=await pose(page);
+    await page.locator('#zoomin').click();
+    await expect.poll(async()=>(await pose(page)).distance).toBeLessThan(initial.distance);
+    await page.locator('#focusballs').click();
+    if(!layout.touch) await page.locator('#cameramode').click();
+    expect(await page.evaluate(()=>(window as any).__pool.cameraMode)).toBe(true);
+    await page.locator('#camera-fly-toggle').click();
+    expect(await page.evaluate(()=>(window as any).__pool.cameraMode)).toBe(false);
+    if(layout.touch) await expect(page.locator('#touchshoot')).toBeVisible();
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(layout.width);
+  });
+});

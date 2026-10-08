@@ -14,7 +14,7 @@ for(const viewport of [{width:320,height:700},{width:390,height:844},{width:844,
   const header=(await page.locator('.topbar').boundingBox())!,tray=(await page.locator('.control-tray').boundingBox())!,identity=(await page.locator('#accountidentity').boundingBox())!,toolbar=(await page.locator('.toolbar').boundingBox())!;
   if(viewport.width<700){expect(header.height).toBeLessThan(150);expect(tray.height).toBeLessThan(112);expect(Math.abs(identity.y-toolbar.y)).toBeLessThan(1);}else{expect(header.width).toBe(160);expect(tray.width).toBe(180);expect(tray.x-header.x-header.width).toBeGreaterThan(250);}
   expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
-  for(const selector of ['#accountidentity','#helpbtn','#settingsbtn','#viewbtn','#onlinebtn','#touchshoot','#touchpower','#spin','#resetspin','#morecontrols','#mobile-move-camera'])for(const element of await page.locator(selector).all()){
+  for(const selector of ['#accountidentity','#helpbtn','#settingsbtn','#onlinebtn','#touchshoot','#touchpower','#spin','#resetspin','#morecontrols','#mobile-move-camera'])for(const element of await page.locator(selector).all()){
     await expect(element).toBeInViewport();const box=(await element.boundingBox())!;expect(box.width).toBeGreaterThanOrEqual(44);expect(box.height).toBeGreaterThanOrEqual(44);
   }
   await expect(page.locator('.topbar #scorecard')).toBeVisible();
