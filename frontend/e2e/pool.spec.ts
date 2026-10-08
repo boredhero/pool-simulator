@@ -842,6 +842,9 @@ test('practice touch aiming and profile-specific coaching use real controls',asy
   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
   await expect(page.locator('#tutorialprogress')).toHaveText('Control worked');
   expect(await page.evaluate(()=>(window as any).__pool.mode)).toBe('aim');
+  // Chromium suppresses a synthetic tap immediately after this raw CDP drag.
+  // Finish its gesture window before testing a separate, real Next tap.
+  await page.waitForTimeout(500);
   await touchPracticeControl(page,'#tutorialnext');await expect(page.locator('#tutorial')).toHaveAttribute('data-step','spin');await touchPracticeControl(page,'#tutorialnext');
   await expect(page.locator('#tutorialbody')).toContainText('two fingers');
   await cdp.send('Emulation.setTouchEmulationEnabled',{enabled:false});
