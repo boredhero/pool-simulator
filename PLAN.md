@@ -10,7 +10,7 @@ Flow: work on `develop`, PR to `main` (protected: PR + `ci` check), merge to shi
 - CI: one workflow (lint/test/e2e/docker/deploy), Dependabot weekly grouped
 
 ## Physics contract (both sims, keep in sync)
-- 2D circles + 3-axis spin, SI units, fixed dt=1/240, semi-implicit Euler + swept TOI
+- Planar rolling + 3D flight/spin, SI units, fixed dt=1/240, swept TOI + gravity
 - μs=0.20, μr=0.010, e_ball=0.94, cushion e_n=0.76 along nose normal + μ_c=0.17
 - Speed-dependent throw μ(v), spin decay 10 rad/s², tip SRF 2.5·(b/R), squirt 5.7°/unit
 - pooltool pocket geometry (offset capture, big corner jaws, speed rejection) + lip gravity
@@ -30,6 +30,54 @@ Flow: work on `develop`, PR to `main` (protected: PR + `ci` check), merge to shi
 - Ball collisions check every pair regardless of array order/sleep state;
   penetration correction and a larger contact budget are mirrored in Python.
   Regressions cover sleeping targets, coincident balls, and every frame of breaks.
+
+- Assisted cue clearance feeds the same elevated impulse in TS and Python.
+  Downward cue impulse rebounds from the slate; gravity, airborne collision
+  normals, landing friction, and low-height pocket capture affect play.
+- Eight-ball strategies consume pre-shot snapshots and physical facts. Shared
+  JSON fixtures exercise both implementations. Bar, Tourny, and Custom expose
+  explicit calls, kitchen placement, break rules, and speed limits. Server
+  derives elevation and owns outcomes; rooms carry rules/version/revision.
+- Large self-hosted Atkinson Hyperlegible UI, automatic pointer-aware help,
+  wide desktop rules settings, separate desktop version card, immediate pot
+  indicators. Pure sidespin at rest no longer delays turn completion.
+
+## Model and preset decisions
+- Bar is a named house preset, not a universal bar standard: scratch in the
+  kitchen, other fouls anywhere, call the 8, 8 on a legal break wins, scratch
+  while on the 8 loses. Kitchen shots must leave the kitchen before contacting
+  an object inside it. If all legal targets are inside, spot the nearest one.
+- Tourny is a tournament-inspired preset: call every scoring shot, normal
+  scratch anywhere, break scratch in kitchen, 8 on break respots. This is not
+  a claim of complete WPA officiating: illegal breaks automatically rerack for
+  the opponent and off-table objects respot; no referee choice flow is modeled.
+- Pre-shot group membership decides whether the shooter was legally on the 8;
+  pocketing the final group ball and 8 in the same stroke is an early-8 loss.
+- Flight uses a rigid impulse/restitution approximation (slate restitution .5,
+  sliding friction .2), not calibrated cue-tip compliance. Cushion collisions
+  use a finite-height gate, not a rounded 3D rail collider. Ball-ball tangential
+  throw remains the existing planar approximation during airborne impacts.
+- Rest threshold is 5 mm/s (<0.13 mm additional rolling distance); isolated
+  residual sidespin is discarded at rest instead of blocking the next turn.
+
+## Research references
+- [Pooltool cue impulse](https://github.com/ekiefl/pooltool/blob/main/pooltool/physics/resolve/stick_ball/instantaneous_point/__init__.py)
+  and [table impact](https://github.com/ekiefl/pooltool/blob/main/pooltool/physics/resolve/ball_table/frictional_inelastic/__init__.py)
+  informed elevation, spin projection and Coulomb-limited landing impulse.
+- [Kim cue-impact paper](https://arxiv.org/html/2104.11232v2) distinguishes
+  rigid impulse models from cue/tip compliance and off-center stroke effects.
+- [WPA 2026 rules](https://www.wpapool.com/wp-content/uploads/2026/01/2026.01.02-WPA-Rules.pdf),
+  [APA US Amateur rules](https://poolplayers.com/us-amateur-championship/rules/),
+  and [CSI rules](https://www.playcsipool.com/uploads/7/3/5/9/7359673/official_rules_of_csi__08122025.pdf)
+  informed explicitly named presets rather than a supposed universal bar rule.
+- [Hexagonal architecture](https://alistair.cockburn.us/hexagonal-architecture),
+  [state pattern](https://gameprogrammingpatterns.com/state.html), and
+  [deterministic lockstep](https://gafferongames.com/post/deterministic_lockstep/)
+  informed the rules boundary, pre-shot context and authoritative room state.
+- [W3C interaction media features](https://www.w3.org/TR/mediaqueries-5/#mf-interaction)
+  and [pointerType](https://developer.mozilla.org/en-US/docs/Web/API/PointerEvent/pointerType)
+  inform automatic help on hybrid devices. Font assets and OFL license are
+  self-hosted from [Atkinson Hyperlegible](https://github.com/googlefonts/atkinson-hyperlegible).
 
 ## Open / known gaps
 - Pocket forgiveness for casual play (strict-pro now); cloth-speed setting

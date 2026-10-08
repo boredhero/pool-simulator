@@ -2,15 +2,19 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <link rel="manifest" href="/manifest.json" />
 <link rel="icon" href="/icon.svg" type="image/svg+xml" />
 <title>Play Pool</title>
+<link rel="preload" href="/fonts/AtkinsonHyperlegible-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <style>
-:root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#f5f1e9;background:#100e0c;font-synthesis:none}
+@font-face{font-family:"Atkinson Hyperlegible";src:url('/fonts/AtkinsonHyperlegible-Regular.woff2') format('woff2');font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:"Atkinson Hyperlegible";src:url('/fonts/AtkinsonHyperlegible-Bold.woff2') format('woff2');font-weight:600 900;font-style:normal;font-display:swap}
+
+:root{color-scheme:dark;font-family:"Atkinson Hyperlegible","Trebuchet MS",Arial,sans-serif;font-size:18px;line-height:1.45;color:#f5f1e9;background:#100e0c;font-synthesis:none}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;overscroll-behavior:none}
-button,input{font:inherit}
+button,input,select{font:inherit}
 button{min-height:48px;padding:0 18px;border:1px solid #6d6254;border-radius:12px;background:#302b24;color:#fff8ed;font-size:16px;font-weight:600;cursor:pointer;touch-action:manipulation;transition:background .15s,border-color .15s}
 button:hover{background:#484033;border-color:#d2b782}
 button:focus-visible,input:focus-visible,.swatch:focus-visible{outline:3px solid #e7c384;outline-offset:3px}
@@ -62,6 +66,22 @@ button.on{background:#264e38;border-color:#88ba91}
 @media(max-width:900px){#scorecard{top:124px;left:24px;right:24px;width:auto;flex-direction:row}.pcard{flex:1;padding:12px 14px}.pcard .pname{font-size:17px}.pcard .grp{font-size:13px}.pcard .balls{gap:4px;margin-top:8px}.pball{width:23px;height:23px}.topbar{gap:12px}.control-tray{gap:16px}.spin-control{padding-left:16px}}
 @media(max-width:600px){.topbar{top:12px;left:12px;right:12px;padding:12px;display:grid;grid-template-columns:1fr auto;gap:10px;border-radius:14px}.status{display:contents}.status-meta{grid-column:1;grid-row:1;margin:0;gap:8px}#turn{font-size:12px}#version{font-size:10px}.toolbar{grid-column:2;grid-row:1;gap:6px}.toolbar button{font-size:13px;padding:0 10px;min-height:44px}#msg{grid-column:1 / -1;grid-row:2;font-size:17px;line-height:1.3}#scorecard{top:136px;left:12px;right:12px;gap:8px}.pcard{padding:10px;border-radius:12px}.pcard .pname{font-size:16px}.pcard .grp{font-size:12px}.pball{width:21px;height:21px}.control-tray{bottom:12px;left:12px;right:12px;padding:12px;display:grid;grid-template-columns:1fr auto;gap:12px;border-radius:14px}.control-tray .actions{grid-column:1 / -1}.actions button{flex:1}.control-help{font-size:12px}.spin-control{padding-left:12px;gap:8px}.spin-control .control-label{font-size:11px}#spin{width:48px;height:48px}.hint{bottom:184px;font-size:13px}#settingspanel,#onlinepanel{top:126px;right:12px;left:12px;width:auto;max-height:calc(100dvh - 150px)}}
 @media(max-height:600px) and (min-width:601px){.topbar{top:8px;padding:8px 14px}#scorecard{top:90px;width:190px;flex-direction:column}.pcard{padding:10px}.pcard .balls{display:none}.control-tray{bottom:8px;padding:8px 14px}.control-help{display:none}.hint{bottom:96px}}
+
+select,input[type=number]{width:100%;min-height:44px;border:1px solid #80705c;background:#151310;color:#fff8ed;border-radius:9px;padding:8px 10px;font-size:15px}
+button:disabled,fieldset:disabled{opacity:.55;cursor:default}fieldset{border:0;padding:0;margin:0;display:flex;flex-direction:column;gap:10px}fieldset label{margin-top:6px}.check{display:flex;gap:10px;align-items:center}.check input{width:20px;height:20px;accent-color:#b3cf97}h2{font-size:23px;letter-spacing:-.03em;margin:0 0 4px}hr{border:0;border-top:1px solid #635747;width:100%}
+#helppanel{position:fixed;right:24px;top:126px;width:280px;padding:20px;border:1px solid #75634a;border-radius:16px;background:rgba(30,26,21,.96);box-shadow:0 12px 40px #0005;z-index:4;max-height:calc(100dvh - 260px);overflow:auto;display:none}#helppanel.open{display:block}.guide-heading{display:flex;align-items:center;justify-content:space-between}.eyebrow{font-size:10px;letter-spacing:.16em;color:#d9b97e;font-weight:750}#closehelp{border:0;background:none;padding:0;min-height:32px;width:32px;font-size:24px}.guide-tabs{display:flex;gap:4px;background:#12110e;padding:4px;border-radius:10px;margin:15px 0}.guide-tabs button{min-height:36px;border:0;background:transparent;flex:1;font-size:13px}.guide-tabs button[aria-pressed=true]{background:#4c4333;color:#ffe2aa}dl{margin:0}dt{font-weight:700;font-size:14px;color:#f6ead1;margin-top:14px}dd{font-size:13px;line-height:1.55;margin:4px 0 0;color:#c9c0b3}.guide-note{font-size:12px;line-height:1.55;color:#c9c0b3;margin:12px 0 0}.guide-note strong{color:#f0dfc0}.rules-summary{margin-top:16px;padding-top:14px;border-top:1px solid #635747;font-size:12px;line-height:1.6;color:#d8c29c}
+#callpanel{position:fixed;bottom:136px;left:50%;transform:translateX(-50%);display:flex;gap:12px;align-items:center;background:#211d18;border:1px solid #c8ad79;border-radius:14px;padding:12px 16px;z-index:3;max-width:calc(100vw - 24px)}#callpanel[hidden]{display:none}#callpanel label{white-space:nowrap;font-size:14px;color:#e2cfaa}#callball{width:100px}#callstatus{font-size:13px;min-width:120px}#clearcall{font-size:12px;min-height:40px;padding:0 10px}
+@media(max-width:1100px){#helppanel{width:260px}}@media(max-width:600px){.settings-label{display:none}#helppanel{top:126px;left:12px;right:12px;width:auto;max-height:calc(100dvh - 150px)}#callpanel{bottom:184px;flex-wrap:wrap;gap:8px;width:calc(100vw - 24px)}#callpanel label{flex:1}#callstatus{flex:1}#callball{width:90px}.hint{display:none}}
+
+#helpbtn{display:grid;place-items:center;padding:0;width:48px;flex:none}
+@media(min-width:900px){#settingspanel{width:min(540px,calc(100vw - 320px));padding:26px;gap:14px}#rulefields{display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:12px 20px}#rulefields>label:not(.check){margin:0}#rulefields>.check{grid-column:1 / -1}#settingspanel h2{font-size:26px}}
+
+button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{font-size:24px}.pcard .grp{font-size:17px}.pcard{padding:16px}#scorecard{width:280px}.control-label{font-size:16px}.control-help,.hint{font-size:16px}.spin-control .control-label{font-size:16px}#helppanel{width:320px}#helppanel h2{font-size:28px}.eyebrow{font-size:13px}dt{font-size:19px}dd,.guide-note,.rules-summary{font-size:16px;line-height:1.5}#settingspanel label,#onlinepanel label{font-size:18px}select,input[type=number],#roominfo{font-size:18px}#callpanel label,#callstatus,#clearcall{font-size:17px}.pball{width:30px;height:30px}.pball span{width:19px;height:19px;font-size:14px}#version{font-size:16px}
+@media(min-width:901px){#version{position:fixed;left:24px;bottom:24px;background:#211d18;border:1px solid #635747;border-radius:12px;padding:12px 16px;color:#ddd0b9;box-shadow:0 6px 20px #0003;line-height:1.3}#version::before{content:'PLAY POOL';display:block;font-size:12px;letter-spacing:.12em;color:#b6a27e;margin-bottom:4px}.control-tray{max-width:900px;left:160px;right:24px}}
+@media(max-width:1100px) and (min-width:901px){#helppanel{width:290px}.control-tray{gap:14px}.spin-control{padding-left:14px}}
+@media(max-width:900px){#scorecard{width:auto}.pcard .pname{font-size:20px}.pcard .grp{font-size:16px}}
+@media(max-width:600px){#msg{font-size:21px}#turn{font-size:14px}#version{font-size:13px}.toolbar button{font-size:16px;padding:0 9px}.topbar{gap:10px}.pcard{padding:10px}.pcard .pname{font-size:20px}.pcard .grp{font-size:15px}.pball{width:25px;height:25px}.pball span{font-size:12px;width:17px;height:17px}.control-label,.spin-control .control-label{font-size:15px}.control-help{font-size:15px}.control-tray{gap:10px}#helppanel{width:auto}.status-meta{gap:6px}#callpanel{bottom:190px}#callpanel label,#callstatus,#clearcall{font-size:16px}}
+#scorecard,#helppanel,#settingspanel,#onlinepanel{top:var(--below-header,136px)}
 </style>
 </head>
 <body>
@@ -73,7 +93,8 @@ button.on{background:#264e38;border-color:#88ba91}
       <div id="msg" role="status" aria-live="polite">Player 1 to break</div>
     </div>
     <div class="toolbar">
-      <button id="settingsbtn" title="Table settings">Table</button>
+      <button id="helpbtn" aria-label="How to play" aria-expanded="false" aria-controls="helppanel"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.5" r=".9" fill="currentColor" stroke="none"/></svg></button>
+      <button id="settingsbtn" title="Table and rules">⚙ <span class="settings-label">Table</span></button>
       <button id="onlinebtn">Online</button>
     </div>
   </div>
@@ -85,7 +106,34 @@ button.on{background:#264e38;border-color:#88ba91}
   </div>
 </div>
 <div id="scorecard"></div>
+<aside id="helppanel" aria-label="How to play">
+  <div class="guide-heading"><span class="eyebrow">YOUR NEXT SHOT</span><button id="closehelp" aria-label="Close controls guide">×</button></div>
+  <h2>Aim. Pull. Release.</h2>
+
+  <dl id="mouseguide"><dt>01 · Line it up</dt><dd>Move over the felt to aim.</dd><dt>02 · Take the shot</dt><dd>Press, drag back to build power, then release. Your aim locks while pulling.</dd><dt>03 · Find your view</dt><dd>Right-drag to orbit. Scroll to zoom.</dd></dl>
+  <dl id="touchguide" hidden><dt>01 · Line it up</dt><dd>Touch the felt in the direction you want to aim.</dd><dt>02 · Take the shot</dt><dd>Keep your finger down, pull back, then release. A longer pull means more power.</dd><dt>03 · Find your view</dt><dd>Use two fingers to orbit and pinch to zoom. This cancels a shot pull.</dd></dl>
+  <p class="guide-note"><strong>Add spin</strong> · Drag the blue dot on the cue ball below. Center it for a straight hit. Cue elevation is assisted around obstacles and changes the shot.</p>
+  <p class="guide-note"><strong>After a foul</strong> · Tap or click a green legal spot to place the cue ball. The outline shows your placement area.</p>
+  <p class="guide-note"><strong>Call a shot</strong> · When prompted, choose your ball, then tap its destination pocket on the table.</p>
+  <div id="rulesummary" class="rules-summary"></div>
+</aside>
+<div id="callpanel" hidden><label for="callball">Call your shot</label><select id="callball" aria-label="Called ball"></select><span id="callstatus">Tap a pocket on the table</span><button id="clearcall">Change pocket</button></div>
 <div id="settingspanel">
+  <h2>Table &amp; rules</h2>
+  <label for="rulespreset">Game</label><select id="rulespreset"><option value="bar">8-ball (Bar)</option><option value="tournament">8-ball (Tourny)</option><option value="custom">8-ball (Custom)</option></select>
+  <p class="guide-note" id="rulesnotice">Preset rules are locked. Choose Custom to make them your own.</p>
+  <fieldset id="rulefields">
+    <label for="scratchrule">Scratch placement</label><select id="scratchrule"><option value="kitchen">Behind the head string</option><option value="anywhere">Anywhere (except break)</option></select>
+    <label for="callsrule">Call shots</label><select id="callsrule"><option value="none">No calls</option><option value="eight">8-ball only</option><option value="all">Every ball</option></select>
+    <label for="eightbreakrule">8-ball on the break</label><select id="eightbreakrule"><option value="win">Win</option><option value="spot">Spot it; keep playing</option></select>
+    <label class="check"><input id="scratch8rule" type="checkbox"> Scratch while on the 8 loses</label>
+    <label class="check"><input id="assignrule" type="checkbox"> Assign groups on the break</label>
+    <label class="check"><input id="strictbreakrule" type="checkbox"> Legal break: pot or four object rails</label>
+    <label for="normalspeed">Maximum shot speed (m/s)</label><input id="normalspeed" type="number" min="1" max="8.5" step="0.1" value="3.5">
+    <label for="breakspeed">Maximum break speed (m/s)</label><input id="breakspeed" type="number" min="1" max="12" step="0.1" value="8.5">
+  </fieldset>
+  <button id="applyrules">Start new rack with these rules</button>
+  <hr>
   <label>Felt</label>
   <div class="swatches" id="feltsw"></div>
   <label>Rails</label>

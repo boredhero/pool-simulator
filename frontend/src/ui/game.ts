@@ -1,8 +1,11 @@
-import { allAsleep, DT, step, strike, VMAX_BREAK, VMAX_NORMAL, type Ball, type ShotEvents } from '../sim/physics';
-import { applyShot, canPlace, newGame, placeCue, type GameState } from '../sim/rules';
-import { breakShot, chooseShot, legalTargets } from '../sim/ai';
+import { cueElevation } from '../sim/cue';
+import { type MatchConfig } from '../sim/config';
+import { TableOptions } from './tableOptions';
+import { allAsleep, DT, step, strike, type Ball, type ShotEvents } from '../sim/physics';
+import { applyShot, beginShot, callRequired, canPlace, legalTargets, newGame, placeCue, type GameState } from '../sim/rules';
+import { breakShot, chooseShot } from '../sim/ai';
 import { Sfx } from './sfx';
-import { TABLE_H, TABLE_W } from '../sim/table';
+import { POCKETS, TABLE_H, TABLE_W } from '../sim/table';
 import { init, type SceneHandle } from '../render/scene';
 import { RoomClient, type RoomState } from '../net/room';
 
@@ -31,6 +34,11 @@ const freshEv = (): ShotEvents => ({
 
 export class Game {
   gs: GameState;
+  options: TableOptions;
+  calledBall: number | null = null;
+  calledPocket: number | null = null;
+  accumulator = 0;
+  pointers = new Set<number>();
   scene: SceneHandle;
   mode: Mode = 'aim';
   angle = 0; // aim direction, sim plane (eased toward targetAngle)
@@ -65,13 +73,26 @@ export class Game {
         'feltsw', 'woodsw', 'feltcustom', 'woodcustom', 'scorecard'].map((id) => [id, document.getElementById(id)!]),
     );
     this.applyTheme(localStorage.getItem('pool:felt') ?? FELTS[0], localStorage.getItem('pool:wood') ?? WOODS[0], false);
+    this.options = new TableOptions(rules => this.reset(rules));
     this.buildThemePanel();
     this.wire(canvas);
+    new ResizeObserver(entries => {
+      const bar = entries[0].target.getBoundingClientRect();
+      document.documentElement.style.setProperty('--below-header', `${bar.bottom + 12}px`);
+    }).observe(document.querySelector('.topbar')!);
     this.scene.onFrame(() => this.frame());
     try {
       if (localStorage.getItem('pool:seen')) document.getElementById('hint')?.classList.add('gone');
     } catch { /* private mode */ }
     this.hud();
+  }
+
+  reset(rules: MatchConfig = this.gs.rules): void {
+    if (this.room) return;
+    this.gs = newGame((Math.random() * 1e9) | 0, rules);
+    this.mode = 'aim'; this.pulling = false; this.pressPt = null;
+    this.lastPotted = 0; this.lastSpeed.clear(); this.calledBall = this.calledPocket = null;
+    this.options.write(rules); this.hud();
   }
 
   cue(): Ball { return this.gs.balls[0]; }
@@ -151,6 +172,7 @@ export class Game {
       this.hud();
     };
     canvas.addEventListener('pointermove', (e) => {
+      if (this.pointers.size > 1) return;
       if (e.pointerType === 'mouse' && e.buttons !== 0 && e.buttons !== 1) return;
       const p = this.scene.pickFelt(e.clientX, e.clientY);
       if (!p) return;
@@ -159,6 +181,8 @@ export class Game {
     });
     canvas.addEventListener('pointerdown', (e) => {
       this.sfx.unlock();
+      this.pointers.add(e.pointerId);
+      if (this.pointers.size > 1) { this.pulling = false; this.pressPt = null; return; }
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       const p = this.scene.pickFelt(e.clientX, e.clientY);
       if (!p) return;
@@ -167,12 +191,18 @@ export class Game {
         tryPlace(p[0], p[1]);
         return;
       }
+      if (this.humanTurn() && callRequired(this.gs) && this.calledPocket === null) {
+        const distances = POCKETS.map(q => Math.hypot(q.x - p[0], q.y - p[1]));
+        const pocket = distances.indexOf(Math.min(...distances));
+        if (distances[pocket] < .20) { this.calledPocket = pocket; this.hud(); }
+        return;
+      }
       if (this.mode === 'aim' && !this.cue().potted) {
         const c = this.cue();
         const dx = p[0] - c.x, dy = p[1] - c.y;
         if (Math.hypot(dx, dy) > 0.02) this.targetAngle = Math.atan2(dy, dx);
       }
-      if (this.canShoot()) {
+      if (this.humanTurn()) {
         this.pulling = true;
         this.pressPt = p;
         this.hoverPt = p;
@@ -180,6 +210,7 @@ export class Game {
     });
     const cancelPull = () => { this.pulling = false; this.pressPt = null; };
     canvas.addEventListener('pointerup', (e) => {
+      this.pointers.delete(e.pointerId);
       if (!this.pulling) return;
       if (e.pointerType === 'mouse' && e.button !== 0) { cancelPull(); return; }
       const power = Math.max(0.04, this.pullPower());
@@ -187,9 +218,11 @@ export class Game {
       if (!this.humanTurn()) return;
       this.fire(power);
     });
-    canvas.addEventListener('pointercancel', cancelPull);
+    canvas.addEventListener('pointercancel', e => { this.pointers.delete(e.pointerId); cancelPull(); });
+    addEventListener('pointerup', e => this.pointers.delete(e.pointerId));
     canvas.addEventListener('pointerleave', cancelPull);
     addEventListener('keydown', (e) => {
+      if ((e.target as HTMLElement)?.closest('input,select,button,textarea')) return;
       if (e.code === 'ArrowLeft') this.targetAngle += 0.03;
       if (e.code === 'ArrowRight') this.targetAngle -= 0.03;
       if (e.code === 'Space') {
@@ -203,6 +236,8 @@ export class Game {
       const r = spin.getBoundingClientRect();
       this.tipX = Math.max(-0.55, Math.min(0.55, ((e.clientX - r.left) / r.width - 0.5) * 2 * 0.55));
       this.tipY = Math.max(-0.55, Math.min(0.55, (0.5 - (e.clientY - r.top) / r.height) * 2 * 0.55));
+      const scale = Math.min(1, .55 / (Math.hypot(this.tipX, this.tipY) || 1));
+      this.tipX *= scale; this.tipY *= scale;
       spin.style.setProperty('--tx', `${(this.tipX / 0.55) * 30}px`);
       spin.style.setProperty('--ty', `${(-this.tipY / 0.55) * 30}px`);
     };
@@ -224,39 +259,36 @@ export class Game {
     });
     this.el.createbtn.addEventListener('click', () => this.connectRoom(true));
     this.el.joinbtn.addEventListener('click', () => this.connectRoom(false));
-    this.el.rack.addEventListener('click', () => {
-      this.gs = newGame((Math.random() * 1e9) | 0);
-      this.mode = 'aim';
-      this.pulling = false; this.pressPt = null;
-      this.lastPotted = 0;
-      this.lastSpeed.clear();
-      this.hud();
-    });
+    document.getElementById('callball')!.addEventListener('change', e => { this.calledBall = Number((e.target as HTMLSelectElement).value); this.calledPocket = null; this.hud(); });
+    document.getElementById('clearcall')!.addEventListener('click', () => { this.calledPocket = null; this.hud(); });
+    this.el.rack.addEventListener('click', () => this.reset());
     this.el.aibtn.addEventListener('click', () => {
+      if (this.room) return;
       this.aiOpponent = !this.aiOpponent;
-      (this.el.aibtn as HTMLButtonElement).textContent = this.aiOpponent ? 'AI: on' : 'Play vs AI';
-      (this.el.aibtn as HTMLButtonElement).classList.toggle('on', this.aiOpponent);
-      this.gs = newGame((Math.random() * 1e9) | 0);
-      this.mode = 'aim';
-      this.lastPotted = 0;
-      this.lastSpeed.clear();
-      this.hud();
+      this.el.aibtn.textContent = this.aiOpponent ? 'AI: on' : 'Play vs AI';
+      this.el.aibtn.classList.toggle('on', this.aiOpponent);
+      this.reset();
     });
   }
 
-  fire(power: number, vmax = this.gs.breakShot ? VMAX_BREAK : VMAX_NORMAL): void {
+  fire(power: number, vmax = this.gs.breakShot ? this.gs.rules.breakMax : this.gs.rules.normalMax): void {
     if (!this.canShoot()) return;
     document.querySelector('.hint')?.classList.add('gone');
     try { localStorage.setItem('pool:seen', '1'); } catch { /* private mode */ }
     const c = this.cue();
     if (c.potted) return;
+    if (callRequired(this.gs) && (this.calledBall === null || this.calledPocket === null)) {
+      this.el.msg.textContent = 'Choose a ball and tap its destination pocket before shooting'; return;
+    }
     this.power = power;
-    const params = { aim: this.angle, power, tipX: this.tipX, tipY: this.tipY, vmax };
-    strike(c, Math.cos(this.angle), Math.sin(this.angle), power, this.tipX, this.tipY, vmax);
+    const elevation = cueElevation(c.x, c.y, this.angle, 0, this.gs.balls);
+    beginShot(this.gs, this.calledBall, this.calledPocket);
+    const params = { aim: this.angle, power, tipX: this.tipX, tipY: this.tipY, vmax, elevation, calledBall: this.calledBall, calledPocket: this.calledPocket };
+    strike(c, Math.cos(this.angle), Math.sin(this.angle), power, this.tipX, this.tipY, vmax, elevation);
     this.ev = freshEv();
     this.contact = { v: false };
     this.whoShot = this.seat;
-    this.mode = 'rolling';
+    this.mode = 'rolling'; this.lastT = 0; this.accumulator = 0;
     if (this.room) this.room.shot(params);
     this.hud();
   }
@@ -265,19 +297,12 @@ export class Game {
     const aiSeat = this.aiOpponent ? 1 : -1;
     if (aiSeat < 0 || this.gs.current !== aiSeat) return;
     if (this.gs.ballInHand) {
-      placeCue(this.gs, TABLE_W / 4, TABLE_H / 2);
-      if (this.room) this.room.place(TABLE_W / 4, TABLE_H / 2);
+      let placed = false;
+      for (let x = .15; x < TABLE_W && !placed; x += .1) for (let y = .15; y < TABLE_H && !placed; y += .1) placed = placeCue(this.gs, x, y);
+      if (!placed) return;
+      this.mode = 'aim';
     }
-    const myGroup = this.gs.groups[this.gs.current];
-    const onEight = !this.gs.open && myGroup !== null &&
-      !this.gs.balls.some((b) => !b.potted && b.n !== null && b.n !== 8 && (
-        this.gs.open || (myGroup === 'solid' || myGroup === 'stripe'
-          ? (b.n < 8 ? 'solid' : 'stripe') === myGroup : false)));
-    const targets = legalTargets(
-      this.gs.balls,
-      onEight ? 'eight' : this.gs.open ? null : myGroup,
-      this.gs.open,
-    );
+    const targets = legalTargets(this.gs).filter(n => !this.gs.kitchenShot || this.gs.balls.find(b => b.n === n)!.x >= TABLE_W / 4);
     const shot = (this.gs.breakShot ? breakShot(this.gs.balls) : chooseShot(this.gs.balls, targets, 'medium'))
       ?? breakShot(this.gs.balls);
     this.angle = shot.angle;
@@ -285,6 +310,7 @@ export class Game {
     this.power = shot.power;
     this.tipX = shot.tipX;
     this.tipY = shot.tipY;
+    this.calledBall = shot.ball ?? targets[0] ?? null; this.calledPocket = shot.pocket ?? 0;
     this.fire(shot.power);
   }
 
@@ -305,9 +331,14 @@ export class Game {
       this.lastSpeed.set(b.id, v);
     }
     const potted = this.gs.balls.filter((b) => b.potted).length;
-    if (potted > this.lastPotted) this.sfx.pot();
+    if (potted > this.lastPotted) {
+      this.sfx.pot();
+      this.renderScorecard();
+      const names = this.ev.potted.map(n => String(n)).join(', ');
+      if (this.mode === 'rolling') this.el.msg.textContent = this.ev.cuePotted ? 'Scratch · waiting for the balls to stop' : `Pocketed ${names || 'ball'} · balls still rolling`;
+    }
     this.lastPotted = potted;
-    if (this.mode === 'aim' && this.aiOpponent && this.gs.current === 1 && this.gs.winner === null && !this.room) {
+    if ((this.mode === 'aim' || this.mode === 'place') && this.aiOpponent && this.gs.current === 1 && this.gs.winner === null && !this.room) {
       this.aiTimer += 1 / 60;
       if (this.aiTimer > 1.2) {
         this.aiTimer = 0;
@@ -319,7 +350,7 @@ export class Game {
     if (this.mode === 'rolling') {
       const now = performance.now();
       if (!this.lastT) this.lastT = now;
-      let acc = Math.min((now - this.lastT) / 1000, 0.25);
+      let acc = this.accumulator + Math.min((now - this.lastT) / 1000, 0.25);
       this.lastT = now;
       let n = 0;
       while (acc >= DT && !allAsleep(this.gs.balls) && n < 60) {
@@ -327,6 +358,7 @@ export class Game {
         acc -= DT;
         n++;
       }
+      this.accumulator = acc;
       if (allAsleep(this.gs.balls)) {
         if (this.room && this.whoShot === this.seat) {
           this.room.done(
@@ -340,6 +372,7 @@ export class Game {
           this.mode = 'wait';
         } else if (!this.room) {
           applyShot(this.gs, this.ev);
+          this.calledBall = this.calledPocket = null;
           this.mode = this.gs.winner !== null ? 'over' : this.gs.ballInHand ? 'place' : 'aim';
         } else {
           this.mode = 'wait';
@@ -358,10 +391,11 @@ export class Game {
     const aiming = this.mode === 'aim' && !this.cue().potted;
     const pulling = this.pulling && aiming;
     const pull = pulling ? 0.02 + this.pullPower() * 0.18 : 0.02 + this.power * 0.1;
-    this.scene.setCue(aiming, this.cue().x, this.cue().y, this.angle, pull);
+    this.scene.setCall(this.calledPocket, aiming && callRequired(this.gs));
+    this.scene.setCue(aiming, this.cue().x, this.cue().y, this.angle, pull, this.tipX, this.tipY);
     (this.el.chargefill as HTMLElement).style.width = pulling ? `${this.pullPower() * 100}%` : '0%';
     if (this.mode === 'place') {
-      this.scene.setPlace(true, this.placeX, this.placeY, canPlace(this.gs, this.placeX, this.placeY));
+      this.scene.setPlace(true, this.placeX, this.placeY, canPlace(this.gs, this.placeX, this.placeY), this.gs.placement);
     } else {
       this.scene.setPlace(false, 0, 0, false);
     }
@@ -370,12 +404,24 @@ export class Game {
   hud(): void {
     let msg = this.gs.message;
     if (this.mode === 'place') msg += ' — tap a green spot to place the cue ball';
+    else if (this.mode === 'rolling') msg = `Player ${this.gs.current + 1} · shot in motion`;
     else if (this.mode === 'wait' && this.room) msg += ' — waiting…';
     else if (this.room && this.seat !== null && this.seat !== this.gs.current && this.mode === 'aim') msg += ' — opponent aiming…';
     this.el.msg.textContent = msg;
     this.el.turn.textContent = this.gs.winner !== null ? 'Game over' : `Player ${this.gs.current + 1}`;
     this.el.turn.classList.toggle('me', !this.room || this.seat === this.gs.current);
     this.el.roominfo.textContent = this.room ? `room ${this.room.code} · you P${(this.seat ?? 0) + 1}` : 'solo table';
+    this.options.summary(this.gs.rules);
+    const needCall = this.mode === 'aim' && this.humanTurn() && callRequired(this.gs);
+    document.getElementById('callpanel')!.hidden = !needCall;
+    if (needCall) {
+      const targets = legalTargets(this.gs);
+      if (this.calledBall === null || !targets.includes(this.calledBall)) this.calledBall = targets[0] ?? null;
+      const select = document.getElementById('callball') as HTMLSelectElement;
+      select.replaceChildren(...targets.map(n => new Option(`Ball ${n}`, String(n), false, n === this.calledBall)));
+      document.getElementById('callstatus')!.textContent = this.calledPocket === null ? 'Tap a pocket on the table' : `Pocket called · ready to shoot`;
+    }
+    for (const id of ['rack', 'aibtn']) (this.el[id] as HTMLButtonElement).disabled = !!this.room;
     this.renderScorecard();
   }
 
@@ -430,6 +476,7 @@ export class Game {
     for (const sb of s.balls) {
       const b = this.gs.balls.find((q) => q.id === sb.id);
       if (!b) continue;
+      b.n = sb.n; b.z = b.vz = 0;
       b.x = sb.x; b.y = sb.y; b.potted = sb.potted;
       b.vx = b.vy = b.wx = b.wy = b.wz = 0;
       b.asleep = true;
@@ -437,6 +484,9 @@ export class Game {
     this.gs.current = s.current === 1 ? 1 : 0;
     this.gs.groups = [(s.groups[0] ?? null) as never, (s.groups[1] ?? null) as never];
     this.gs.open = s.open;
+    this.gs.breakShot = s.break_shot; this.gs.placement = s.placement; this.gs.kitchenShot = s.kitchen_shot; this.gs.rules = s.rules;
+    this.calledBall = this.calledPocket = null; delete this.gs.shot;
+    this.options.write(s.rules, true);
     this.gs.ballInHand = s.ball_in_hand;
     this.gs.winner = s.winner === 1 ? 1 : s.winner === 0 ? 0 : null;
     this.gs.message = s.message;
@@ -462,20 +512,22 @@ export class Game {
       this.applyServerState(s);
     };
     rc.onShot = (by, shot) => {
+      if (by === this.seat) return;
       const c = this.cue();
       if (c.potted) return;
+      beginShot(this.gs, shot.calledBall, shot.calledPocket);
       // Server is authoritative on break speed; ignore client-claimed vmax.
-      const vmax = this.gs.breakShot ? VMAX_BREAK : VMAX_NORMAL;
-      strike(c, Math.cos(shot.aim), Math.sin(shot.aim), shot.power, shot.tipX, shot.tipY, vmax);
+      const vmax = this.gs.breakShot ? this.gs.rules.breakMax : this.gs.rules.normalMax;
+      strike(c, Math.cos(shot.aim), Math.sin(shot.aim), shot.power, shot.tipX, shot.tipY, vmax, shot.elevation ?? 0);
       this.ev = freshEv();
       this.contact = { v: false };
       this.whoShot = by;
-      this.mode = 'rolling';
+      this.mode = 'rolling'; this.lastT = 0; this.accumulator = 0;
       this.hud();
     };
     rc.onError = (e) => { this.el.msg.textContent = `net: ${e}`; };
     rc.onJoined = (names) => { this.roomNames = names; this.hud(); };
-    rc.onOpen = () => (create ? rc.create(name) : rc.join(code, name));
+    rc.onOpen = () => (create ? rc.create(name, this.gs.rules) : rc.join(code, name));
     rc.connect();
     this.el.onlinepanel.classList.remove('open');
   }

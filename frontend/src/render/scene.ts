@@ -44,13 +44,14 @@ export interface SceneHandle {
   controls: OrbitControls;
   /** Sync ball meshes from sim state (rolls them by their spin state). */
   setBalls(
-    list: Array<{ n: number | null; x: number; y: number; potted: boolean; wx: number; wy: number; wz: number }>,
+    list: Array<{ n: number | null; x: number; y: number; z: number; potted: boolean; wx: number; wy: number; wz: number }>,
     dt: number,
   ): void;
   /** Cue stick. pull in meters of drawback. */
-  setCue(visible: boolean, cx: number, cy: number, angle: number, pull: number): void;
+  setCue(visible: boolean, cx: number, cy: number, angle: number, pull: number, tipX?: number, tipY?: number): void;
   /** Ball-in-hand placement preview: legal-zone outline + cursor ring. */
-  setPlace(visible: boolean, x: number, y: number, legal: boolean): void;
+  setPlace(visible: boolean, x: number, y: number, legal: boolean, zone?: string): void;
+  setCall(pocket: number | null, visible: boolean): void;
   /** Felt + wood theme colors (css color strings). */
   setTheme(felt: string, wood: string): void;
   /** Raycast pointer to felt plane, sim coords or null. */
@@ -92,7 +93,7 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
   };
   controls.touches = {
     ONE: -1 as unknown as THREE.TOUCH,
-    TWO: THREE.TOUCH.DOLLY_PAN,
+    TWO: THREE.TOUCH.DOLLY_ROTATE,
   };
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
@@ -396,9 +397,16 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
   ring.visible = false;
   scene.add(ring);
 
+  const callRings = pocketCenters.map(([x, z, radius]) => {
+    const material = new THREE.MeshBasicMaterial({color: 0xf5cc79, transparent:true, opacity:.65, depthTest:false});
+    const mesh = new THREE.Mesh(new THREE.RingGeometry(radius * 1.04, radius * 1.20, 48), material);
+    mesh.rotation.x = -Math.PI / 2; mesh.position.set(x,.058,z); mesh.visible=false; mesh.renderOrder=5;
+    scene.add(mesh); return mesh;
+  });
+
   // Full-length cue, automatically elevated over obstacles.
   const SHAFT_LEN = CUE_LENGTH;
-  const SHAFT_Z0 = BALL_R + 0.014;
+  const SHAFT_Z0 = 0.012;
   const cueGroup = new THREE.Group();
   const shaft = new THREE.Mesh(
     new THREE.CylinderGeometry(0.006, 0.009, SHAFT_LEN, 12),
@@ -413,7 +421,7 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
     new THREE.MeshStandardMaterial({ color: 0x2244aa, roughness: 0.8 }),
   );
   tip.rotation.x = Math.PI / 2;
-  tip.position.z = BALL_R + 0.008;
+  tip.position.z = 0.006;
   tip.castShadow = true;
   cueGroup.add(tip);
   cueGroup.position.y = BALL_R;
@@ -499,7 +507,7 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
             const d = Math.hypot(rx - px, rz - pz);
             if (d < pr * 1.5) dip = Math.max(dip, 1 - d / (pr * 1.5));
           }
-          m.position.y = BALL_R - dip * dip * 0.024;
+          m.position.y = BALL_R + b.z - (b.z < .005 ? dip * dip * 0.024 : 0);
         }
         if (!b.potted && dt > 0) {
           // Sim (x right, y plan, z up) -> render (x right, y up, z plan):
@@ -524,24 +532,38 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
       woodMat.needsUpdate = true;
       oldWood?.dispose();
     },
-    setPlace(visible, x, y, legal) {
+    setCall(pocket, visible) {
+      callRings.forEach((ring, i) => {
+        ring.visible = visible && (pocket === null || pocket === i);
+        ring.material.opacity = pocket === null ? .5 : 1;
+      });
+    },
+    setPlace(visible, x, y, legal, zone = 'anywhere') {
       zoneLine.visible = visible;
+      const points = zoneLine.geometry.getAttribute('position');
+      const edge = zone === 'kitchen' ? TABLE_W / 4 : TABLE_W - .035;
+      points.setX(1, edge - TABLE_W / 2); points.setX(2, edge - TABLE_W / 2); points.needsUpdate = true;
       ring.visible = visible;
       if (!visible) return;
       const [rx, rz] = toRender(x, y);
       ring.position.set(rx, 0.004, rz);
       ringMat.color.set(legal ? 0x4caf50 : 0xf44336);
     },
-    setCue(visible, cx, cy, angle, pull) {
+    setCue(visible, cx, cy, angle, pull, tipX = 0, tipY = 0) {
       cueGroup.visible = visible;
       if (!visible) return;
       const [rx, rz] = toRender(cx, cy);
       const dx = Math.cos(angle), dy = Math.sin(angle);
-      const elevation = cueElevation(cx, cy, angle, pull, cueObstacles);
+      const elevation = cueElevation(cx, cy, angle, 0, cueObstacles);
       // Local +z is the butt. Tilt up around the ball, then yaw along -aim.
       cueGroup.rotation.set(-elevation, Math.atan2(-dx, -dy), 0, 'YXZ');
-      const setback = pull * Math.cos(elevation);
-      cueGroup.position.set(rx - dx * setback, BALL_R + pull * Math.sin(elevation), rz - dy * setback);
+      const scale = Math.min(1, .55 / (Math.hypot(tipX, tipY) || 1));
+      const tx = tipX * scale, ty = tipY * scale;
+      const c = Math.sqrt(1 - tx * tx - ty * ty), ct = Math.cos(elevation), st = Math.sin(elevation);
+      const along = BALL_R * (ty * st - c * ct) - pull * ct;
+      cueGroup.position.set(rx + dx * along - dy * BALL_R * tx,
+        BALL_R + BALL_R * (ty * ct + c * st) + pull * st,
+        rz + dy * along + dx * BALL_R * tx);
     },
     pickFelt,
     onFrame(cb) { cbs.push(cb); },

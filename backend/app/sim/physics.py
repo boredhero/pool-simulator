@@ -1,4 +1,4 @@
-"""Custom 2D + 3-axis-spin pool physics. Fixed dt=1/240, semi-implicit Euler
+"""Planar rolling plus 3D flight and spin. Fixed dt=1/240, semi-implicit Euler
 for friction + swept (analytic TOI) ball-ball / cushion / jaw collisions.
 Mirror of frontend/src/sim/physics.ts — keep constants + behavior in sync.
 Golden behavior is cross-checked by pytest/vitest suites, not bit-identical.
@@ -18,7 +18,7 @@ E_BALL = 0.94
 E_CUSH_N = 0.76
 MU_CUSH = 0.17
 SPIN_DECAY = 10.0
-SLEEP_V = 1e-3
+SLEEP_V = 0.005
 SLEEP_W = 0.5
 TIP_C = 2.5
 TIP_MAX = 0.55
@@ -37,6 +37,8 @@ class Ball:
     n: int | None = None  # ball number 1..15, None = cue
     x: float = 0.0
     y: float = 0.0
+    z: float = 0.0  # Bottom height above cloth.
+    vz: float = 0.0
     vx: float = 0.0
     vy: float = 0.0
     wx: float = 0.0
@@ -53,6 +55,10 @@ class ShotEvents:
     off_table: list[int | None] = field(default_factory=list)
     rail_after_contact: bool = False
     cue_potted: bool = False
+    pockets: list[dict] = field(default_factory=list)
+    first_contact_x: float | None = None
+    cue_left_kitchen: bool = False
+    object_rails: list[int] = field(default_factory=list)
 
 
 def shoot_speed(power: float, vmax: float = VMAX_NORMAL) -> float:
@@ -74,24 +80,79 @@ def strike(
     tip_x: float,
     tip_y: float,
     vmax: float = VMAX_NORMAL,
+    elevation: float = 0.0,
 ) -> None:
-    tx = max(-TIP_MAX, min(TIP_MAX, tip_x))
-    ty = max(-TIP_MAX, min(TIP_MAX, tip_y))
-    v = shoot_speed(power, vmax)
+    """Rigid cue impulse, then slate rebound; mirrors the browser model."""
     import math
 
+    offset = math.hypot(tip_x, tip_y)
+    scale = TIP_MAX / offset if offset > TIP_MAX else 1.0
+    tx, ty = tip_x * scale, tip_y * scale
+    theta = max(0.0, min(math.pi / 2 - 0.01, elevation))
+    ct, st = math.cos(theta), math.sin(theta)
+    v = shoot_speed(power, vmax)
     sq = tx * SQUIRT_K
     c, s = math.cos(sq), math.sin(sq)
     rx, ry = dx * c - dy * s, dx * s + dy * c
-    b.vx, b.vy = rx * v, ry * v
-    sx, sy = -ry, rx
-    w_side = TIP_C * v * ty / BALL_R
-    b.wx, b.wy = sx * w_side, sy * w_side
-    b.wz = -TIP_C * v * tx / BALL_R
+    b.vx, b.vy, b.vz = rx * v * ct, ry * v * ct, -v * st
+    w = TIP_C * v / BALL_R
+    b.wx = w * (-tx * st * rx - ty * ry)
+    b.wy = w * (-tx * st * ry + ty * rx)
+    b.wz = -w * tx * ct
     b.asleep = False
+    if b.z <= 1e-9 and b.vz < 0:
+        land(b)
+
+
+def land(b: Ball) -> None:
+    """Restitution plus Coulomb-limited friction at the bottom contact."""
+    import math
+
+    b.z = 0.0
+    if b.vz >= 0:
+        return
+    normal = -1.5 * b.vz
+    ux, uy = b.vx - BALL_R * b.wy, b.vy + BALL_R * b.wx
+    slip = math.hypot(ux, uy)
+    if slip > 1e-12:
+        impulse = min(2 * slip / 7, MU_S * normal)
+        ix, iy = -impulse * ux / slip, -impulse * uy / slip
+        b.vx += ix
+        b.vy += iy
+        b.wx += 2.5 * iy / BALL_R
+        b.wy -= 2.5 * ix / BALL_R
+    b.vz *= -0.5
+    if b.vz * b.vz / (2 * G) < 0.0005:
+        b.vz = 0.0
+
+
+def _advance(b: Ball, dt: float, ev: ShotEvents, cue_id: int) -> None:
+    if b.potted or b.asleep:
+        return
+    b.x += b.vx * dt
+    b.y += b.vy * dt
+    if b.z > 0 or b.vz != 0:
+        b.z += b.vz * dt - 0.5 * G * dt * dt
+        b.vz -= G * dt
+        if -1e-7 < b.z < 0:
+            b.z = 0.0
+    if b.id == cue_id and ev.first_contact is None and b.x >= TABLE_W / 4:
+        ev.cue_left_kitchen = True
 
 
 def _friction(b: Ball, dt: float) -> None:
+    import math
+
+    speed = math.hypot(b.vx, b.vy)
+    if speed < 1.5:
+        for px, py, radius, _ in POCKETS:
+            dx, dy = px - b.x, py - b.y
+            distance = math.hypot(dx, dy)
+            capture = capture_radius(radius, speed)
+            if 1e-6 < distance < capture + BALL_R:
+                acceleration = 0.5 + 3 * (1 - distance / (capture + BALL_R))
+                b.vx += acceleration * dx / distance * dt
+                b.vy += acceleration * dy / distance * dt
     ux = b.vx - BALL_R * b.wy
     uy = b.vy + BALL_R * b.wx
     s = (ux**2 + uy**2) ** 0.5
@@ -123,15 +184,15 @@ def _earliest_contact(balls: list[Ball], dt: float):
     live = [b for b in balls if not b.potted]
     for i, a in enumerate(live):
         for b in live[i + 1 :]:
-            dx, dy = a.x - b.x, a.y - b.y
-            dvx, dvy = a.vx - b.vx, a.vy - b.vy
-            qa = dvx * dvx + dvy * dvy
-            qb = 2 * (dx * dvx + dy * dvy)
-            qc = dx * dx + dy * dy - r2 * r2
+            dx, dy, dz = a.x - b.x, a.y - b.y, a.z - b.z
+            dvx, dvy, dvz = a.vx - b.vx, a.vy - b.vy, a.vz - b.vz
+            qa = dvx * dvx + dvy * dvy + dvz * dvz
+            qb = 2 * (dx * dvx + dy * dvy + dz * dvz)
+            qc = dx * dx + dy * dy + dz * dz - r2 * r2
             if qc < 0:
-                d = (dx * dx + dy * dy) ** 0.5
+                d = (dx * dx + dy * dy + dz * dz) ** 0.5
                 nx, ny = (dx / d, dy / d) if d > 1e-9 else (1.0, 0.0)
-                best = (0.0, "bb", a.id, b.id, nx, ny)
+                best = (0.0, "bb", a.id, b.id, nx, ny, dz / d if d > 1e-9 else 0.0)
                 continue
             if qa < 1e-12 or qb >= 0:
                 continue
@@ -140,8 +201,20 @@ def _earliest_contact(balls: list[Ball], dt: float):
                 continue
             t = (-qb - disc**0.5) / (2 * qa)
             if 0 <= t <= dt and (best is None or t < best[0]):
-                best = (t, "bb", a.id, b.id, (dx + dvx * t) / r2, (dy + dvy * t) / r2)
+                best = (
+                    t,
+                    "bb",
+                    a.id,
+                    b.id,
+                    (dx + dvx * t) / r2,
+                    (dy + dvy * t) / r2,
+                    (dz + dvz * t) / r2,
+                )
     for a in live:
+        if a.z > 0 or a.vz != 0:
+            t = (a.vz + (a.vz * a.vz + 2 * G * max(0, a.z)) ** 0.5) / G
+            if 0 <= t <= dt and (best is None or t < best[0]):
+                best = (t, "floor", a.id, -1, 0.0, 0.0)
         for cu in _CUSHIONS:
             x1, y1, x2, y2 = cu.x1, cu.y1, cu.x2, cu.y2
             if y1 == y2:
@@ -154,7 +227,10 @@ def _earliest_contact(balls: list[Ball], dt: float):
                 if t < 0 or t > dt or (best is not None and t >= best[0]):
                     continue
                 cx = a.x + a.vx * t
-                if not (min(x1, x2) - 1e-6 <= cx <= max(x1, x2) + 1e-6):
+                if (
+                    not (min(x1, x2) - 1e-6 <= cx <= max(x1, x2) + 1e-6)
+                    or a.z + a.vz * t - 0.5 * G * t * t > 0.05
+                ):
                     continue
                 best = (t, "rail", a.id, -1, 0.0, 1.0 if y1 == 0 else -1.0)
             else:
@@ -167,10 +243,15 @@ def _earliest_contact(balls: list[Ball], dt: float):
                 if t < 0 or t > dt or (best is not None and t >= best[0]):
                     continue
                 cy = a.y + a.vy * t
-                if not (min(y1, y2) - 1e-6 <= cy <= max(y1, y2) + 1e-6):
+                if (
+                    not (min(y1, y2) - 1e-6 <= cy <= max(y1, y2) + 1e-6)
+                    or a.z + a.vz * t - 0.5 * G * t * t > 0.05
+                ):
                     continue
                 best = (t, "rail", a.id, -1, 1.0 if x1 == 0 else -1.0, 0.0)
         for j in _JAWS:
+            if a.z > 0.05 and a.vz >= 0:
+                continue
             dx, dy = a.x - j[0], a.y - j[1]
             rr = BALL_R + j[2]
             qa = a.vx * a.vx + a.vy * a.vy
@@ -192,20 +273,25 @@ def _earliest_contact(balls: list[Ball], dt: float):
                 continue
             t = (-qb - disc**0.5) / (2 * qa)
             if 0 <= t <= dt and (best is None or t < best[0]):
-                best = (t, "jaw", a.id, -1, (dx + a.vx * t) / rr, (dy + a.vy * t) / rr)
+                if a.z + a.vz * t - 0.5 * G * t * t <= 0.05:
+                    best = (t, "jaw", a.id, -1, (dx + a.vx * t) / rr, (dy + a.vy * t) / rr)
     return best
 
 
-def _resolve_bb(a: Ball, b: Ball, nx: float, ny: float, ev: ShotEvents, cue_id: int) -> None:
+def _resolve_bb(
+    a: Ball, b: Ball, nx: float, ny: float, ev: ShotEvents, cue_id: int, nz: float = 0.0
+) -> None:
     tx, ty = -ny, nx
-    vn = (a.vx - b.vx) * nx + (a.vy - b.vy) * ny
+    vn = (a.vx - b.vx) * nx + (a.vy - b.vy) * ny + (a.vz - b.vz) * nz
     vt = (a.vx - b.vx) * tx + (a.vy - b.vy) * ty + BALL_R * (a.wz + b.wz)
     if vn < 0:
         jn = -(1 + E_BALL) * vn / 2
         a.vx += jn * nx
         a.vy += jn * ny
+        a.vz += jn * nz
         b.vx -= jn * nx
         b.vy -= jn * ny
+        b.vz -= jn * nz
         jt = max(-throw_mu(vn) * jn, min(throw_mu(vn) * jn, -vt / 2))
         a.vx += jt * tx
         a.vy += jt * ty
@@ -218,14 +304,17 @@ def _resolve_bb(a: Ball, b: Ball, nx: float, ny: float, ev: ShotEvents, cue_id: 
         if ev.first_contact is None and (a.id == cue_id or b.id == cue_id):
             other = b if a.id == cue_id else a
             ev.first_contact = other.n
+            ev.first_contact_x = other.x
     # Position-only correction, including impacts and coincident centers.
-    distance = ((a.x - b.x) ** 2 + (a.y - b.y) ** 2) ** 0.5
+    distance = ((a.x - b.x) ** 2 + (a.y - b.y) ** 2 + (a.z - b.z) ** 2) ** 0.5
     if distance < BALL_R * 2:
         push = (BALL_R * 2 - distance) / 2 + 1e-8
         a.x += nx * push
         a.y += ny * push
+        a.z = max(0.0, a.z + nz * push)
         b.x -= nx * push
         b.y -= ny * push
+        b.z = max(0.0, b.z - nz * push)
 
 
 def _resolve_rail(a: Ball, nx: float, ny: float, ev: ShotEvents, contact_made: dict) -> None:
@@ -245,6 +334,8 @@ def _resolve_rail(a: Ball, nx: float, ny: float, ev: ShotEvents, contact_made: d
     a.asleep = False
     if contact_made["v"] or ev.first_contact is not None or ev.potted:
         ev.rail_after_contact = True
+        if a.n is not None and a.n not in ev.object_rails:
+            ev.object_rails.append(a.n)
 
 
 def step(balls: list[Ball], dt: float, ev: ShotEvents, cue_id: int, contact_made: dict) -> None:
@@ -254,7 +345,8 @@ def step(balls: list[Ball], dt: float, ev: ShotEvents, cue_id: int, contact_made
     for b in balls:
         if not b.potted and not b.asleep:
             prev[b.id] = (b.x, b.y)
-            _friction(b, dt)
+            if b.z <= 1e-9 and b.vz == 0:
+                _friction(b, dt)
     remaining = dt
     for _ in range(64):
         if remaining <= 1e-9:
@@ -265,19 +357,21 @@ def step(balls: list[Ball], dt: float, ev: ShotEvents, cue_id: int, contact_made
         t = min(c[0], remaining)
         for b in balls:
             if not b.potted and not b.asleep:
-                b.x += b.vx * t
-                b.y += b.vy * t
+                _advance(b, t, ev, cue_id)
         remaining -= t
         by_id = {b.id: b for b in balls}
         if c[1] == "bb":
-            _resolve_bb(by_id[c[2]], by_id[c[3]], c[4], c[5], ev, cue_id)
+            _resolve_bb(by_id[c[2]], by_id[c[3]], c[4], c[5], ev, cue_id, c[6])
+        elif c[1] == "floor":
+            land(by_id[c[2]])
         else:
             _resolve_rail(by_id[c[2]], c[4], c[5], ev, contact_made)
     if remaining > 1e-9:
         for b in balls:
             if not b.potted and not b.asleep:
-                b.x += b.vx * remaining
-                b.y += b.vy * remaining
+                _advance(b, remaining, ev, cue_id)
+                if b.z < 0:
+                    land(b)
 
     def seg_dist(x1: float, y1: float, x2: float, y2: float, px: float, py: float) -> float:
         dx, dy = x2 - x1, y2 - y1
@@ -292,7 +386,9 @@ def step(balls: list[Ball], dt: float, ev: ShotEvents, cue_id: int, contact_made
         captured = False
         pr = prev.get(b.id)
         spd = (b.vx**2 + b.vy**2) ** 0.5
-        for p in POCKETS:
+        for pocket, p in enumerate(POCKETS):
+            if b.z > 0.005:
+                continue
             cr = capture_radius(p[2], spd)
             if pr is not None:
                 d = seg_dist(pr[0], pr[1], b.x, b.y, p[0], p[1])
@@ -301,9 +397,10 @@ def step(balls: list[Ball], dt: float, ev: ShotEvents, cue_id: int, contact_made
             if d < cr:
                 b.potted = True
                 b.asleep = True
-                b.vx = b.vy = b.wx = b.wy = b.wz = 0.0
+                b.z = b.vz = b.vx = b.vy = b.wx = b.wy = b.wz = 0.0
                 if b.n is not None:
                     ev.potted.append(b.n)
+                    ev.pockets.append({"n": b.n, "pocket": pocket})
                 else:
                     ev.cue_potted = True
                 captured = True
@@ -313,18 +410,19 @@ def step(balls: list[Ball], dt: float, ev: ShotEvents, cue_id: int, contact_made
         ):
             b.potted = True
             b.asleep = True
-            b.vx = b.vy = b.wx = b.wy = b.wz = 0.0
+            b.z = b.vz = b.vx = b.vy = b.wx = b.wy = b.wz = 0.0
             ev.off_table.append(b.n)
             if b.n is None:
                 ev.cue_potted = True
             continue
         if (
             not b.potted
+            and b.z <= 1e-9
+            and b.vz == 0
             and (b.vx**2 + b.vy**2) ** 0.5 < SLEEP_V
             and (b.wx**2 + b.wy**2) ** 0.5 < SLEEP_W
-            and abs(b.wz) < 2
         ):
-            b.vx = b.vy = b.wx = b.wy = b.wz = 0.0
+            b.z = b.vz = b.vx = b.vy = b.wx = b.wy = b.wz = 0.0
             b.asleep = True
 
 
@@ -345,7 +443,7 @@ def simulate_shot(balls: list[Ball], cue_id: int, max_sim: float = 45.0) -> Shot
 def hash_state(balls: list[Ball]) -> str:
     h = 0x811C9DC5
     for b in sorted(balls, key=lambda q: q.id):
-        for v in (b.x, b.y, b.vx, b.vy, b.wx, b.wy, b.wz):
+        for v in (b.x, b.y, b.z, b.vx, b.vy, b.vz, b.wx, b.wy, b.wz):
             h ^= round(v * 1e9) & 0xFFFFFFFF
             h = (h * 0x01000193) & 0xFFFFFFFF
         h ^= 1 if b.potted else 0

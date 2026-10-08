@@ -1,158 +1,135 @@
-// 8-ball rules (WPA, casual: no called shots). Pure logic over sim ShotEvents.
+// Rules consume immutable pre-shot context and physical facts; no UI/net imports.
 import { Ball, ShotEvents, makeBall } from './physics';
-import { HEAD_SPOT, TABLE_H, TABLE_W, rackOrder, rackPositions } from './table';
+import { BALL_R, HEAD_SPOT, TABLE_H, TABLE_W, rackOrder, rackPositions } from './table';
+import { BAR_RULES, matchConfig, type MatchConfig } from './config';
 
 export type Group = 'solid' | 'stripe' | null;
-
+export type Placement = 'none' | 'kitchen' | 'anywhere';
+export interface ShotContext {
+  current: 0 | 1; open: boolean; breakShot: boolean; group: Group;
+  remaining: number[]; kitchen: boolean; calledBall: number | null; calledPocket: number | null;
+}
 export interface GameState {
-  balls: Ball[]; // id 0 = cue (n=null), ids 1..15 hold ball numbers
-  current: 0 | 1;
-  groups: [Group, Group]; // per player; null until assigned
-  open: boolean;
-  ballInHand: boolean;
-  breakShot: boolean; // first shot of the game (8 potted here respots, not loss)
-  winner: 0 | 1 | null;
-  message: string;
+  balls: Ball[]; current: 0 | 1; groups: [Group, Group]; open: boolean;
+  ballInHand: boolean; placement: Placement; kitchenShot: boolean; breakShot: boolean;
+  winner: 0 | 1 | null; message: string; rules: MatchConfig; shot?: ShotContext;
 }
-
-export function newGame(seed = 1): GameState {
-  const balls: Ball[] = [makeBall(0, null, HEAD_SPOT[0], HEAD_SPOT[1])];
-  const order = rackOrder(seed);
-  const pos = rackPositions();
-  order.forEach((n, i) => balls.push(makeBall(i + 1, n, pos[i][0], pos[i][1])));
-  return { balls, current: 0, groups: [null, null], open: true, ballInHand: false, breakShot: true, winner: null, message: 'Player 1 to break' };
+// Future games implement this boundary while reusing balls/table/shot facts.
+export interface Ruleset<S, C> {
+  id: string; version: number;
+  create(seed: number, options: MatchConfig): S;
+  begin(state: S, calledBall?: number | null, calledPocket?: number | null): C;
+  resolve(state: S, facts: ShotEvents, before?: C): S;
+  targets(state: S): number[];
+  canPlace(state: S, x: number, y: number): boolean;
 }
-
-export function groupOf(n: number): 'solid' | 'stripe' | 'eight' {
-  if (n === 8) return 'eight';
-  return n < 8 ? 'solid' : 'stripe';
+export function newGame(seed = 1, options: MatchConfig = BAR_RULES): GameState {
+  const balls = [makeBall(0, null, ...HEAD_SPOT)];
+  const order = rackOrder(seed), pos = rackPositions();
+  order.forEach((n, i) => balls.push(makeBall(i + 1, n, ...pos[i])));
+  return { balls, current: 0, groups: [null, null], open: true, ballInHand: false, placement: 'none', kitchenShot: false, breakShot: true, winner: null, message: 'Player 1 to break', rules: matchConfig(options) };
 }
-
-function aliveBalls(gs: GameState, player: 0 | 1): number[] {
-  const g = gs.groups[player];
-  return gs.balls.filter((b) => !b.potted && b.n !== null && (gs.open || g === null ? b.n !== 8 : groupOf(b.n) === g)).map((b) => b.n!);
+export function groupOf(n: number): 'solid' | 'stripe' | 'eight' { return n === 8 ? 'eight' : n < 8 ? 'solid' : 'stripe'; }
+function remaining(gs: GameState): number[] {
+  const group = gs.groups[gs.current];
+  return gs.balls.filter(b => !b.potted && b.n !== null && b.n !== 8 && (gs.open || group === null || groupOf(b.n) === group)).map(b => b.n!);
 }
-
-/** Apply a finished shot. Returns updated state (mutates gs). */
-export function applyShot(gs: GameState, ev: ShotEvents): GameState {
+export function legalTargets(gs: GameState): number[] {
+  const targets = remaining(gs);
+  return targets.length || gs.open ? targets : [8];
+}
+export function callRequired(gs: GameState): boolean {
+  return !gs.breakShot && (gs.rules.calls === 'all' || (gs.rules.calls === 'eight' && legalTargets(gs).includes(8)));
+}
+export function beginShot(gs: GameState, calledBall: number | null = null, calledPocket: number | null = null): ShotContext {
+  const before = { current: gs.current, open: gs.open, breakShot: gs.breakShot, group: gs.groups[gs.current], remaining: remaining(gs), kitchen: gs.kitchenShot, calledBall, calledPocket };
+  gs.shot = before;
+  return before;
+}
+export function spotBall(gs: GameState, n: number): void {
+  const ball = gs.balls.find(b => b.n === n);
+  if (!ball) return;
+  const candidates: Array<[number, number]> = [[TABLE_W * .75, TABLE_H / 2]];
+  for (let d = BALL_R * 2 + .001; d < TABLE_W; d += BALL_R * 2 + .001) {
+    candidates.push([TABLE_W * .75 - d, TABLE_H / 2], [TABLE_W * .75 + d, TABLE_H / 2]);
+  }
+  for (let x = .1; x < TABLE_W - .1; x += .07) for (let y = .1; y < TABLE_H - .1; y += .07) candidates.push([x, y]);
+  const point = candidates.find(([x, y]) => x > BALL_R && x < TABLE_W - BALL_R && gs.balls.every(b => b.id === ball.id || b.potted || Math.hypot(b.x - x, b.y - y) >= 2 * BALL_R + .001));
+  if (!point) throw new Error('No free spot for object ball');
+  Object.assign(ball, makeBall(ball.id, n, ...point));
+}
+function grantPlacement(gs: GameState, zone: Placement): void {
+  gs.ballInHand = true; gs.placement = zone; gs.kitchenShot = zone === 'kitchen';
+  // A kitchen-only layout must still offer a legal direct target.
+  const targets = gs.balls.filter(b => !b.potted && b.n !== null && legalTargets(gs).includes(b.n));
+  if (zone === 'kitchen' && targets.length && targets.every(b => b.x < TABLE_W / 4)) {
+    targets.sort((a, b) => b.x - a.x);
+    spotBall(gs, targets[0].n!);
+  }
+}
+export function applyShot(gs: GameState, ev: ShotEvents, before = gs.shot ?? beginShot(gs)): GameState {
   if (gs.winner !== null) return gs;
-  const me = gs.current;
-  const other = (1 - me) as 0 | 1;
-  const myGroup = gs.groups[me];
-
-  const first = ev.firstContact; // ball number or null
+  delete gs.shot;
+  const me = before.current, other = (1 - me) as 0 | 1;
+  const onEight = !before.open && before.group !== null && before.remaining.length === 0;
+  const eightDown = ev.potted.includes(8), eightOff = ev.offTable.includes(8);
+  const scratch = ev.cuePotted || ev.offTable.includes(null);
   let foul: string | null = null;
-
-  const potted8 = ev.potted.includes(8) || ev.offTable.includes(8);
-  const myRemainingBefore = aliveBalls(gs, me);
-
-  // --- 8-ball terminal cases (checked against pre-shot state) ---
-  const onEight = !gs.open && myGroup !== null && myRemainingBefore.length === 0;
-
-  if (first === null) {
-    foul = 'No contact';
-  } else if (!gs.open && !onEight && myGroup !== null) {
-    if (first === 8 || groupOf(first) !== myGroup) foul = 'Wrong first contact';
-  } else if (!gs.open && onEight) {
-    if (first !== 8) foul = 'Must contact the 8-ball';
-  } else if (gs.open) {
-    if (first === 8 && ev.potted.length === 0 && !ev.railAfterContact) foul = 'Illegal break contact';
-    else if (first === 8) {
-      // 8 first on open table: legal only if 8 potted (does not win, respotted) — casual rule.
-      if (!ev.potted.includes(8)) foul = 'Wrong first contact';
-    }
+  if (ev.firstContact === null) foul = 'No contact';
+  else if (before.open ? ev.firstContact === 8 : onEight ? ev.firstContact !== 8 : groupOf(ev.firstContact) !== before.group) foul = 'Wrong first contact';
+  if (!foul && before.kitchen && (ev.firstContactX ?? TABLE_W) < TABLE_W / 4 && !ev.cueLeftKitchen) foul = 'The cue ball must leave the kitchen first';
+  if (!foul && !ev.potted.length && !ev.railAfterContact) foul = 'No rail after contact';
+  if (!foul && scratch) foul = 'Scratch';
+  if (!foul && ev.offTable.length) foul = 'Ball off the table';
+  const called = before.calledBall !== null && ev.pockets?.some(p => p.n === before.calledBall && p.pocket === before.calledPocket);
+  const eightCalled = gs.rules.calls === 'none' || (before.calledBall === 8 && called);
+  const spotBreakEight = before.breakShot && eightDown && gs.rules.eightOnBreak === 'spot';
+  if (spotBreakEight) spotBall(gs, 8);
+  if (eightOff || (onEight && scratch && gs.rules.scratchOnEightLoss) || (eightDown && !spotBreakEight && !(before.breakShot && !foul) && !(onEight && !foul && eightCalled))) {
+    gs.winner = other; gs.message = `Player ${other + 1} wins — ${foul ?? (onEight ? '8-ball in the wrong pocket' : 'early 8-ball')}`; return gs;
   }
-  if (!foul && ev.potted.length === 0 && !ev.railAfterContact) foul = 'No rail after contact';
-  if (!foul && ev.cuePotted) foul = 'Scratch';
-  if (!foul && ev.offTable.length > 0) foul = 'Ball off the table';
-
-  // --- 8-ball win/loss ---
-  if (potted8) {
-    // 8 on a legal break respots (casual WPA); any other early 8 loses.
-    if (gs.open && gs.breakShot && !foul) {
-      respot8(gs);
-      gs.message = '8-ball on the break — respotted, table open';
-    } else if (onEight && !foul) {
-      gs.winner = me;
-      gs.message = `Player ${me + 1} wins!`;
-      return gs;
-    } else {
-      gs.winner = other;
-      gs.message = foul
-        ? `Player ${me + 1} fouled on the 8 — Player ${other + 1} wins`
-        : `Early 8-ball — Player ${other + 1} wins`;
-      return gs;
-    }
+  if (eightDown && before.breakShot && !foul) {
+    if (gs.rules.eightOnBreak === 'win') { gs.winner = me; gs.message = `Player ${me + 1} wins — 8-ball on the break`; return gs; }
+    spotBall(gs, 8);
+  } else if (eightDown && onEight && !foul && eightCalled) {
+    gs.winner = me; gs.message = `Player ${me + 1} wins!`; return gs;
   }
-
-  if (foul) {
-    gs.current = other;
-    gs.ballInHand = true;
-    gs.breakShot = false;
-    gs.message = `Foul (${foul}) — Player ${other + 1} ball in hand`;
+  if (before.breakShot && gs.rules.strictBreak && !ev.potted.length && (ev.objectRails?.length ?? 0) < 4) {
+    const options = gs.rules;
+    Object.assign(gs, newGame(1, options)); gs.current = other; gs.message = `Illegal break — reracked for Player ${other + 1}`;
     return gs;
   }
-
-  // --- Group assignment on first pot while open ---
-  if (gs.open && ev.potted.length > 0) {
-    const firstPot = ev.potted[0];
-    if (firstPot !== 8) {
-      const g = groupOf(firstPot);
-      gs.groups[me] = g === 'eight' ? null : (g as Group);
-      gs.groups[other] = g === 'solid' ? 'stripe' : g === 'stripe' ? 'solid' : null;
-      gs.open = false;
-      gs.message = `Player ${me + 1} is ${gs.groups[me]}s`;
-    }
-  }
-
-  // --- Continue or pass turn ---
-  const pottedOwn = ev.potted.some((n) => {
-    if (n === 8) return false;
-    if (gs.open) return true; // any pot on open table continues (after assignment)
-    return groupOf(n) === gs.groups[me];
-  });
-  if (pottedOwn) {
-    gs.message = `Player ${me + 1} shoots again`;
-  } else {
+  for (const n of ev.offTable) if (n !== null && n !== 8) spotBall(gs, n);
+  gs.breakShot = false; gs.kitchenShot = false;
+  if (foul) {
     gs.current = other;
-    gs.message = `Player ${other + 1} to shoot`;
+    const zone = scratch && (gs.rules.scratch === 'kitchen' || before.breakShot) ? 'kitchen' : 'anywhere';
+    grantPlacement(gs, zone);
+    gs.message = `Foul: ${foul} · Player ${other + 1}, place ${zone === 'kitchen' ? 'behind the head string' : 'anywhere'}`;
+    return gs;
   }
-  gs.ballInHand = false;
-  gs.breakShot = false;
+  const validPot = before.breakShot || gs.rules.calls !== 'all' || !!called;
+  const pots = ev.potted.filter(n => n !== 8);
+  if (gs.open && (!before.breakShot || gs.rules.assignOnBreak) && validPot && pots.length) {
+    const groups = new Set(pots.map(groupOf));
+    const group = gs.rules.calls === 'all' && before.calledBall !== null ? groupOf(before.calledBall) : groups.size === 1 ? groupOf(pots[0]) : null;
+    if (group === 'solid' || group === 'stripe') { gs.groups[me] = group; gs.groups[other] = group === 'solid' ? 'stripe' : 'solid'; gs.open = false; }
+  }
+  const continues = validPot && pots.some(n => gs.open || groupOf(n) === gs.groups[me]);
+  gs.current = continues ? me : other; gs.ballInHand = false; gs.placement = 'none';
+  gs.message = `Player ${gs.current + 1} ${continues ? 'shoots again' : 'to shoot'}`;
   return gs;
 }
-
-function respot8(gs: GameState): void {
-  const eight = gs.balls.find((b) => b.n === 8)!;
-  // Foot spot, else nearest free point along long string.
-  const cands: Array<[number, number]> = [[(TABLE_W * 3) / 4, TABLE_H / 2]];
-  for (let dx = 0.06; dx < 1.2; dx += 0.06) {
-    cands.push([(TABLE_W * 3) / 4 - dx, TABLE_H / 2], [(TABLE_W * 3) / 4 + dx, TABLE_H / 2]);
-  }
-  for (const [x, y] of cands) {
-    const free = gs.balls.every((b) => b.potted || b.id === eight.id || Math.hypot(b.x - x, b.y - y) > 0.065);
-    if (x > 0.05 && x < TABLE_W - 0.05) {
-      if (free) {
-        eight.x = x; eight.y = y; eight.potted = false; eight.asleep = true;
-        return;
-      }
-    }
-  }
-  eight.x = (TABLE_W * 3) / 4; eight.y = TABLE_H / 2; eight.potted = false; eight.asleep = true;
-}
-
-/** Placement legality without mutating. */
 export function canPlace(gs: GameState, x: number, y: number): boolean {
-  if (x < 0.03 || x > TABLE_W - 0.03 || y < 0.03 || y > TABLE_H - 0.03) return false;
-  return !gs.balls.some((b) => b.id !== 0 && !b.potted && Math.hypot(b.x - x, b.y - y) < 0.062);
+  if (!gs.ballInHand || gs.winner !== null || !Number.isFinite(x) || !Number.isFinite(y)) return false;
+  if (x < BALL_R + .001 || x > TABLE_W - BALL_R - .001 || y < BALL_R + .001 || y > TABLE_H - BALL_R - .001) return false;
+  if (gs.placement === 'kitchen' && x >= TABLE_W / 4) return false;
+  return gs.balls.every(b => b.id === 0 || b.potted || Math.hypot(b.x - x, b.y - y) >= 2 * BALL_R + .001);
 }
-
-/** Place cue ball (ball in hand). Returns false if blocked. */
 export function placeCue(gs: GameState, x: number, y: number): boolean {
   if (!canPlace(gs, x, y)) return false;
-  const cue = gs.balls[0];
-  cue.x = x; cue.y = y;
-  cue.vx = cue.vy = cue.wx = cue.wy = cue.wz = 0;
-  cue.potted = false; cue.asleep = true;
+  Object.assign(gs.balls[0], makeBall(0, null, x, y));
+  gs.kitchenShot = gs.placement === 'kitchen'; gs.ballInHand = false; gs.placement = 'none';
   return true;
 }
+export const eightBall: Ruleset<GameState, ShotContext> = { id: 'eight-ball', version: 1, create: newGame, begin: beginShot, resolve: applyShot, targets: legalTargets, canPlace };

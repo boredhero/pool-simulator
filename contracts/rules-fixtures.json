@@ -1,0 +1,561 @@
+[
+  {
+    "name": "bar break leaves groups open",
+    "state": {},
+    "ev": {
+      "firstContact": 1,
+      "potted": [
+        1
+      ],
+      "offTable": [],
+      "railAfterContact": true,
+      "cuePotted": false
+    },
+    "expected": {
+      "open": true,
+      "current": 0
+    }
+  },
+  {
+    "name": "bar eight on break wins",
+    "state": {},
+    "ev": {
+      "firstContact": 1,
+      "potted": [
+        8
+      ],
+      "offTable": [],
+      "railAfterContact": true,
+      "cuePotted": false
+    },
+    "expected": {
+      "winner": 0
+    }
+  },
+  {
+    "name": "tournament eight on break respots",
+    "state": {},
+    "ev": {
+      "firstContact": 1,
+      "potted": [
+        8
+      ],
+      "offTable": [],
+      "railAfterContact": true,
+      "cuePotted": false
+    },
+    "expected": {
+      "winner": null,
+      "open": true
+    },
+    "preset": "tournament",
+    "respot": [
+      8
+    ]
+  },
+  {
+    "name": "illegal break reracks for opponent",
+    "state": {},
+    "ev": {
+      "firstContact": 1,
+      "potted": [],
+      "offTable": [],
+      "railAfterContact": true,
+      "cuePotted": false,
+      "objectRails": [
+        1,
+        2,
+        3
+      ]
+    },
+    "expected": {
+      "current": 1,
+      "breakShot": true,
+      "ballInHand": false
+    }
+  },
+  {
+    "name": "four rails is legal break",
+    "state": {},
+    "ev": {
+      "firstContact": 1,
+      "potted": [],
+      "offTable": [],
+      "railAfterContact": true,
+      "cuePotted": false,
+      "objectRails": [
+        1,
+        2,
+        3,
+        4
+      ]
+    },
+    "expected": {
+      "current": 1,
+      "breakShot": false
+    }
+  },
+  {
+    "name": "ordinary whiff gives anywhere",
+    "state": {
+      "breakShot": false
+    },
+    "ev": {
+      "firstContact": null,
+      "potted": [],
+      "offTable": [],
+      "railAfterContact": false,
+      "cuePotted": false
+    },
+    "expected": {
+      "current": 1,
+      "ballInHand": true,
+      "placement": "anywhere"
+    }
+  },
+  {
+    "name": "bar scratch gives kitchen",
+    "state": {
+      "breakShot": false
+    },
+    "ev": {
+      "firstContact": 1,
+      "potted": [],
+      "offTable": [],
+      "railAfterContact": true,
+      "cuePotted": true
+    },
+    "expected": {
+      "current": 1,
+      "ballInHand": true,
+      "placement": "kitchen"
+    }
+  },
+  {
+    "name": "tournament scratch gives anywhere",
+    "state": {
+      "breakShot": false
+    },
+    "ev": {
+      "firstContact": 1,
+      "potted": [],
+      "offTable": [],
+      "railAfterContact": true,
+      "cuePotted": true
+    },
+    "expected": {
+      "current": 1,
+      "placement": "anywhere"
+    },
+    "preset": "tournament"
+  },
+  {
+    "name": "tournament break scratch kitchen",
+    "state": {},
+    "ev": {
+      "firstContact": 1,
+      "potted": [],
+      "offTable": [],
+      "railAfterContact": true,
+      "cuePotted": true,
+      "objectRails": [
+        1,
+        2,
+        3,
+        4
+      ]
+    },
+    "expected": {
+      "current": 1,
+      "placement": "kitchen"
+    },
+    "preset": "tournament"
+  },
+  {
+    "name": "single group establishes solids",
+    "state": {
+      "breakShot": false
+    },
+    "ev": {
+      "firstContact": 1,
+      "potted": [
+        1
+      ],
+      "offTable": [],
+      "railAfterContact": true,
+      "cuePotted": false
+    },
+    "expected": {
+      "current": 0,
+      "open": false,
+      "groups": [
+        "solid",
+        "stripe"
+      ]
+    }
+  },
+  {
+    "name": "mixed casual pot keeps table open",
+    "state": {
+      "breakShot": false
+    },
+    "ev": {
+      "firstContact": 1,
+      "potted": [
+        1,
+        9
+      ],
+      "offTable": [],
+      "railAfterContact": true,
+      "cuePotted": false
+    },
+    "expected": {
+      "current": 0,
+      "open": true
+    }
+  },
+  {
+    "name": "called mixed pot assigns called group",
+    "state": {
+      "breakShot": false
+    },
+    "ev": {
+      "firstContact": 1,
+      "potted": [
+        1,
+        9
+      ],
+      "offTable": [],
+      "railAfterContact": true,
+      "cuePotted": false,
+      "pockets": [
+        {
+          "n": 9,
+          "pocket": 2
+        },
+        {
+          "n": 1,
+          "pocket": 0
+        }
+      ]
+    },
+    "expected": {
+      "current": 0,
+      "open": false,
+      "groups": [
+        "stripe",
+        "solid"
+      ]
+    },
+    "preset": "tournament",
+    "call": [
+      9,
+      2
+    ]
+  },
+  {
+    "name": "uncalled tournament pot ends inning",
+    "state": {
+      "breakShot": false
+    },
+    "ev": {
+      "firstContact": 1,
+      "potted": [
+        1
+      ],
+      "offTable": [],
+      "railAfterContact": true,
+      "cuePotted": false
+    },
+    "expected": {
+      "current": 1,
+      "open": true
+    },
+    "preset": "tournament",
+    "call": [
+      1,
+      2
+    ]
+  },
+  {
+    "name": "kitchen contact without leaving is foul",
+    "state": {
+      "breakShot": false,
+      "kitchenShot": true
+    },
+    "ev": {
+      "firstContact": 1,
+      "potted": [],
+      "offTable": [],
+      "railAfterContact": true,
+      "cuePotted": false,
+      "firstContactX": 0.3,
+      "cueLeftKitchen": false
+    },
+    "expected": {
+      "current": 1,
+      "ballInHand": true
+    }
+  },
+  {
+    "name": "kitchen bank back is legal",
+    "state": {
+      "breakShot": false,
+      "kitchenShot": true
+    },
+    "ev": {
+      "firstContact": 1,
+      "potted": [],
+      "offTable": [],
+      "railAfterContact": true,
+      "cuePotted": false,
+      "firstContactX": 0.3,
+      "cueLeftKitchen": true
+    },
+    "expected": {
+      "current": 1,
+      "ballInHand": false
+    }
+  },
+  {
+    "name": "called eight after cleared wins",
+    "state": {
+      "breakShot": false,
+      "open": false,
+      "groups": [
+        "solid",
+        "stripe"
+      ]
+    },
+    "ev": {
+      "firstContact": 8,
+      "potted": [
+        8
+      ],
+      "offTable": [],
+      "railAfterContact": true,
+      "cuePotted": false,
+      "pockets": [
+        {
+          "n": 8,
+          "pocket": 2
+        }
+      ]
+    },
+    "expected": {
+      "winner": 0
+    },
+    "pottedBefore": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "call": [
+      8,
+      2
+    ]
+  },
+  {
+    "name": "wrong eight pocket loses",
+    "state": {
+      "breakShot": false,
+      "open": false,
+      "groups": [
+        "solid",
+        "stripe"
+      ]
+    },
+    "ev": {
+      "firstContact": 8,
+      "potted": [
+        8
+      ],
+      "offTable": [],
+      "railAfterContact": true,
+      "cuePotted": false,
+      "pockets": [
+        {
+          "n": 8,
+          "pocket": 1
+        }
+      ]
+    },
+    "expected": {
+      "winner": 1
+    },
+    "pottedBefore": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "call": [
+      8,
+      2
+    ]
+  },
+  {
+    "name": "last group ball and eight together loses",
+    "state": {
+      "breakShot": false,
+      "open": false,
+      "groups": [
+        "solid",
+        "stripe"
+      ]
+    },
+    "ev": {
+      "firstContact": 1,
+      "potted": [
+        1,
+        8
+      ],
+      "offTable": [],
+      "railAfterContact": true,
+      "cuePotted": false,
+      "pockets": [
+        {
+          "n": 8,
+          "pocket": 2
+        }
+      ]
+    },
+    "expected": {
+      "winner": 1
+    },
+    "pottedBefore": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "call": [
+      8,
+      2
+    ]
+  },
+  {
+    "name": "bar scratch on eight loses even if eight stays",
+    "state": {
+      "breakShot": false,
+      "open": false,
+      "groups": [
+        "solid",
+        "stripe"
+      ]
+    },
+    "ev": {
+      "firstContact": 8,
+      "potted": [],
+      "offTable": [],
+      "railAfterContact": true,
+      "cuePotted": true
+    },
+    "expected": {
+      "winner": 1
+    },
+    "pottedBefore": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "call": [
+      8,
+      2
+    ]
+  },
+  {
+    "name": "tournament scratch on eight stays alive",
+    "state": {
+      "breakShot": false,
+      "open": false,
+      "groups": [
+        "solid",
+        "stripe"
+      ]
+    },
+    "ev": {
+      "firstContact": 8,
+      "potted": [],
+      "offTable": [],
+      "railAfterContact": true,
+      "cuePotted": true
+    },
+    "expected": {
+      "winner": null,
+      "current": 1,
+      "placement": "anywhere"
+    },
+    "pottedBefore": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "call": [
+      8,
+      2
+    ],
+    "preset": "tournament"
+  },
+  {
+    "name": "off table object respots and fouls",
+    "state": {
+      "breakShot": false
+    },
+    "ev": {
+      "firstContact": 1,
+      "potted": [],
+      "offTable": [
+        2
+      ],
+      "railAfterContact": true,
+      "cuePotted": false
+    },
+    "expected": {
+      "current": 1,
+      "ballInHand": true
+    },
+    "respot": [
+      2
+    ]
+  },
+  {
+    "name": "tournament break eight plus scratch respots",
+    "preset": "tournament",
+    "state": {},
+    "ev": {
+      "firstContact": 1,
+      "potted": [
+        8
+      ],
+      "offTable": [],
+      "railAfterContact": true,
+      "cuePotted": true
+    },
+    "expected": {
+      "winner": null,
+      "current": 1,
+      "placement": "kitchen"
+    },
+    "respot": [
+      8
+    ]
+  }
+]

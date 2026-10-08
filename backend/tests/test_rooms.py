@@ -62,3 +62,44 @@ def test_bad_code_and_turn_order():
         # Solo player shoots (allowed, no opponent yet).
         w1.send_json({"t": "shot", "shot": {"aim": 0.0, "power": 0.1, "tipX": 0, "tipY": 0}})
         assert w1.receive_json()["t"] == "shot"
+
+
+def test_room_rules_revision_and_authoritative_calls():
+    with c1.websocket_connect("/ws") as ws:
+        ws.send_json(
+            {"t": "create", "rules": {"preset": "custom", "calls": "all", "normalMax": 4.2}}
+        )
+        msg = ws.receive_json()
+        state = msg["state"]
+        assert state["rules"]["normalMax"] == 4.2
+        assert state["ruleset"] == {"id": "eight-ball", "version": 1}
+        assert state["break_shot"] and state["placement"] == "none"
+        ws.send_json({"t": "shot", "revision": -1, "shot": {"aim": 0, "power": 0.5}})
+        assert ws.receive_json()["error"] == "stale table state"
+        assert ws.receive_json()["revision"] == 0
+        from app.net.rooms import lobby
+
+        room = lobby.get(msg["code"])
+        room.gs.break_shot = False
+        ws.send_json({"t": "shot", "revision": 0, "shot": {"aim": 0, "power": 0.5}})
+        assert ws.receive_json()["error"] == "call a legal ball and pocket"
+        ws.send_json(
+            {
+                "t": "shot",
+                "revision": 0,
+                "shot": {
+                    "aim": 0,
+                    "power": 0.2,
+                    "calledBall": 1,
+                    "calledPocket": 2,
+                    "elevation": 1.5,
+                },
+            }
+        )
+        shot = ws.receive_json()["shot"]
+        assert shot["elevation"] < 0.2  # Server derives clearance, ignoring invented angle.
+        assert shot["vmax"] == 4.2
+        ws.send_json({"t": "done", "ev": {"potted": [8]}})
+        result = ws.receive_json()
+        assert result["revision"] == 1
+        assert result["winner"] is None  # Fake client 8-ball event cannot decide the match.

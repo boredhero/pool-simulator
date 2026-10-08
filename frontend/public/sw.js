@@ -1,6 +1,6 @@
 // Minimal PWA: precache shell, cache-first hashed assets, SWR for navigations.
-const CACHE = 'pool-v1';
-const SHELL = ['/', '/index.html', '/manifest.json', '/icon.svg'];
+const CACHE = 'pool-v2';
+const SHELL = ['/', '/index.html', '/manifest.json', '/icon.svg', '/fonts/AtkinsonHyperlegible-Regular.woff2', '/fonts/AtkinsonHyperlegible-Bold.woff2'];
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
 });
