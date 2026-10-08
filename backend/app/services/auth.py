@@ -92,7 +92,12 @@ def account_for_token(token: str | None) -> dict | None:
             return None
         user = db.get(Account, session.account_id)
         return (
-            {"id": user.id, "username": user.username, "createdAt": user.created_at}
+            {
+                "id": user.id,
+                "username": user.username,
+                "createdAt": user.created_at,
+                "premium": user.premium,
+            }
             if user
             else None
         )

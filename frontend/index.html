@@ -117,6 +117,9 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
 body:has(#tutorial:not([hidden])) .privacy-notice{display:none}
 #tutorial{--tutorial-top:max(var(--below-header,140px),var(--below-scores,140px));left:50%;right:auto;bottom:auto;top:calc((var(--tutorial-top) + 100dvh - var(--above-controls,180px)) / 2);transform:translate(-50%,-50%);width:min(420px,calc(100vw - 24px));max-height:max(80px,calc(100dvh - var(--tutorial-top) - var(--above-controls,180px) - 16px));overflow-y:auto;overscroll-behavior:contain}
 </style>
+<style>
+.premium-badge{display:inline-block;vertical-align:middle;width:fit-content;padding:3px 9px;border:1px solid #baa065;border-radius:999px;background:#3c321f;color:#f4d88f;font-size:13px;font-weight:700;letter-spacing:.03em}.premium-badge[hidden]{display:none}
+</style>
 </head>
 <body>
 <div id="app"><canvas id="game-canvas"></canvas>
@@ -159,7 +162,7 @@ body:has(#tutorial:not([hidden])) .privacy-notice{display:none}
 </aside>
 <div id="callpanel" hidden><label for="callball">Call your shot</label><select id="callball" aria-label="Called ball"></select><span id="callstatus">Tap a pocket on the table</span><button id="clearcall">Change pocket</button></div>
 <div id="settingspanel" role="dialog" aria-labelledby="settings-title">
-  <header class="settings-header"><h2 id="settings-title">Settings</h2><button id="closesettings" type="button" aria-label="Close settings" title="Close settings">×</button></header>
+  <header class="settings-header"><h2 id="settings-title">Settings <span id="settingspremium" class="premium-badge" hidden>Premium</span></h2><button id="closesettings" type="button" aria-label="Close settings" title="Close settings">×</button></header>
   <div class="settings-body">
   <h2>Table &amp; rules</h2>
   <label for="rulespreset">Game</label><select id="rulespreset"><option value="bar">8-Ball (Bar)</option><option value="tournament">8-Ball (Tourny)</option><option value="custom">8-Ball (Custom)</option></select>
@@ -249,7 +252,7 @@ body:has(#tutorial:not([hidden])) .privacy-notice{display:none}
       <div class="row"><button id="recoverycopy">Copy code</button><button id="recoverysaved">I've saved my code</button></div>
     </section>
     <section id="accountprofile" hidden>
-      <h3 id="accountname"></h3><p id="accountsince" class="guide-note"></p>
+      <h3><span id="accountname"></span> <span id="accountpremium" class="premium-badge" hidden>Premium</span></h3><p id="accountsince" class="guide-note"></p>
       <h3>Lifetime casual stats</h3><p class="guide-note">Recorded by the server. Local practice and CPU games do not count. Private and custom matches are unranked. Leaving after the first shot counts as a forfeit, even if your connection drops.</p>
       <p id="accountjev"></p><div id="termsupdate"><label class="terms-check"><input id="termsadult" type="checkbox"> <span>I am 18 or older and agree to the <a href="/terms.html" target="_blank" rel="noopener">Terms</a>. I have read the <a href="/privacy.html" target="_blank" rel="noopener">Privacy Notice</a>.</span></label><button id="acceptterms" type="button">Accept Terms for Jev AI</button></div><dl id="accountstats"></dl><h3>Recent matches</h3><ul id="accountmatches"></ul>
       <div class="row"><button id="accountrefresh">Refresh stats</button><button id="accountlogout">Sign out</button></div>

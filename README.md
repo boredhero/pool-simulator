@@ -57,8 +57,11 @@ currently unrated and there is no public matchmaking queue yet.
 Both Compose files retain the existing named `pool_data` volume at `/srv/data`,
 with `DATABASE_URL=sqlite:////srv/data/pool.db`. Rebuilding/replacing the container
 preserves accounts, session verifiers, match history, and stats. Initial startup
-creates the current tables idempotently. Changes to existing columns need an
-explicit migration rather than relying on `create_all`. Obsolete test tables in
+creates the current tables idempotently. The premium upgrade explicitly adds
+`accounts.premium` (default false) and makes `jev_games.day` nullable using an
+Alembic batch migration, preserving game data, indexes and free-game uniqueness.
+NULL allowance days identify premium games; `started_at` retains creation time.
+Changes to existing columns need explicit migrations. Obsolete test tables in
 an existing database are no longer mapped or exposed by the application.
 
 Production publishes port 8000 on host loopback for the existing HTTPS reverse
@@ -168,10 +171,32 @@ and [HSTS](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/S
 
 CPU stays offline and account-free. Jev AI requires a signed-in adult account and
 explicit acceptance of the current Terms. It offers **one server-owned game per
-account and per source network per UTC day**. IPv6 /64 addresses share an allowance.
+free account and per source network per UTC day**. IPv6 /64 addresses share an allowance.
 An unfinished game resumes after reload, even across server restarts. A new local
 rack does not reset the free game. Server simulation owns turn progression, legal
 shots and the winner; clients cannot supply Jev prompts, candidate sets or costs.
+
+Premium accounts show a badge in Settings and Account and have unlimited Jev
+games without a daily account/network allowance or midnight expiry. Select Jev
+to resume, or use **New rack** during Jev to abandon that rack and start another.
+Premium games do not consume the shared free network allowance. Terms acceptance,
+authentication, short request throttles, concurrent-turn limits and the global
+paid-call safeguard still apply; reaching that safeguard uses visible CPU fallback.
+
+After deploying, toggle an existing account on this host (case-insensitive):
+
+```sh
+cd ~/pool-simulator
+docker compose exec -T api uv run --directory backend python -m app.premium USERNAME on
+docker compose exec -T api uv run --directory backend python -m app.premium USERNAME off
+```
+
+To enable all accounts that currently exist, use the same command with `--all-existing on` in place of `USERNAME on`. New registrations still default to free.
+
+The boolean defaults off. There is no public API for setting it. Existing sessions
+see changes on their next account refresh or Jev request. Revocation prevents
+premium-only games from continuing and does not reset a consumed free allowance.
+Back up the existing database before upgrading; preserve the `pool_data` volume.
 
 Jev 1.13 selects among at most 12 server-calculated direct-pot candidates. Geometry
 owns aim and physics. Standard breaks and positions without multiple clear pots
@@ -192,8 +217,8 @@ model price is recorded per game (42 nano-USD per input token as researched); th
 is an estimate, not an invoice. Failed or incomplete provider responses can leave
 actual charges unknown, explicitly counted as unmetered. These records have no
 public reporting endpoint. Account/game ownership checks protect resume endpoints.
-`jev_usage` retains lifetime attempt/completion counters. Global admission is capped
-at 100 daily games, paid calls at 1,000 per rolling 24-hour window, concurrent Jev
+`jev_usage` retains lifetime attempt/completion counters. Free-game admission is capped
+at 100 daily games, paid calls at 1,000 per 24-hour budget window, concurrent Jev
 game turns at four, and turn requests at 30/minute/account. The call cap falls back
 to CPU instead of ending the rack. Network and account identity are not proof of a
 unique human; the global caps bound abuse even across accounts and VPNs.

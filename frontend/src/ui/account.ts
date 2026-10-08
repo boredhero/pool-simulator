@@ -1,4 +1,4 @@
-export interface Account {id:string;username:string;createdAt:number}
+export interface Account {id:string;username:string;createdAt:number;premium:boolean}
 interface Stats {matches:number;wins:number;losses:number;abandoned:number;shots:number;ballsPocketed:number;scratches:number;fouls:number;recent:Array<{id:string;opponent:string;status:string;result:string|null}>}
 const el=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 
@@ -22,6 +22,7 @@ export class AccountPanel {
         .catch(()=>this.status('Could not save acceptance. Please try again.'));
     });
     el('accountrefresh').addEventListener('click',()=>void this.refresh());
+    el('settingsbtn').addEventListener('click',()=>void this.refresh());
     el('recoverycopy').addEventListener('click',()=>void navigator.clipboard.writeText(el<HTMLInputElement>('recoveryvalue').value).then(()=>this.status('Recovery code copied. Keep it somewhere safe.')).catch(()=>this.status('Select and copy the recovery code above.')));
     el('recoverysaved').addEventListener('click',()=>{
       this.recoveryPending=false;el<HTMLInputElement>('recoveryvalue').value='';el('recoverypanel').hidden=true;
@@ -57,6 +58,7 @@ export class AccountPanel {
     this.status('');
   }
   private render(stats?:Stats) {
+    for(const id of ['accountpremium','settingspremium'])el(id).hidden=!this.account?.premium;
     el('accountbtn').textContent=this.account?`${this.account.username} · Account`:'Sign in / Create account';
     el('accountauth').hidden=!!this.account||this.recoveryPending;
     el('accountprofile').hidden=!this.account||this.recoveryPending;
@@ -85,7 +87,9 @@ export class AccountPanel {
       if(this.account?.id!==accountId)return;
       const u=data.usage;
       el('accountjev').textContent=data.available
-        ? `Jev AI: ${u.gamesRemaining} free game available today (one per account and network). ${data.game?.status==='active'?'Your current game can be resumed. ':''}Resets ${new Date(u.resetsAt*1000).toLocaleString()}.`
+        ? u.unlimited
+          ? 'Premium · Unlimited Jev AI games. Resume your game or use New rack while playing Jev to start another.'
+          : `Jev AI: ${u.gamesRemaining} free game available today (one per account and network). ${data.game?.status==='active'?'Your current game can be resumed. ':''}Resets ${new Date(u.resetsAt*1000).toLocaleString()}.`
         : 'Jev AI is not configured on this server.';
     } catch {
       if(this.account?.id===accountId)el('accountjev').textContent='Jev AI usage is unavailable.';

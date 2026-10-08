@@ -453,6 +453,43 @@ test('compact mobile scores expand and trackpad shift-scroll orbits',async({page
   await page.screenshot({path:'/tmp/pool-060-mobile.png'});
 });
 
+test('premium badges and unlimited racks follow the server account',async({page})=>{
+  let premium=true,starts=0;
+  await page.route('**/api/account',route=>route.fulfill({json:{account:{id:'premium',username:'PremiumPlayer',createdAt:0,premium},stats:null}}));
+  await page.route('**/api/opponents/jev',route=>route.fulfill({json:{available:true,usage:{unlimited:premium,gamesRemaining:premium?null:0,resetsAt:2000000000}}}));
+  await openGame(page);
+  await page.locator('#settingsbtn').click();await expect(page.locator('#settingspremium')).toBeVisible();
+  await page.locator('#closesettings').click();
+  await page.locator('#onlinebtn').click();await page.locator('#accountbtn').click();
+  await expect(page.locator('#accountpremium')).toBeVisible();
+  await expect(page.locator('#accountjev')).toContainText('Unlimited Jev AI games');
+  await page.setViewportSize({width:390,height:844});
+  await expect(page.locator('#accountpremium')).toBeVisible();
+  await page.locator('#accountclose').click();await page.locator('#closeonline').click();
+  await page.setViewportSize({width:1280,height:800});
+  const state=await page.evaluate(()=>{
+    const g=(window as any).__pool;
+    return {balls:g.gs.balls,return_order:[],current:0,groups:[null,null],open:true,ball_in_hand:false,break_shot:true,placement:'none',kitchen_shot:false,rules:g.gs.rules,revision:0,winner:null,message:'Player 1 to break'};
+  });
+  await page.route('**/api/opponents/jev/games',route=>{
+    if(route.request().postDataJSON().new_game===true)starts++;
+    return route.fulfill({json:{id:'premium-'+starts,state,status:'active',expiresAt:null}});
+  });
+  await page.locator('#jevbtn').click();
+  await expect.poll(()=>page.evaluate(()=>(window as any).__pool.jevGame?.id)).toBe('premium-0');
+  await expect(page.locator('#opponentstatus')).toContainText('Unlimited Jev AI');
+  for(const n of [1,2]){
+    await page.locator('#rack').click();
+    await expect.poll(()=>page.evaluate(()=>(window as any).__pool.jevGame?.id)).toBe('premium-'+n);
+  }
+  premium=false;
+  await page.locator('#settingsbtn').click();await expect(page.locator('#settingspremium')).toBeHidden();
+  await page.locator('#closesettings').click();
+  await page.locator('#onlinebtn').click();await page.locator('#accountbtn').click();
+  await expect(page.locator('#accountpremium')).toBeHidden();
+  await expect(page.locator('#accountjev')).toContainText('0 free game available today');
+});
+
 test('Jev requires sign-in while CPU remains available to guests', async ({page}) => {
   await openGame(page);
   await page.locator('#jevbtn').click();
