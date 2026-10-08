@@ -218,3 +218,24 @@ test('close zoom cannot orbit the camera inside the table',async({page})=>{
   expect(result.distance).toBeCloseTo(.6,6);
   expect(result.angle).toBeLessThan(Math.PI/2);
 });
+
+test('cue ball markings persist without changing the physical ball state',async({page})=>{
+  await openGame(page);await page.locator('#settingsbtn').click();
+  const before=await page.evaluate(()=>JSON.stringify((window as any).__pool.gs.balls));
+  for(const style of ['red-ring','blue-dot','black-triangles','plain','red-spots'])await page.locator('#cueappearance').selectOption(style);
+  expect(await page.evaluate(()=>JSON.stringify((window as any).__pool.gs.balls))).toBe(before);
+  await openGame(page,true);
+  expect(await page.locator('#cueappearance').inputValue()).toBe('red-spots');
+  expect(await page.evaluate(()=>localStorage.getItem('pool:cue-style'))).toBe('red-spots');
+});
+
+test('head-string tip stays dismissed after reload while its tutorial remains available',async({page})=>{
+  await page.setViewportSize({width:1440,height:900});await openGame(page);
+  const kitchen=()=>page.evaluate(()=>{const g=(window as any).__pool;g.gs.ballInHand=true;g.gs.placement='kitchen';g.gs.kitchenShot=true;g.mode='place';g.frame();});
+  await kitchen();await expect(page.locator('#headstringguide')).toBeVisible();
+  await page.locator('#dismissheadstring').click();await expect(page.locator('#headstringguide')).toBeHidden();
+  await openGame(page,true);await kitchen();
+  await expect(page.locator('#headstringguide')).toBeHidden();
+  await expect(page.locator('#kitchenhelp')).toContainText('behind the dashed line');
+  expect(await page.evaluate(()=>localStorage.getItem('pool:headstring-dismissed'))).toBe('1');
+});

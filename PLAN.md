@@ -214,3 +214,21 @@ Flow: work on `develop`, PR to `main` (protected: PR + `ci` check), merge to shi
   are visual geometry changes; collision and capture definitions remain shared.
 - Checked close pocket and window views, plus raycast regressions for cushion
   face orientation, closed return ends and the recessed felt edge.
+
+## Ball artwork and optional cue markings
+- Replaced 256×128 UV-painted ball artwork with 1024×512 spherical number
+  medallions and antialiased stripe boundaries. Tangent-projected numerals stay
+  legible on both sides; 6/9 have distinguishing underlines. Smooth warm-white
+  resin uses restrained specular/clearcoat highlights, not surface grain or
+  baked lighting. Mesh silhouettes use 48×32 sphere segments.
+- Appearance offers plain, six red spots, red ring, blue dot, and black triangles.
+  The cue preference persists locally; switching disposes the previous texture
+  and changes no simulation state. These are generic markings, not brand logos.
+- Manufacturer references: [Aramith cue-ball variants](https://aramith.com/cue-ball/),
+  [Brunswick blue dot](https://www.brunswickbilliards.com/products/blue-dot-cue-ball),
+  [Predator black triangles](https://predatorcues.com/products/predator-arcos-ii-reserve-cue-ball-with-black-triangles),
+  [resin finish](https://aramith.com/general-specifications/), and
+  [embedded number cores](https://aramith.com/aramith-makes-difference/).
+- The head-string callout has a permanent local dismissal. Its dashed boundary
+  and shaded kitchen remain; the information panel retains the explanation
+  whenever the active rules use kitchen placement (including Custom).

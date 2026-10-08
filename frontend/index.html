@@ -85,6 +85,7 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
 .kitchen-guide{position:fixed;z-index:3;transform:translate(-50%,-100%);pointer-events:none;padding:10px 16px;background:#211d18f5;border:1px solid #efd395;border-radius:12px;text-align:center;box-shadow:0 5px 20px #0005;max-width:280px}.kitchen-guide[hidden]{display:none}.kitchen-guide strong{display:block;font-size:20px;color:#ffe1a6}.kitchen-guide span{display:block;font-size:16px;line-height:1.3;color:#f2e7d2}.kitchen-guide::after{content:'';position:absolute;top:100%;left:50%;width:2px;height:30px;background:#efd395}
 @media(max-width:600px){.kitchen-guide{max-width:235px;width:235px;padding:8px 12px}.kitchen-guide strong{font-size:18px}}
 #playbackstate{color:#acd2ad;font-size:14px;text-transform:none;letter-spacing:0;margin-left:8px}.live-pots{margin-top:10px;padding-top:8px;border-top:1px solid #70644d;color:#f4dcae;font-size:16px}.pcard.provisional .grp{color:#ffdda1}
+#dismissheadstring{pointer-events:auto;min-height:36px;margin-top:10px;font-size:14px;padding:4px 10px}
 </style>
 </head>
 <body>
@@ -118,6 +119,7 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
   <p class="guide-note"><strong>Add spin</strong> · Drag the blue dot on the cue ball below. Center it for a straight hit. Cue elevation is assisted around obstacles and changes the shot.</p>
   <p class="guide-note"><strong>After a foul</strong> · Tap or click a green legal spot to place the cue ball. The outline shows your placement area.</p>
   <p class="guide-note"><strong>Call a shot</strong> · When prompted, choose your ball, then tap its destination pocket on the table.</p>
+  <p id="kitchenhelp" class="guide-note"><strong>Head string &amp; kitchen</strong> · After a scratch, place the cue ball in the shaded area behind the dashed line. It must leave the kitchen before contacting a ball inside it.</p>
   <div id="rulesummary" class="rules-summary"></div>
 </aside>
 <div id="callpanel" hidden><label for="callball">Call your shot</label><select id="callball" aria-label="Called ball"></select><span id="callstatus">Tap a pocket on the table</span><button id="clearcall">Change pocket</button></div>
@@ -143,6 +145,8 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
   <hr>
   <h2>Appearance</h2>
   <label for="railsights">Rail sights</label><select id="railsights"><option value="diamonds">Diamonds</option><option value="dots">Dots</option><option value="double-diamonds">Double diamonds</option><option value="squares">Squares</option><option value="none">None</option></select>
+  <label for="cueappearance">Cue ball markings</label><select id="cueappearance"><option value="plain">Plain ivory white</option><option value="red-spots">Six red spots</option><option value="red-ring">Red ring</option><option value="blue-dot">Blue dot</option><option value="black-triangles">Black triangles</option></select>
+  <p class="guide-note">Markings help you see the spin. Appearance only; all play identically.</p>
   <label>Felt</label>
   <div class="swatches" id="feltsw"></div>
   <label>Rails</label>

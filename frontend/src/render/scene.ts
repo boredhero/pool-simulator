@@ -1,3 +1,4 @@
+import { ballTexture, type CueStyle } from './ballTextures';
 import { cushionGeometry } from './cushionGeometry';
 import { constrainTableCamera } from './cameraBounds';
 import { createCabinet, returnPosition } from './cabinet';
@@ -16,35 +17,6 @@ import { BALL_R, POCKETS, TABLE_H, TABLE_W, cushions } from '../sim/table';
 export const toRender = (x: number, y: number): [number, number] => [x - TABLE_W / 2, y - TABLE_H / 2];
 export const toSim = (rx: number, rz: number): [number, number] => [rx + TABLE_W / 2, rz + TABLE_H / 2];
 
-const BALL_COLORS = [
-  '#f5c518', '#0d47d8', '#d82323', '#5b0d8a', '#ef6c00', '#0a7a3d', '#7a1a1a', '#111111',
-  '#f5c518', '#0d47d8', '#d82323', '#5b0d8a', '#ef6c00', '#0a7a3d', '#7a1a1a',
-];
-
-function ballTexture(n: number): THREE.CanvasTexture {
-  const c = document.createElement('canvas');
-  c.width = 256; c.height = 128;
-  const g = c.getContext('2d')!;
-  const stripe = n > 8;
-  g.fillStyle = stripe ? '#f8f8f8' : BALL_COLORS[(n - 1) % 15];
-  g.fillRect(0, 0, 256, 128);
-  if (stripe) {
-    g.fillStyle = BALL_COLORS[(n - 1) % 15];
-    g.fillRect(0, 40, 256, 48);
-  }
-  for (const x of [64, 192]) {
-    g.fillStyle = '#f8f8f8';
-    g.beginPath(); g.arc(x, 64, 22, 0, Math.PI * 2); g.fill();
-    g.fillStyle = '#111';
-    g.font = 'bold 26px system-ui';
-    g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillText(String(n), x, 66);
-  }
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
-
 export interface SceneHandle {
   renderer: THREE.WebGLRenderer;
   controls: OrbitControls;
@@ -59,6 +31,7 @@ export interface SceneHandle {
   /** Ball-in-hand placement preview: legal-zone outline + cursor ring. */
   setPlace(visible: boolean, x: number, y: number, legal: boolean, zone?: string): void;
   setSights(style: SightStyle): void;
+  setCueStyle(style: CueStyle): void;
   setKitchen(visible: boolean, placed?: boolean): void;
   setCall(pocket: number | null, visible: boolean): void;
   /** Felt + wood theme colors (css color strings). */
@@ -218,15 +191,14 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
   scene.add(facings);
 
   // Ball meshes keyed by number ('cue' for cue ball).
-  const ballGeo = new THREE.SphereGeometry(BALL_R, 32, 24);
+  const ballGeo = new THREE.SphereGeometry(BALL_R, 48, 32);
   const meshes = new Map<string, THREE.Mesh>();
+  let cueAppearance:CueStyle='plain';
   const getMesh = (n: number | null): THREE.Mesh => {
     const key = n === null ? 'cue' : `b${n}`;
     let m = meshes.get(key);
     if (!m) {
-      const mat = n === null
-        ? new THREE.MeshPhysicalMaterial({ color: 0xf8f8f8, roughness: 0.45, specularIntensity: 0.4 })
-        : new THREE.MeshPhysicalMaterial({ map: ballTexture(n), roughness: 0.45, specularIntensity: 0.4 });
+      const mat = new THREE.MeshPhysicalMaterial({ map: ballTexture(n,cueAppearance,surfaceAnisotropy), roughness: .34, specularIntensity: .28, clearcoat: .15, clearcoatRoughness: .4 });
       mat.envMapIntensity = 0.25;
       m = new THREE.Mesh(ballGeo, mat);
       m.castShadow = true;
@@ -271,7 +243,10 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
   scene.add(kitchen);
   // Keep text in CSS pixels so the guide stays readable when the table zooms out.
   const kitchenLabel=document.createElement('div');kitchenLabel.id='headstringguide';kitchenLabel.className='kitchen-guide';kitchenLabel.hidden=true;
-  kitchenLabel.innerHTML='<strong>Head string</strong><span>Place inside the shaded kitchen</span>';
+  kitchenLabel.innerHTML='<strong>Head string</strong><span>Place inside the shaded kitchen</span><button id="dismissheadstring" type="button">Got it — hide this tip</button>';
+  let kitchenDismissed=false;
+  try {kitchenDismissed=localStorage.getItem('pool:headstring-dismissed')==='1';}catch{}
+  kitchenLabel.querySelector('button')!.addEventListener('click',()=>{kitchenDismissed=true;kitchenLabel.hidden=true;try{localStorage.setItem('pool:headstring-dismissed','1');}catch{}});
   document.body.appendChild(kitchenLabel);
   let kitchenPlaced=false;
   const kitchenAnchor=new THREE.Vector3(-TABLE_W/4,.006,-TABLE_H*.27);
@@ -345,7 +320,7 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
     controls.update();
     constrainTableCamera(camera, controls);
     for (const cb of cbs) cb();
-    if (kitchen.visible) {
+    if (kitchen.visible && !kitchenDismissed) {
       const anchor=kitchenAnchor.clone().project(camera), rect=canvas.getBoundingClientRect();
       kitchenLabel.hidden=anchor.z>1 || anchor.z < -1;
       const half=kitchenLabel.offsetWidth/2;
@@ -414,7 +389,13 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
       oldWood.map.dispose();oldWood.bump.dispose();oldWood.roughness.dispose();
     },
     setSights: sights.setStyle,
-    setKitchen(visible, placed = false) { if (kitchen.visible === visible && kitchenPlaced === placed) return; kitchenPlaced = placed; kitchen.visible = visible; kitchenLabel.hidden = !visible; kitchenLabel.querySelector('span')!.textContent = placed ? 'Cue ball must leave the kitchen first' : 'Place inside the shaded kitchen'; },
+    setCueStyle(style) {
+      if(style===cueAppearance)return;
+      cueAppearance=style;
+      const cue=meshes.get('cue');
+      if(cue) {const material=cue.material as THREE.MeshPhysicalMaterial;material.map?.dispose();material.map=ballTexture(null,style,surfaceAnisotropy);material.needsUpdate=true;}
+    },
+    setKitchen(visible, placed = false) { if (kitchen.visible === visible && kitchenPlaced === placed) return; kitchenPlaced = placed; kitchen.visible = visible; kitchenLabel.hidden = !visible || kitchenDismissed; kitchenLabel.querySelector('span')!.textContent = placed ? 'Cue ball must leave the kitchen first' : 'Place inside the shaded kitchen'; },
     setCall(pocket, visible) {
       callRings.forEach((ring, i) => {
         ring.visible = visible && (pocket === null || pocket === i);

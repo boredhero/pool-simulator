@@ -1,3 +1,4 @@
+import { cueStyle } from '../render/ballTextures';
 import { advancePlayback } from './playback';
 import { sightStyle } from '../render/railSights';
 import { cueElevation } from '../sim/cue';
@@ -128,6 +129,10 @@ export class Game {
   }
 
   buildThemePanel(): void {
+    const cueSelect=document.getElementById('cueappearance') as HTMLSelectElement;
+    let savedCue:string|null=null;try{savedCue=localStorage.getItem('pool:cue-style');}catch{}
+    cueSelect.value=cueStyle(savedCue);this.scene.setCueStyle(cueStyle(savedCue));
+    cueSelect.addEventListener('change',()=>{const style=cueStyle(cueSelect.value);this.scene.setCueStyle(style);try{localStorage.setItem('pool:cue-style',style);}catch{}});
     const railSelect = document.getElementById('railsights') as HTMLSelectElement;
     railSelect.value = sightStyle(localStorage.getItem('pool:sights'));
     this.scene.setSights(sightStyle(railSelect.value));
