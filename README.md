@@ -54,6 +54,9 @@ configuration with a persistent database volume.
 
 ## Verification and releases
 
+See the [1.0.0 reliability review](docs/reliability-review.md) for findings, fixes and
+remaining implementation boundaries.
+
 ```sh
 uv run --project backend --no-sync pytest backend/tests -q
 uvx ruff check backend/
