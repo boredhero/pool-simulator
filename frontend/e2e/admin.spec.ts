@@ -76,3 +76,25 @@ test('owner can disable, re-enable and confirm deletion without owner self-actio
   await expect(panel.getByRole('button',{name:'Delete account ManagedPlayer',exact:true})).toHaveCount(0);
   await expect(page.locator('#adminstatus')).toContainText('account deleted');expect(deleteCalls).toBe(1);
 });
+
+test('monthly budgets show last activity and save defaults, limits and top-ups',async({page})=>{
+ const budget={month:'2026-10',baseNano:150000000,topupsNano:0,limitNano:150000000,spentNano:42000,reservedNano:2688000,remainingNano:147270000,graceNano:20000000,unlimited:false,resetsAt:1793491200};
+ const calls:Array<{path:string;body:any}>=[];
+ await page.route('**/api/account',r=>r.fulfill({json:{account:owner,stats:null}}));
+ await page.route('**/api/admin/**',r=>{
+  const path=new URL(r.request().url()).pathname;
+  if(['POST','PATCH'].includes(r.request().method())){calls.push({path,body:r.request().postDataJSON()});return r.fulfill({json:{...budget,topupsNano:50000000,limitNano:200000000}});}
+  if(path.endsWith('/overview'))return r.fulfill({json:{accounts:1,premium:0,usage,lifetimeAttempts:12,budgetDefaultNano:150000000}});
+  if(path.endsWith('/accounts/player'))return r.fulfill({json:{budget,lastActiveAt:1780000060,lifetimeAttempts:12,lifetimeCompleted:10,games:[],audit:[],requests:[{id:'request-1',at:1780000060,model:'jev-1.13.0',seat:1,status:'metered',costNano:42000,inputTokens:1000}],budgetAdjustments:[]}});
+  return r.fulfill({json:{total:1,accounts:[{id:'player',username:'BudgetPlayer',createdAt:1780000000,lastActiveAt:1780000060,premium:false,isAdmin:false,usage}]}});
+ });
+ await page.goto('/');await page.locator('#settingsbtn').click();await page.locator('#adminbtn').click();
+ const panel=page.locator('#admindialog');await expect(page.locator('#adminrows')).toContainText('Last active');
+ await expect(panel).toContainText('TypeSafe prepaid balance: unavailable');
+ const defaultForm=panel.locator('.budget-default form');await defaultForm.locator('input').fill('0.10');await defaultForm.getByRole('button',{name:'Save',exact:true}).click();
+ await expect.poll(()=>calls.length).toBe(1);expect(calls[0].body.dollars).toBe('0.10');expect(calls[0].body.requestId).toBeTruthy();
+ await panel.getByRole('button',{name:'Usage details for BudgetPlayer'}).click();await expect(panel).toContainText('Recent request ledger');await expect(panel).toContainText('$0.000042');
+ for(const [i,value] of [[0,'0.25'],[1,'0.05']] as const){const form=panel.locator('.budget-account form').nth(i);await form.locator('input').fill(value);await form.getByRole('button',{name:'Save',exact:true}).click();}
+ await expect.poll(()=>calls.length).toBe(3);expect(calls[1].path).toContain('/budget/limit');expect(calls[2].path).toContain('/budget/topup');
+ await page.setViewportSize({width:390,height:844});expect((await panel.boundingBox())!.width).toBeLessThanOrEqual(390);await expect(panel).toContainText('$0.05 in top-ups');
+});

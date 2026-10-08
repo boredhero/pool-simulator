@@ -486,7 +486,7 @@ test('compact mobile scores expand and explicit trackpad scrolling orbits',async
 test('premium badges and unlimited racks follow the server account',async({page})=>{
   let premium=true,starts=0;
   await page.route('**/api/account',route=>route.fulfill({json:{account:{id:'premium',username:'PremiumPlayer',createdAt:0,premium},stats:null}}));
-  await page.route('**/api/opponents/jev',route=>route.fulfill({json:{available:true,usage:{unlimited:premium,gamesRemaining:premium?null:0,resetsAt:2000000000}}}));
+  await page.route('**/api/opponents/jev',route=>route.fulfill({json:{available:true,usage:{unlimited:premium,budget:{remainingNano:0,limitNano:150000000,unknownRequests:0},resetsAt:2000000000}}}));
   await openGame(page);
   await page.locator('#settingsbtn').click();await expect(page.locator('#settingspremium')).toBeVisible();
   await page.locator('#closesettings').click();
@@ -517,7 +517,7 @@ test('premium badges and unlimited racks follow the server account',async({page}
   await page.locator('#closesettings').click();
   await page.locator('#onlinebtn').click();await page.locator('#accountbtn').click();
   await expect(page.locator('#accountpremium')).toBeHidden();
-  await expect(page.locator('#accountjev')).toContainText('0 free game available today');
+  await expect(page.locator('#accountjev')).toContainText('$0.0000 remaining');
 });
 
 test('Jev requires sign-in while CPU remains available to guests', async ({page}) => {
@@ -532,7 +532,7 @@ test('Jev requires sign-in while CPU remains available to guests', async ({page}
 
 test('Jev resumes its server-owned game and reset discards an in-flight turn', async ({page}) => {
   await page.route('**/api/account',route=>route.fulfill({json:{account:{id:'jev-test',username:'Tester',createdAt:0},stats:null}}));
-  await page.route('**/api/opponents/jev',route=>route.fulfill({json:{available:true,usage:{gamesRemaining:1,resetsAt:2000000000}}}));
+  await page.route('**/api/opponents/jev',route=>route.fulfill({json:{available:true,usage:{budget:{remainingNano:150000000,limitNano:150000000,unknownRequests:0},resetsAt:2000000000}}}));
   await openGame(page);
   const state=await page.evaluate(()=>{
     const g=(window as any).__pool;

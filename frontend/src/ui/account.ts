@@ -36,6 +36,7 @@ export class AccountPanel {
       if(!this.account)this.setMode('login');
       void this.refresh();
     });
+    window.setInterval(()=>{if(this.account&&!document.hidden)void this.request('/activity',{}).catch(()=>{});},60_000);
     this.setMode('login');void this.refresh();
   }
   private status(text:string){el('accountstatus').textContent=text;}
@@ -134,7 +135,7 @@ export class AccountPanel {
       el('accountjev').textContent=data.available
         ? u.unlimited
           ? 'Premium · Unlimited Jev AI games. Resume your game or use New rack while playing Jev to start another.'
-          : `Jev AI: ${u.gamesRemaining} of 5 free games remaining today. ${data.game?.status==='active'?'Your current game can be resumed. ':''}Resets ${new Date(u.resetsAt*1000).toLocaleString()}.`
+          : `Jev AI: $${(u.budget.remainingNano/1e9).toFixed(4)} remaining of $${(u.budget.limitNano/1e9).toFixed(2)} this month. ${u.budget.unknownRequests?`${u.budget.unknownRequests} pending/unknown requests have reserved allowance. `:''}Your current rack can finish, using CPU if its completion grace runs out. Resets ${new Date(u.resetsAt*1000).toLocaleString()}.`
         : 'Jev AI is not configured on this server.';
     } catch {
       if(this.account?.id===accountId)el('accountjev').textContent='Jev AI usage is unavailable.';

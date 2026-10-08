@@ -17,3 +17,4 @@
 .admin-delete-confirm label{display:flex;flex-direction:column;gap:6px;font-size:14px;margin:12px 0}
 .admin-delete-confirm input{max-width:340px;min-height:44px;box-sizing:border-box;border:1px solid #87714f;border-radius:8px;background:#171411;color:#f5eddf;padding:8px;font:inherit}
 .admin-delete-confirm button{margin-right:8px;min-height:44px}
+.budget-form{display:flex;align-items:end;flex-wrap:wrap;gap:8px;margin:12px 0}.budget-form label{display:flex;flex-direction:column;gap:6px}.budget-form input{min-height:44px;max-width:150px;border:1px solid var(--border,#786549);border-radius:8px;padding:8px;background:#211d18;color:#eee2cb}.budget-form button{min-height:44px}.budget-account{overflow-wrap:anywhere;border-top:1px solid #786549;margin-top:12px}.budget-account p{line-height:1.5}

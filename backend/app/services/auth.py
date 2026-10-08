@@ -12,7 +12,7 @@ from urllib.parse import urlsplit
 from argon2 import PasswordHasher
 from argon2.exceptions import VerificationError
 from fastapi import HTTPException, Request, Response
-from sqlalchemy import delete
+from sqlalchemy import delete, or_, update
 
 from app.models.db import Account, AuthThrottle, LoginSession, Session, init_db
 
@@ -34,6 +34,7 @@ def public_account(user: Account) -> dict:
         "id": user.id,
         "username": user.username,
         "createdAt": user.created_at,
+        "lastActiveAt": user.last_active_at,
         "premium": user.premium,
         "simEnabled": user.sim_enabled,
         "isAdmin": is_admin(user.id),
@@ -108,7 +109,21 @@ def account_for_token(token: str | None) -> dict | None:
         if not session or session.expires_at <= int(time.time()):
             return None
         user = db.get(Account, session.account_id)
-        return public_account(user) if user and not user.disabled else None
+        if not user or user.disabled:
+            return None
+        now = int(time.time())
+        if user.last_active_at is None or user.last_active_at <= now - 60:
+            db.execute(
+                update(Account)
+                .where(
+                    Account.id == user.id,
+                    Account.disabled.is_(False),
+                    or_(Account.last_active_at.is_(None), Account.last_active_at <= now - 60),
+                )
+                .values(last_active_at=now)
+            )
+            db.commit()
+        return public_account(user)
 
 
 def current_account(request: Request) -> dict | None:
@@ -116,6 +131,9 @@ def current_account(request: Request) -> dict | None:
 
 
 def set_session(db, response: Response, request: Request, account_id: str) -> None:
+    db.execute(
+        update(Account).where(Account.id == account_id).values(last_active_at=int(time.time()))
+    )
     token = secrets.token_urlsafe(32)
     now = int(time.time())
     db.execute(delete(LoginSession).where(LoginSession.expires_at <= now))

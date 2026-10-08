@@ -164,3 +164,11 @@ def recover(payload: Recovery, request: Request, response: Response) -> dict:
     response.delete_cookie(COOKIE, path="/")
     response.headers["Cache-Control"] = "no-store"
     return {"ok": True, "recovery": code}
+
+
+@router.post("/activity", dependencies=[Depends(mutation_guard)])
+def activity(request: Request):
+    account = current_account(request)
+    if account is None:
+        raise HTTPException(401, "Sign in first.")
+    return {"lastActiveAt": account["lastActiveAt"]}

@@ -106,3 +106,17 @@ def upgrade_simulation(connection) -> None:
         op.add_column(
             "jev_games", Column("simulation", String(16), nullable=False, server_default="")
         )
+
+
+def upgrade_monthly_budget(connection) -> None:
+    if "monthly_budget_nano" not in {
+        c["name"] for c in inspect(connection).get_columns("accounts")
+    }:
+        Operations(MigrationContext.configure(connection)).add_column(
+            "accounts", Column("monthly_budget_nano", Integer, nullable=True)
+        )
+
+    if "last_active_at" not in {c["name"] for c in inspect(connection).get_columns("accounts")}:
+        Operations(MigrationContext.configure(connection)).add_column(
+            "accounts", Column("last_active_at", Integer, nullable=True)
+        )

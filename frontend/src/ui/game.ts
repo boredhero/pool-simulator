@@ -661,7 +661,7 @@ export class Game {
       if(game.created===true)this.coin.queue(this.gs,this.gs.current);
       this.el.opponentstatus.textContent=this.account?.premium
         ? 'Premium · Unlimited Jev AI · New rack starts another game'
-        : 'Five free Jev games per day · New rack starts another game';
+        : 'Monthly Jev allowance · View usage in Account settings';
       if(game.created===false&&(Object.keys(requestedRules) as Array<keyof MatchConfig>).some(key=>requestedRules[key]!==game.state.rules[key]))
         this.el.opponentstatus.textContent='Your existing Jev game keeps its original rules.'+(this.account?.premium?' Open Table to start a new Jev game with different rules.':' These rules stay fixed for this game.');
     } catch(error) {
@@ -709,9 +709,10 @@ export class Game {
       }
       this.pendingNetwork.push(()=>{if(valid())this.applyJevState(result.state);});
       this.el.opponentstatus.textContent=result.source==='jev'?`Jev AI selected a ${result.family??'planned'} shot`:
+        result.source==='budget-fallback'?'Monthly allowance and completion grace used · CPU is finishing this rack':
         result.source==='cpu-fallback'?'Jev AI unavailable or capacity reached · CPU took this shot':
         result.source==='planner'?`${this.playerName(result.by??this.gs.current)} · local ${result.family??'planned'} shot (no model choice needed)`:
-        this.account?.premium?'Premium · Unlimited Jev AI':'Daily Jev game';
+        this.account?.premium?'Premium · Unlimited Jev AI':'Monthly Jev allowance';
     } catch(error) {
       if(valid()){
         if(this.mode!=='rolling')this.mode='wait';
@@ -914,7 +915,7 @@ export class Game {
     this.winnerDialog.sync({game:this.gs,name:this.playerName(this.gs.winner),
       detail:this.gs.message.replace(/\bPlayer ([12])\b/g,(_,seat)=>this.playerName(Number(seat)-1)),
       action:online?'New online session':jev?'Play Jev again':'Play again',
-      note:online?'Start a fresh room and share its new invite with your friend.':jev&&!this.account?.premium?'Five free Jev games per day; your allowance resets at midnight UTC.':''});
+      note:online?'Start a fresh room and share its new invite with your friend.':jev&&!this.account?.premium?'New games use your monthly Jev allowance. Check Account settings for your remaining balance.':''});
   }
 
   private async restartAfterWin():Promise<void> {

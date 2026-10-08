@@ -1,4 +1,4 @@
-"""Authenticated, server-owned daily Jev games and private cost accounting."""
+"""Authenticated, server-owned Jev games and private cost accounting."""
 
 import asyncio
 import json
@@ -13,12 +13,13 @@ from typing import Literal
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.api.privacy import require_terms
 from app.models.db import Account, JevGame, JevUsage, Session
 from app.net.rooms import Room
+from app.services import jev_budget
 from app.services.auth import current_account, mutation_guard
 from app.services.matches import ensure_jev_match, record_shot_in_session
 from app.sim import opening
@@ -40,7 +41,6 @@ from app.sim.rules import (
 router = APIRouter(prefix="/opponents/jev")
 MODEL = "jev-1.13.0"
 active_games: set[str] = set()
-FREE_DAILY_GAMES = 5
 
 
 @dataclass
@@ -124,7 +124,6 @@ def public_game(game, premium=False, *, created=False):
         "id": game.id,
         "created": created,
         "simulation": game.simulation,
-        "dailyCost": game.daily_cost,
         "state": state,
         "status": game.status,
         "expiresAt": None,
@@ -142,15 +141,7 @@ def availability(request: Request, response: Response, account: dict = Depends(r
     day = int(time.time()) // 86400
     with Session() as db:
         game = resumable_game(db, account, day)
-        used = db.scalar(
-            select(func.coalesce(func.sum(JevGame.daily_cost), 0))
-            .select_from(JevGame)
-            .where(
-                JevGame.account_id == account["id"],
-                JevGame.day == day,
-                JevGame.daily_slot.is_not(None),
-            )
-        )
+        budget = jev_budget.balance(db, db.get(Account, account["id"]))
         total = db.get(JevUsage, account["id"])
         return {
             "available": bool(os.environ.get("JEV_API_KEY")),
@@ -158,8 +149,8 @@ def availability(request: Request, response: Response, account: dict = Depends(r
             "game": public_game(game, account["premium"]) if game else None,
             "usage": {
                 "unlimited": account["premium"],
-                "gamesRemaining": None if account["premium"] else max(0, FREE_DAILY_GAMES - used),
-                "resetsAt": None if account["premium"] else (day + 1) * 86400,
+                "budget": budget,
+                "resetsAt": budget["resetsAt"],
                 "attempts": total.attempts if total else 0,
                 "completed": total.completed if total else 0,
             },
@@ -177,36 +168,25 @@ async def start_game(
     premium = account["premium"]
     fresh = payload is not None and payload.new_game
     with Session.begin() as db:
-        current = db.get(Account, account["id"])
+        current = jev_budget.lock_account(db, account["id"])
         if current is None or current.disabled:
             raise HTTPException(401, "Account access is unavailable.")
         simulation = payload.simulation if payload else ""
         if simulation and not current.sim_enabled:
             raise HTTPException(403, "Sim mode is not enabled for this account.")
-        daily_cost = 2 if simulation == "jev-jev" else 1
+        premium = current.premium
         existing = resumable_game(db, account, day)
         if existing and existing.status == "active" and not fresh:
             if existing.simulation and not current.sim_enabled:
                 raise HTTPException(403, "Sim mode is not enabled for this account.")
             return public_game(existing, premium)
-        slot = None
-        if not premium:
-            used = db.scalar(
-                select(func.coalesce(func.sum(JevGame.daily_cost), 0))
-                .select_from(JevGame)
-                .where(
-                    JevGame.account_id == account["id"],
-                    JevGame.day == day,
-                    JevGame.daily_slot.is_not(None),
-                )
+        budget = jev_budget.balance(db, current, now)
+        if not premium and budget["remainingNano"] <= 0:
+            raise HTTPException(
+                429,
+                "Your monthly Jev allowance is used. Resume your existing game, "
+                "play CPU, or ask the admin for a top-up.",
             )
-            if used + daily_cost > FREE_DAILY_GAMES:
-                raise HTTPException(
-                    429,
-                    "Not enough of your five daily Jev games remain for this game. "
-                    "Try CPU or return after midnight UTC.",
-                )
-            slot = used + 1
         if existing and existing.status == "active":
             if existing.id in active_games:
                 raise HTTPException(409, "Wait for your current shot to finish.")
@@ -224,8 +204,8 @@ async def start_game(
             id=secrets.token_hex(16),
             account_id=account["id"],
             day=None if premium else day,
-            daily_slot=slot,
-            daily_cost=daily_cost,
+            daily_slot=None,
+            daily_cost=0,
             simulation=simulation,
             network_hash="",
             started_at=now,
@@ -470,7 +450,12 @@ async def play_turn(
             source = "planner"
             if use_jev and len(options) > 1 and not gs.break_shot:
                 source = "cpu-fallback"
+                attempt = jev_budget.reserve(account["id"], game_id, payload.revision, by, MODEL)
+                result = None
                 try:
+                    if attempt is None:
+                        source = "budget-fallback"
+                        raise HTTPException(429, "Monthly allowance and completion grace used.")
                     with Session.begin() as db:
                         total = db.get(JevUsage, account["id"])
                         if total is None:
@@ -505,6 +490,9 @@ async def play_turn(
                     HTTPException,
                 ):
                     pass  # Preserve a playable deterministic fallback and private errors.
+                finally:
+                    if attempt is not None:
+                        jev_budget.settle(attempt, result)
             if gs.ball_in_hand:
                 position = s.get("placement")
                 if not position or not place_cue(gs, position["x"], position["y"]):

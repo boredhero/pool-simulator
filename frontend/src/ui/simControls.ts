@@ -10,9 +10,9 @@ export class SimControls {
     this.panel.id='sim-panel';this.panel.hidden=true;this.panel.setAttribute('aria-label','Simulation games');
     const header=document.createElement('header'),title=document.createElement('strong'),done=document.createElement('button');
     title.textContent='Watch a simulation';done.type='button';done.textContent='Done';done.addEventListener('click',()=>this.close());header.append(title,done);this.panel.append(header);
-    const note=document.createElement('p');note.textContent='Uses your shared daily Jev allowance. Premium has unlimited games.';this.panel.append(note);
+    const note=document.createElement('p');note.textContent='Jev requests use your monthly dollar allowance. Both Jev seats are metered individually. CPU is free. Premium is unlimited.';this.panel.append(note);
     for(const [mode,label,cost] of [['cpu-cpu','CPU vs CPU',0],['jev-cpu','Jev vs CPU',1],['jev-jev','Jev vs Jev',2]] as const){
-      const button=document.createElement('button');button.type='button';button.dataset.simMode=mode;button.textContent=`${label} · ${cost===0?'Free':`${cost} Jev game${cost===1?'':'s'}`}`;
+      const button=document.createElement('button');button.type='button';button.dataset.simMode=mode;button.textContent=`${label} · ${cost===0?'Free':'Monthly allowance'}`;
       button.addEventListener('click',()=>{this.close();void start(mode);});this.panel.append(button);
     }
     document.body.append(this.panel);

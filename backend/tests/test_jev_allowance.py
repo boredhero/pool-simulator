@@ -1,40 +1,25 @@
-import time
-
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import IntegrityError
 from test_premium import register, start
 
-from app.api import jev
 from app.main import app
-from app.models.db import JevGame, Session
 from app.models.migrations import upgrade_jev_allowance
 
 
-def test_five_starts_resume_exhaustion_and_next_day(monkeypatch):
+def test_game_starts_no_longer_consume_daily_allowance(monkeypatch):
     monkeypatch.setenv("JEV_API_KEY", "test-placeholder")
-    now = int(time.time())
-    monkeypatch.setattr(jev.time, "time", lambda: now)
     client = TestClient(app)
     register(client)
     ids = []
-    for remaining in range(4, -1, -1):
+    for _ in range(8):
         response = start(client, fresh=True)
-        assert response.status_code == 200, response.text
-        game = response.json()
-        ids.append(game["id"])
-        assert start(client).json()["id"] == game["id"]
-        assert client.get("/api/opponents/jev").json()["usage"]["gamesRemaining"] == remaining
-    assert len(set(ids)) == 5
-    assert start(client, fresh=True).status_code == 429
-    with Session() as db:
-        assert db.get(JevGame, ids[-1]).status == "active"
-        assert all(db.get(JevGame, identity).status == "abandoned" for identity in ids[:-1])
-    now += 86400
-    assert client.get("/api/opponents/jev").json()["usage"]["gamesRemaining"] == 5
+        assert response.status_code == 200
+        ids.append(response.json()["id"])
+    assert len(set(ids)) == 8
     assert start(client).json()["id"] == ids[-1]
-    assert start(client, fresh=True).status_code == 200
+    assert client.get("/api/opponents/jev").json()["usage"]["budget"]["spentNano"] == 0
 
 
 def test_new_allowance_migration_preserves_history_and_resets_old_usage_once():

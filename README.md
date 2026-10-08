@@ -229,14 +229,15 @@ References: [OWASP WebSocket security](https://cheatsheetseries.owasp.org/cheats
 [Chrome HPKP removal](https://developer.chrome.com/blog/chrome-72-deps-rems/),
 and [HSTS](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Strict-Transport-Security).
 
-## Jev AI, privacy, and daily games (0.7.0)
+## Jev AI, privacy, and monthly budgets
 
 CPU stays offline and account-free. Jev AI requires a signed-in adult account and
-explicit acceptance of the current Terms. Free accounts may start **five games per
-UTC day**. Resuming an unfinished game uses no additional start and games do not
-expire at midnight. Selecting Jev or New rack starts a fresh game. Premium has
-unlimited starts. The 1.0.2 migration preserves games and cost history while
-resetting prior allowance usage; it does not reset usage on subsequent restarts.
+explicit acceptance of the current Terms. Free accounts receive a $0.15 monthly
+allowance by default, configurable globally or per account in Admin. Dollar top-ups
+apply to the current UTC calendar month only. Premium remains unlimited. The daily
+game-count cap is removed; starting a rack costs nothing by itself. An admitted
+rack can use $0.02 completion grace, then the CPU planner finishes without further
+provider calls. Resuming remains free and does not discard the existing rack.
 Account ownership, Terms acceptance and concurrent-shot protections still apply.
 
 After deploying, toggle an existing account on this host (case-insensitive):
@@ -282,10 +283,26 @@ model price is recorded per game (42 nano-USD per input token as researched); th
 is an estimate, not an invoice. Failed or incomplete provider responses can leave
 actual charges unknown, explicitly counted as unmetered. These records have no
 public reporting endpoint. Account/game ownership checks protect resume endpoints.
-`jev_usage` retains lifetime attempt/completion counters. The five-start daily allowance is per account, enforced with durable unique
-slots and stored game costs. Sim games consume two starts for Jev vs Jev, one for
-Jev vs CPU, and zero for offline CPU vs CPU. Existing usage is preserved.
-Network-wide and global usage caps and Jev start/turn throttles are removed.
+`jev_usage` retains lifetime attempt/completion counters. `jev_requests` records
+one attempt before each provider call, linked to the account, rack, turn and seat.
+Reported input tokens are charged at the stored 42 nano-USD/token rate; outputs
+are free. Integer nanodollars prevent cent-rounding losses. Missing usage is
+unknown, never zero: a separate reservation uses the published 64K-token maximum.
+Reservations and admission serialize on the account row. Each retry is a separate
+attempt; settlement is idempotent. CPU vs CPU has no provider calls, Jev vs CPU
+meters the Jev seat, and Jev vs Jev meters each actual request without a multiplier.
+Monthly attribution uses the request start timestamp in UTC. Old game estimates
+remain available but are not fabricated into request-level records or charged to
+the new allowance. The ledger starts with 1.1.0. Request and adjustment records
+expire after 90 days; current-month accounting is preserved.
+
+Admin shows current budget, spend, unknown reservations, recent request records,
+and audited monthly adjustments. Top-up request IDs prevent duplicate credits on
+network retries. Calculated usage charges are not provider-issued receipts.
+TypeSafe's documented API/SDK do not expose prepaid balance: Admin explicitly
+shows it as unavailable and links to the provider billing page. Funding remains
+manual, outside this application's per-player allowance system.
+Network-wide and global usage caps and Jev start/turn throttles remain removed.
 Concurrent Jev turns remain bounded at four to protect simulation capacity.
 
 
@@ -379,8 +396,17 @@ The owner dashboard has a separate Sim permission for each account, disabled by
 default. Enable it for your own account to reveal the Sim button on desktop and
 mobile. On mobile it sits between Reset and Move Camera and opens a replacement
 tray; Done returns to the shot tray. CPU vs CPU runs locally; games involving Jev
-use server-authoritative turns and the same daily allowance as ordinary games.
+use server-authoritative turns and the same monthly dollar allowance as ordinary games.
 Both players act automatically, human shot controls are locked, and spectator
 games do not contribute to the viewer’s win/loss statistics. Premium removes the
 allowance limit but does not grant Sim permission. Server checks enforce Sim
 permission at game creation and on each automated Jev-game turn.
+
+
+### Account activity
+
+Accounts store `last_active_at`, initially unknown for legacy accounts. Successful
+sign-in and authenticated activity update it, throttled to once per minute. A
+visible signed-in game sends a minute heartbeat, including local/CPU play. Hidden
+tabs do not send heartbeats. Admin shows creation and last-active timestamps in
+the player table and detail view; this is service activity, not optional analytics.

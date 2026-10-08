@@ -2,10 +2,11 @@
 
 import secrets
 import time
+from decimal import Decimal
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import delete, func, or_, select, update
 
 from app.models.db import (
@@ -13,13 +14,17 @@ from app.models.db import (
     AdminAccountAction,
     AdminAudit,
     GameMatch,
+    JevBudgetAdjustment,
+    JevBudgetSetting,
     JevGame,
+    JevRequest,
     JevUsage,
     LoginSession,
     MatchPlayer,
     Session,
     TermsAcceptance,
 )
+from app.services import jev_budget
 from app.services.auth import current_account, is_admin, mutation_guard
 
 
@@ -73,6 +78,7 @@ def overview():
             select(func.sum(JevUsage.attempts), func.sum(JevUsage.completed))
         ).one()
         return {
+            "budgetDefaultNano": jev_budget.defaults(db),
             "accounts": accounts,
             "premium": premium,
             "usage": usage_dict(totals),
@@ -120,6 +126,7 @@ def accounts(
                     "id": row["Account"].id,
                     "username": row["Account"].username,
                     "createdAt": row["Account"].created_at,
+                    "lastActiveAt": row["Account"].last_active_at,
                     "premium": row["Account"].premium,
                     "disabled": row["Account"].disabled,
                     "simEnabled": row["Account"].sim_enabled,
@@ -151,6 +158,38 @@ def account_detail(account_id: str):
             .limit(10)
         )
         return {
+            "budget": jev_budget.balance(db, account),
+            "budgetAdjustments": [
+                {"at": e.occurred_at, "kind": e.kind, "amountNano": e.amount_nano, "month": e.month}
+                for e in db.scalars(
+                    select(JevBudgetAdjustment)
+                    .where(JevBudgetAdjustment.account_id == account_id)
+                    .order_by(JevBudgetAdjustment.occurred_at.desc())
+                    .limit(20)
+                )
+            ],
+            "requests": [
+                {
+                    "id": e.id,
+                    "at": e.started_at,
+                    "month": e.month,
+                    "gameId": e.game_id,
+                    "seat": e.seat,
+                    "model": e.model,
+                    "status": e.status,
+                    "inputTokens": e.input_tokens,
+                    "outputTokens": e.output_tokens,
+                    "costNano": e.cost_nano,
+                    "reservedNano": e.reserved_nano,
+                }
+                for e in db.scalars(
+                    select(JevRequest)
+                    .where(JevRequest.account_id == account_id)
+                    .order_by(JevRequest.started_at.desc(), JevRequest.id)
+                    .limit(50)
+                )
+            ],
+            "lastActiveAt": account.last_active_at,
             "username": account.username,
             "disabled": account.disabled,
             "simEnabled": account.sim_enabled,
@@ -270,7 +309,14 @@ async def delete_account(account_id: str, payload: AccountDeletion, actor=Depend
             .where(GameMatch.id.in_(game_ids), GameMatch.status == "active")
             .values(status="abandoned", ended_at=int(time.time()))
         )
-        for model in (LoginSession, TermsAcceptance, JevUsage, JevGame):
+        for model in (
+            JevRequest,
+            JevBudgetAdjustment,
+            LoginSession,
+            TermsAcceptance,
+            JevUsage,
+            JevGame,
+        ):
             db.execute(delete(model).where(model.account_id == account_id))
         db.execute(
             delete(AdminAudit).where(
@@ -306,3 +352,65 @@ def set_account_simulation(
                 db, actor, account_id, "sim-enabled" if payload.simEnabled else "sim-disabled"
             )
         return {"id": account_id, "simEnabled": account.sim_enabled}
+
+
+class MoneyChange(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    dollars: str = Field(pattern=r"^(0|[1-9][0-9]{0,5})\.[0-9]{2}$")
+    requestId: str = Field(pattern=r"^[a-zA-Z0-9-]{16,64}$")
+
+
+def apply_money(db, payload, actor, account_id, kind):
+    amount = int(Decimal(payload.dollars) * 1_000_000_000)
+    prior = db.get(JevBudgetAdjustment, payload.requestId)
+    if prior:
+        if (prior.actor_id, prior.account_id, prior.kind, prior.amount_nano) != (
+            actor["id"],
+            account_id,
+            kind,
+            amount,
+        ):
+            raise HTTPException(409, "This request ID was already used for another adjustment.")
+        return False
+    db.add(
+        JevBudgetAdjustment(
+            id=payload.requestId,
+            account_id=account_id,
+            actor_id=actor["id"],
+            month=jev_budget.period()[0],
+            kind=kind,
+            amount_nano=amount,
+            occurred_at=int(time.time()),
+        )
+    )
+    return True
+
+
+@router.patch("/budget-default", dependencies=[Depends(mutation_guard)])
+def set_budget_default(payload: MoneyChange, actor=Depends(require_admin)):
+    with Session.begin() as db:
+        jev_budget.lock_account(db, actor["id"])
+        if apply_money(db, payload, actor, None, "default"):
+            db.merge(
+                JevBudgetSetting(
+                    key="monthly_default", value=int(Decimal(payload.dollars) * 1_000_000_000)
+                )
+            )
+        return {"budgetDefaultNano": jev_budget.defaults(db)}
+
+
+@router.post("/accounts/{account_id}/budget/{kind}", dependencies=[Depends(mutation_guard)])
+def change_budget(
+    account_id: str,
+    kind: Literal["limit", "topup"],
+    payload: MoneyChange,
+    actor=Depends(require_admin),
+):
+    with Session.begin() as db:
+        account = jev_budget.lock_account(db, account_id)
+        if account is None:
+            raise HTTPException(404, "Account not found")
+        if apply_money(db, payload, actor, account_id, kind) and kind == "limit":
+            account.monthly_budget_nano = int(Decimal(payload.dollars) * 1_000_000_000)
+        db.flush()
+        return jev_budget.balance(db, account)

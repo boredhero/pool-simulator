@@ -18,7 +18,10 @@ def clean_accounts_and_matches():
         AuthThrottle,
         FeatureEvent,
         GameMatch,
+        JevBudgetAdjustment,
+        JevBudgetSetting,
         JevGame,
+        JevRequest,
         JevUsage,
         LoginSession,
         MatchPlayer,
@@ -34,6 +37,9 @@ def clean_accounts_and_matches():
     lobby.rooms.clear()
     with Session.begin() as db:
         for model in (
+            JevRequest,
+            JevBudgetSetting,
+            JevBudgetAdjustment,
             AdminAudit,
             MatchShot,
             MatchPlayer,

@@ -1,8 +1,9 @@
+import {defaultBudgetControls,accountBudgetControls} from './budgetControls';
 import type { Account } from './account';
 import './admin.css';
 
 type Usage = {games:number;requests:number;input_tokens:number;output_tokens:number;estimated_cost_nano:number;unmetered_requests:number;last_activity:number|null};
-type User = {id:string;username:string;createdAt:number;premium:boolean;simEnabled?:boolean;disabled?:boolean;isAdmin:boolean;usage:Usage};
+type User = {id:string;username:string;createdAt:number;lastActiveAt?:number|null;premium:boolean;simEnabled?:boolean;disabled?:boolean;isAdmin:boolean;usage:Usage};
 type Game = {id:string;status:string;startedAt:number;updatedAt:number;premiumGame:boolean} & Usage;
 const el=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 const number=(n:number)=>n.toLocaleString();
@@ -74,6 +75,7 @@ export class AdminPanel {
       ]);
       if(seq!==this.sequence)return;
       this.total=list.total;
+      if(summary.budgetDefaultNano!==undefined)defaultBudgetControls(el('adminsummary').parentElement!,summary.budgetDefaultNano,(p,o)=>this.request(p,o));
       if(this.offset>=this.total&&this.offset>0){this.offset=Math.max(0,Math.floor((this.total-1)/20)*20);void this.load();return;}
       el('adminsummary').replaceChildren(...[
         ['Accounts',number(summary.accounts),'Registered players'],
@@ -97,6 +99,7 @@ export class AdminPanel {
     if(user.isAdmin)identity.append(node('span','Owner','admin-owner-tag'));
     if(user.disabled)identity.append(node('span','Disabled','admin-disabled-tag'));
     identity.append(node('small',`Joined ${new Date(user.createdAt*1000).toLocaleDateString()}`));
+    identity.append(node('small',`Last active ${date(user.lastActiveAt??null)}`));
     const status=node('td');
     const toggle=node('button',user.premium?'Premium':'Free','admin-switch');toggle.type='button';
     toggle.setAttribute('role','switch');toggle.setAttribute('aria-checked',String(user.premium));
@@ -133,8 +136,10 @@ export class AdminPanel {
         const data=await this.request(`/accounts/${encodeURIComponent(user.id)}`);
         if(!detailRow?.isConnected)return;
         cell.replaceChildren(node('h3',`${user.username} · Jev activity`));
+        cell.append(node('p',`Joined ${date(user.createdAt)} · Last active ${date(data.lastActiveAt??null)}`));
         cell.append(node('p',`${number(data.lifetimeAttempts)} lifetime attempts · ${number(data.lifetimeCompleted)} completed selections. Last game activity: ${date(user.usage.last_activity)}.`));
         cell.append(node('p',`${number(user.usage.input_tokens)} input tokens · ${number(user.usage.output_tokens)} output tokens · ${number(user.usage.unmetered_requests)} unmetered requests in recorded games.`));
+        if(data.budget)accountBudgetControls(cell,user.id,data,(p,o)=>this.request(p,o));
         const games=node('ul','','admin-game-list');
         for(const game of data.games as Game[]){
           const item=node('li');item.append(node('strong',`${game.status} · ${date(game.startedAt)}`),node('span',`${game.premiumGame?'Premium':'Free'} · ${number(game.requests)} requests · ${number(game.input_tokens)} input / ${number(game.output_tokens)} output tokens · ${money(game.estimated_cost_nano)} estimated${game.unmetered_requests?` · ${game.unmetered_requests} unmetered`:''}`));games.append(item);

@@ -84,8 +84,8 @@ def test_premium_new_games_resume_midnight_and_do_not_consume_network_allowance(
     assert first["expiresAt"] is None
     assert start(client).json()["id"] == first["id"]
     usage = client.get("/api/opponents/jev").json()["usage"]
-    assert usage["unlimited"] is True and usage["gamesRemaining"] is None
-    assert usage["resetsAt"] is None
+    assert usage["unlimited"] is True and usage["budget"]["unlimited"] is True
+    assert usage["resetsAt"] > 0
     second = start(client, fresh=True).json()
     assert second["id"] != first["id"]
     with Session.begin() as db:
@@ -123,7 +123,9 @@ def test_revocation_rechecks_access_and_preserves_free_daily_limits(monkeypatch)
     premium_game = start(client).json()
     assert premium_game["id"] != free_game["id"]
     set_premium("PremiumPlayer", False)
-    assert client.get("/api/opponents/jev").json()["usage"]["gamesRemaining"] == 4
+    assert (
+        client.get("/api/opponents/jev").json()["usage"]["budget"]["remainingNano"] == 150_000_000
+    )
     assert start(client).json()["id"] == premium_game["id"]
     assert (
         client.post(
