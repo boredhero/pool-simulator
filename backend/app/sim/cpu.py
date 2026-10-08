@@ -29,6 +29,8 @@ def candidates(gs):
             dx, dy = b.x - p[0], b.y - p[1]
             distance = math.hypot(dx, dy) or 1
             gx, gy = b.x + dx / distance * BALL_R * 2, b.y + dy / distance * BALL_R * 2
+            if not (BALL_R <= gx <= TABLE_W - BALL_R and BALL_R <= gy <= TABLE_H - BALL_R):
+                continue
             ax, ay = gx - cue.x, gy - cue.y
             travel = math.hypot(ax, ay) or 1
             cut = math.acos(
