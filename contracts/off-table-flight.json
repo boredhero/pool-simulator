@@ -1,0 +1,82 @@
+[
+  {
+    "name": "production-clearance-False-False-0.3",
+    "x": 0.06,
+    "y": 0.4,
+    "aim": 0.7,
+    "power": 0.3,
+    "vmax": 8.5,
+    "mirrorY": false,
+    "off": false
+  },
+  {
+    "name": "production-clearance-False-False-1",
+    "x": 0.06,
+    "y": 0.4,
+    "aim": 0.7,
+    "power": 1,
+    "vmax": 8.5,
+    "mirrorY": false,
+    "off": true
+  },
+  {
+    "name": "production-clearance-True-False-0.3",
+    "x": 2.48,
+    "y": 0.4,
+    "aim": 2.441592653589793,
+    "power": 0.3,
+    "vmax": 8.5,
+    "mirrorY": false,
+    "off": false
+  },
+  {
+    "name": "production-clearance-True-False-1",
+    "x": 2.48,
+    "y": 0.4,
+    "aim": 2.441592653589793,
+    "power": 1,
+    "vmax": 8.5,
+    "mirrorY": false,
+    "off": true
+  },
+  {
+    "name": "production-clearance-False-True-0.3",
+    "x": 0.06,
+    "y": 0.87,
+    "aim": 0.7,
+    "power": 0.3,
+    "vmax": 8.5,
+    "mirrorY": true,
+    "off": false
+  },
+  {
+    "name": "production-clearance-False-True-1",
+    "x": 0.06,
+    "y": 0.87,
+    "aim": 0.7,
+    "power": 1,
+    "vmax": 8.5,
+    "mirrorY": true,
+    "off": true
+  },
+  {
+    "name": "production-clearance-True-True-0.3",
+    "x": 2.48,
+    "y": 0.87,
+    "aim": 2.441592653589793,
+    "power": 0.3,
+    "vmax": 8.5,
+    "mirrorY": true,
+    "off": false
+  },
+  {
+    "name": "production-clearance-True-True-1",
+    "x": 2.48,
+    "y": 0.87,
+    "aim": 2.441592653589793,
+    "power": 1,
+    "vmax": 8.5,
+    "mirrorY": true,
+    "off": true
+  }
+]

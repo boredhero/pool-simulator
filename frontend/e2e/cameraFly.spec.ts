@@ -1,4 +1,4 @@
-import { acceptWelcomeBeforeLoad } from './welcomeFixture';
+import { acceptWelcomeBeforeLoad, waitForOpening } from './welcomeFixture';
 import { expect, test, type Page } from '@playwright/test';
 
 async function position(page: Page) {
@@ -19,6 +19,7 @@ test.beforeEach(async ({ page }) => {
     });
   });
   await page.goto('/');
+  await waitForOpening(page);
   await expect(page.locator('#camera-fly-toggle')).toBeVisible();
   if (await page.locator('#privacynotice').isVisible()) await page.locator('#privacyessential').click();
   if (await page.locator('#helppanel').isVisible()) await page.locator('#closehelp').click();
@@ -169,7 +170,7 @@ test('trackpad momentum never steers or fires the cue and Shift spin precision s
 });
 
 
-test('camera HUD keeps mode and disclosure together, reveals help on demand and stays clear of shooting',async({page})=>{
+test('camera HUD reveals help on demand and stays clear of shooting',async({page})=>{
   await page.setViewportSize({width:1024,height:768});
   const hud=page.locator('#camera-fly-hud'),toggle=page.locator('#camera-fly-toggle');
   await expect(page.locator('#camera-input-profile')).toBeVisible();

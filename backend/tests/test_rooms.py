@@ -273,3 +273,34 @@ def test_simulation_capacity_rejects_shot_without_mutation(monkeypatch):
             ws.send_json({"t": "shot", "revision": 0, "shot": {"aim": 0, "power": 0.5}})
             assert "busy" in ws.receive_json()["error"]
             assert not room.started and room.revision == 0 and not room.busy
+
+
+@pytest.mark.parametrize("starter", [0, 1])
+def test_coin_toss_waits_for_opponent_and_broadcasts_one_authoritative_starter(
+    monkeypatch, starter
+):
+    calls = []
+
+    def toss():
+        calls.append(starter)
+        return starter
+
+    monkeypatch.setattr("app.sim.opening.choose_breaker", toss)
+    with (
+        TestClient(app).websocket_connect("/ws") as host,
+        TestClient(app).websocket_connect("/ws") as guest,
+    ):
+        host.send_json({"t": "create", "name": "Host"})
+        waiting = host.receive_json()
+        assert waiting["state"]["break_starter"] is None and calls == []
+        guest.send_json({"t": "join", "code": waiting["code"], "name": "Guest"})
+        joined = guest.receive_json()
+        assert host.receive_json()["t"] == "joined"
+        for state in [joined["state"], host.receive_json(), guest.receive_json()]:
+            assert state["ready"] and state["current"] == starter
+            assert state["break_starter"] == starter and state["revision"] == 0
+        room = lobby.get(waiting["code"])
+        room.gs.current = 1 - starter
+        assert room.state_msg()["break_starter"] == starter
+        assert room.state_msg()["current"] == 1 - starter
+        assert calls == [starter]

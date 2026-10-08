@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: ['pool.spec.ts', 'panels.spec.ts', 'admin.spec.ts', 'cameraFly.spec.ts', 'welcome.spec.ts'],
+  testMatch: ['pool.spec.ts', 'panels.spec.ts', 'admin.spec.ts', 'cameraFly.spec.ts', 'welcome.spec.ts', 'accountIdentity.spec.ts', 'winner.spec.ts', 'coin.spec.ts', 'jevLatency.spec.ts'],
   fullyParallel: true,
   workers: process.env.CI ? 1 : 2,
   timeout: 60_000,

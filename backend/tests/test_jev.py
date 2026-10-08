@@ -344,3 +344,41 @@ def test_invalid_planned_placement_does_not_consume_turn(monkeypatch):
     with Session() as db:
         row = db.get(JevGame, game["id"])
         assert row.revision == 0 and row.state == raw
+
+
+@pytest.mark.parametrize("starter", [0, 1])
+def test_coin_toss_is_persisted_only_for_new_jev_games(monkeypatch, starter):
+    calls = []
+
+    def toss():
+        calls.append(starter)
+        return starter
+
+    monkeypatch.setattr(jev.opening, "choose_breaker", toss)
+    first = start()
+    assert first["created"] is True
+    assert first["state"]["current"] == starter
+    assert first["state"]["break_shot"] is True
+    with Session() as db:
+        assert json.loads(db.get(JevGame, first["id"]).state)["current"] == starter
+    resumed = start()
+    assert resumed["id"] == first["id"] and resumed["created"] is False
+    assert resumed["state"]["current"] == starter
+    available = client.get("/api/opponents/jev").json()["game"]
+    assert available["created"] is False and available["state"]["current"] == starter
+    assert calls == [starter]
+    if starter == 1:
+        rejected = client.post(
+            f"/api/opponents/jev/games/{first['id']}/turn",
+            headers=HEADERS,
+            json={"revision": 0, "shot": {"aim": 0.0, "power": 0.05}},
+        )
+        assert rejected.status_code == 409
+    from app.premium import set_premium
+
+    set_premium("jevtester", True)
+    monkeypatch.setattr(jev.opening, "choose_breaker", lambda: 1 - starter)
+    fresh = client.post("/api/opponents/jev/games", headers=HEADERS, json={"new_game": True}).json()
+    assert fresh["created"] is True and fresh["id"] != first["id"]
+    assert fresh["state"]["current"] == 1 - starter
+    assert start()["state"]["current"] == 1 - starter

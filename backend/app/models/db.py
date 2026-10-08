@@ -98,7 +98,7 @@ class GameMatch(Base):
     __tablename__ = "game_matches"
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
     status: Mapped[str] = mapped_column(String(16), default="active", index=True)
-    ruleset: Mapped[str] = mapped_column(String(32), default="eight-ball:1")
+    ruleset: Mapped[str] = mapped_column(String(32), default="eight-ball:2")
     rules: Mapped[str] = mapped_column(Text)
     game_version: Mapped[str] = mapped_column(String(32))
     started_at: Mapped[int] = mapped_column(Integer)

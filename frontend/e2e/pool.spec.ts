@@ -1,4 +1,4 @@
-import { acceptWelcomeBeforeLoad } from './welcomeFixture';
+import { acceptWelcomeBeforeLoad, waitForOpening } from './welcomeFixture';
 import { expect, test, type Page } from '@playwright/test';
 
 test.beforeEach(async ({page}) => {
@@ -27,13 +27,14 @@ async function openGame(page: Page, reload = false) {
   if (reload) await page.reload(); else await page.goto('/');
   await page.waitForFunction(() => !!(window as any).__draw, undefined, {timeout:10000,polling:100});
   await expect(page.locator('#version')).toHaveText('ve2e');
+  await waitForOpening(page);
 }
 
 test('loads, renders table, breaks and resolves', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await openGame(page);
-  await expect(page).toHaveTitle(/Play Pool/);
+  await expect(page).toHaveTitle(/Pool Simulator/);
   const canvas = page.locator('#game-canvas');
   await expect(canvas).toBeVisible();
   const box = await canvas.boundingBox();
@@ -124,7 +125,7 @@ test('pocket indicators update before rest without overwriting the next turn', a
 test('bar break assigns both cards before the same player shoots again', async ({page}) => {
   await openGame(page);
   const result=await page.evaluate(()=>{
-    const g=(window as any).__pool;
+    const g=(window as any).__pool;g.gs.current=0;
     g.gs.balls.find((b:any)=>b.n===1).potted=true;
     g.ev={firstContact:1,potted:[1],offTable:[],railAfterContact:true,cuePotted:false};g.mode='rolling';
     g.frame();
@@ -698,7 +699,7 @@ test('reracking cancels a prepared opponent stroke before it can fire',async({pa
     g.reset();const state=g.gs;await pending;
     return {strikes,same:g.gs===state,current:g.gs.current,mode:g.mode,action:g.opponentAction};
   });
-  expect(result).toEqual({strikes:0,same:true,current:0,mode:'aim',action:null});
+  expect(result).toMatchObject({strikes:0,same:true,mode:'aim',action:null});expect([0,1]).toContain(result.current);
 });
 
 test('Jev cue presentation uses authoritative placement and strike before final state',async({page})=>{
@@ -745,7 +746,7 @@ test('reduced motion shows a static opponent cue',async({page})=>{
 test('a delayed human Jev response cannot reverse the latched visible shot direction',async({page})=>{
   await openGame(page);
   const state=await page.evaluate(()=>{
-    const g=(window as any).__pool;g.cpuOpponent=true;g.jevOpponent=true;g.jevGame={id:'human-cue',revision:0};
+    const g=(window as any).__pool;g.cpuOpponent=true;g.jevOpponent=true;g.jevGame={id:'human-cue',revision:0};g.gs.current=0;
     g.angle=.35;g.targetAngle=.35+Math.PI;
     return {balls:g.gs.balls,return_order:[],current:1,groups:[null,null],open:true,ball_in_hand:false,
       break_shot:false,placement:'none',kitchen_shot:false,rules:g.gs.rules,revision:1,winner:null,message:'Player 2 to shoot'};
@@ -771,6 +772,25 @@ test('a delayed human Jev response cannot reverse the latched visible shot direc
   expect(await page.evaluate(()=>{const g=(window as any).__pool;return {angle:g.angle,target:g.targetAngle,action:g.opponentAction};})).toEqual({angle:.35,target:.35,action:null});
 });
 
+async function pullPracticeShot(page:Page){
+  await expect(page.locator('.power-control')).toBeVisible();
+  await expect(page.locator('.touch-shot')).not.toBeVisible();
+  const drag=await page.evaluate(()=>{
+    const g=(window as any).__pool;
+    for(let y=160;y<innerHeight-100;y+=20)for(let x=40;x<innerWidth-50;x+=20){
+      const a=g.scene.pickFelt(x,y),b=g.scene.pickFelt(x+25,y+25);
+      if(a&&b&&document.elementFromPoint(x,y)?.id==='game-canvas'&&document.elementFromPoint(x+25,y+25)?.id==='game-canvas'&&Math.hypot(a[0]-b[0],a[1]-b[1])>.03)return{x,y};
+    }
+    throw Error('No exposed felt for pull gesture');
+  });
+  await page.mouse.move(drag.x,drag.y);await page.mouse.down();
+  await expect(page.locator('#tutorialprogress')).toHaveText('Practice · game saved');
+  await page.mouse.move(drag.x+25,drag.y+25,{steps:4});
+  await expect.poll(()=>page.locator('#chargefill').evaluate(e=>parseFloat((e as HTMLElement).style.width))).toBeGreaterThan(0);
+  expect(await page.evaluate(()=>(window as any).__pool.mode)).toBe('aim');
+  await page.mouse.up();
+}
+
 for(const viewport of [{width:320,height:700},{width:390,height:844},{width:844,height:390},{width:1280,height:800}]){
   test(`practice keeps staged targets clear and restores game at ${viewport.width}x${viewport.height}`,async({page})=>{
     await page.setViewportSize(viewport);await openGame(page);
@@ -793,7 +813,7 @@ for(const viewport of [{width:320,height:700},{width:390,height:844},{width:844,
       expect(await page.evaluate(()=>{const g=(window as any).__pool;return !g.cpuOpponent&&!g.jevOpponent&&!g.room&&!g.jevGame;})).toBe(true);
       if(step!=='shot')await page.locator('#tutorialnext').click();
     }
-    await page.locator('#touchshoot').click();
+    await pullPracticeShot(page);
     await expect(page.locator('#tutorialprogress')).toHaveText('Control worked');
     expect(await page.evaluate(()=> (window as any).__pool.mode)).toBe('rolling');
     await page.locator('#tutorialclose').click();
@@ -815,13 +835,14 @@ test('practice touch aiming and profile-specific coaching use real controls',asy
   const cdp=await context.newCDPSession(page);await cdp.send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:5});
   await page.evaluate(()=>{document.documentElement.classList.add('touch-input');(window as any).__pool.tutorial.start();});
   await expect(page.locator('#tutorialbody')).toContainText('one finger');
+  await page.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));
   const p=await page.evaluate(()=>{const g=(window as any).__pool;for(let y=220;y<600;y+=20)for(let x=80;x<300;x+=20)if(document.elementFromPoint(x,y)?.id==='game-canvas'&&g.scene.pickFelt(x,y))return{x,y};throw Error('No exposed felt');});
   await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{...p,id:1}]});
   await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:p.x+20,y:p.y+15,id:1}]});
   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
   await expect(page.locator('#tutorialprogress')).toHaveText('Control worked');
   expect(await page.evaluate(()=>(window as any).__pool.mode)).toBe('aim');
-  await page.locator('#tutorialnext').click();await page.locator('#tutorialnext').click();
+  await touchPracticeControl(page,'#tutorialnext');await expect(page.locator('#tutorial')).toHaveAttribute('data-step','spin');await touchPracticeControl(page,'#tutorialnext');
   await expect(page.locator('#tutorialbody')).toContainText('two fingers');
   await cdp.send('Emulation.setTouchEmulationEnabled',{enabled:false});
   await page.evaluate(()=>document.documentElement.classList.remove('touch-input'));
@@ -830,4 +851,57 @@ test('practice touch aiming and profile-specific coaching use real controls',asy
   await expect(page.locator('#tutorialprogress')).toHaveText('Practice · game saved');
   await page.locator('#camera-input-profile').selectOption('mouse');
   await expect(page.locator('#tutorialbody')).toContainText('Right-drag');
+});
+
+test('accepted placement frames a clear shot without aiming or calling it and respects manual camera input',async({page})=>{
+  await openGame(page);
+  const result=await page.evaluate(()=>{
+    const g=(window as any).__pool,rig=g.scene.cameraRig;
+    for(const b of g.gs.balls)b.potted=true;
+    Object.assign(g.gs.balls[0],{potted:false,x:.9,y:.54});Object.assign(g.gs.balls.find((b:any)=>b.n===1),{potted:false,x:.45,y:.27});
+    Object.assign(g.gs,{breakShot:false,ballInHand:false,groups:['solid','stripe'],open:false,current:0});
+    g.options.autoCamera=true;g.angle=g.targetAngle=.7;g.calledBall=1;g.calledPocket=2;
+    let calls:any[]=[];const frame=rig.frame.bind(rig);rig.frame=(...args:any[])=>{calls.push(args);return frame(...args);};
+    g.frameBalls(false,true);
+    const direct={count:calls.length,points:calls[0][0].length,theta:typeof calls[0][3],angle:g.targetAngle,ball:g.calledBall,pocket:g.calledPocket};
+    g.options.autoCamera=false;g.frameBalls(false,true);const disabled=calls.length;
+    g.options.autoCamera=true;g.cameraMode=true;g.frameBalls(false,true);const manual=calls.length;g.cameraMode=false;
+    g.tutorial.start();g.frameBalls(false,true);const practice=calls.length;g.tutorial.close();
+    const room={ready:true};g.room=room;g.seat=0;
+    const state=()=>({balls:g.gs.balls.map((b:any)=>({...b})),current:0,groups:['solid','stripe'],open:false,return_order:[],ball_in_hand:false,winner:null,message:'Placed',break_shot:false,placement:'none',kitchen_shot:false,rules:g.gs.rules});
+    const pending=()=>{g.gs.ballInHand=true;g.pendingPlacementCamera={revision:rig.revision,seat:0,room,x:.9,y:.54};};
+    pending();rig.cancel(true);g.applyServerState(state());const moved=calls.length;
+    pending();g.applyServerState(state());const accepted=calls.length;
+    g.gs.ballInHand=true;g.applyServerState(state());const unsolicited=calls.length;
+    g.room=null;return{direct,disabled,manual,practice,moved,accepted,unsolicited};
+  });
+  expect(result).toEqual({direct:{count:1,points:4,theta:'number',angle:.7,ball:1,pocket:2},disabled:1,manual:1,practice:1,moved:1,accepted:2,unsolicited:2});
+});
+
+async function touchPracticeControl(page:Page,selector:string){
+  const cdp=await page.context().newCDPSession(page),box=(await page.locator(selector).boundingBox())!;
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:box.x+box.width/2,y:box.y+box.height/2,id:1}]});
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await cdp.detach();
+  // Let the browser finish its touch click/double-tap window before another tap.
+  await page.waitForTimeout(350);
+}
+
+test('practice shot controls follow actual pointer interface and trackpad profile',async({page,context})=>{
+  await openGame(page);await page.evaluate(()=>(window as any).__pool.tutorial.start());
+  for(let i=0;i<3;i++)await page.locator('#tutorialnext').click();
+  await page.locator('#camera-input-profile').selectOption('trackpad');
+  await expect(page.locator('#tutorialbody')).toContainText('Pull farther');
+  await expect(page.locator('.power-control')).toHaveClass(/tutorial-focus/);
+  const cdp=await context.newCDPSession(page);await cdp.send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:5});
+  await page.evaluate(()=>document.documentElement.classList.add('touch-input'));
+  await expect(page.locator('.touch-shot')).toBeVisible();await expect(page.locator('.power-control')).not.toBeVisible();await expect(page.locator('.touch-shot')).toHaveClass(/tutorial-focus/);
+  await expect(page.locator('#tutorialprogress')).toHaveText('Practice · game saved');
+  await page.locator('#touchpower').fill('35');await expect(page.locator('#tutorialprogress')).toHaveText('Practice · game saved');
+  await touchPracticeControl(page,'#touchshoot');await expect(page.locator('#tutorialprogress')).toHaveText('Control worked');
+  await touchPracticeControl(page,'#tutorialback');await touchPracticeControl(page,'#tutorialnext');
+  // A real mouse on a coarse hybrid must override the initial touch default.
+  await page.mouse.move(20,200);await page.mouse.down();await page.mouse.up();
+  await expect(page.locator('#tutorial')).toHaveAttribute('data-profile','trackpad');
+  await expect(page.locator('.power-control')).toHaveClass(/tutorial-focus/);
+  await pullPracticeShot(page);await expect(page.locator('#tutorialprogress')).toHaveText('Control worked');
 });

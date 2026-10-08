@@ -1,0 +1,5 @@
+#accountidentity{display:flex;align-items:center;gap:8px;min-height:44px;min-width:0;max-width:200px;padding:0 12px;background:#302a21;border:1px solid #796748;border-radius:10px;color:#f1e5ce;font-size:14px;flex-shrink:1}
+#accountidentityname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}.accountidentityicon{color:#c4d6a2;font-size:18px}
+#accountidentity:hover{background:#403729;border-color:#b9a178}#accountidentity:focus-visible{outline:2px solid #e7c384;outline-offset:3px}
+@media(min-width:901px){#version::before{font-size:10px;letter-spacing:1px}}
+@media(max-width:900px){#accountidentity{order:0;max-width:calc(100% - 70px);margin-left:auto}.topbar .status-meta{flex:1}.topbar .toolbar{order:1;flex-basis:100%;justify-content:flex-end}.topbar #msg{order:2}}

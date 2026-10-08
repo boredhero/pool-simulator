@@ -13,7 +13,7 @@ export function setupWelcome(startTutorial:()=>void):void {
   const dialog=document.createElement('dialog');dialog.id='welcomedialog';
   dialog.setAttribute('aria-labelledby','welcometitle');
   dialog.innerHTML=`<form id="welcomeform">
-    <header class="welcome-header"><span class="welcome-eyebrow">A table. A little practice. Your next shot.</span><h1 id="welcometitle" tabindex="-1" autofocus>Welcome to Play Pool</h1><p>Play solo, challenge the CPU, or invite a friend. Sign in when you’re ready to meet Jev AI.</p></header>
+    <header class="welcome-header"><span class="welcome-eyebrow">A table. A little practice. Your next shot.</span><h1 id="welcometitle" tabindex="-1" autofocus>Welcome to Pool Simulator</h1><p>Play solo, challenge the CPU, or invite a friend. Sign in when you’re ready to meet Jev AI.</p></header>
     <div class="welcome-body">
       <section class="welcome-practice"><strong>Start with a quick practice</strong><p>Get comfortable with aiming, spin, your camera, and shooting before your first game.</p><p id="welcomeinvite" hidden>Your invite is ready in Online. You can practice first or go straight to joining your friend.</p></section>
       <label id="welcomeprofilelabel" class="welcome-profile">Your controls<select id="welcomeprofile"><option value="mouse">Mouse &amp; Keyboard Mode</option><option value="trackpad">Trackpad Mode</option></select></label>
@@ -30,7 +30,7 @@ export function setupWelcome(startTutorial:()=>void):void {
   const get=<T extends HTMLElement=HTMLElement>(id:string)=>dialog.querySelector<T>('#'+id)!;
   const agreement=get<HTMLInputElement>('welcometerms'),analytics=get<HTMLInputElement>('welcomeanalytics');
   const profile=get<HTMLSelectElement>('welcomeprofile'),primary=get<HTMLButtonElement>('welcometutorial'),secondary=get<HTMLButtonElement>('welcomeplay');
-  const touch=matchMedia('(pointer:coarse)').matches||document.documentElement.classList.contains('touch-input');
+  const touch=document.documentElement.classList.contains('touch-input');
   if(touch)document.documentElement.classList.add('touch-input');
   const cameraProfile=document.getElementById('camera-input-profile') as HTMLSelectElement|null;
   profile.value=cameraProfile?.value??'mouse';

@@ -38,8 +38,11 @@ export function setupCameraFly(rig: CameraRig): void {
   const profileHint=document.createElement('span');profileHint.id='camera-input-hint';
   profile.setAttribute('aria-describedby',profileHint.id);
   const updateHint=()=>{profileHint.textContent=profile.value==='trackpad'?'Scroll to orbit · pinch to zoom · Option-scroll to pan':'Right-drag to orbit · scroll to zoom · Alt-scroll to pan';};
-  updateHint();header.append(profile,toggle);pad.append(profileHint);
-  document.body.append(hud);
+  updateHint();header.append(toggle);pad.append(profileHint);
+  const profileDock=document.createElement('aside');profileDock.id='camera-profile-dock';profileDock.setAttribute('aria-label','Camera input');
+  const profileLabel=document.createElement('label');profileLabel.htmlFor=profile.id;profileLabel.textContent='Controls';
+  profileDock.append(profileLabel,profile);
+  document.body.append(hud,profileDock);
 
   const keys = new Set<string>();
   const vectors: Record<string, [number, number, number, number]> = { KeyW:[1,0,0,0], KeyS:[-1,0,0,0], KeyA:[0,-1,0,0], KeyD:[0,1,0,0], Space:[0,0,1,0], ShiftLeft:[0,0,-1,0], KeyQ:[0,0,0,1], KeyE:[0,0,0,-1] };

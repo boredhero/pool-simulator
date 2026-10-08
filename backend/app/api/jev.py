@@ -20,6 +20,7 @@ from app.api.privacy import require_terms
 from app.models.db import JevGame, JevUsage, Session
 from app.net.rooms import Room
 from app.services.auth import current_account, digest, mutation_guard, rate_limit
+from app.sim import opening
 from app.sim.cue import cue_elevation
 from app.sim.physics import Ball, simulate_shot, strike
 from app.sim.planner import plan_shots
@@ -102,12 +103,13 @@ def decode(raw):
     return GameState(**state)
 
 
-def public_game(game, premium=False):
+def public_game(game, premium=False, *, created=False):
     state = Room(code="", gs=decode(game.state)).state_msg()
     state["names"] = ["Player 1", "Jev AI"]
     state["revision"] = game.revision
     return {
         "id": game.id,
+        "created": created,
         "state": state,
         "status": game.status,
         "expiresAt": None if premium or game.day is None else (game.day + 1) * 86400,
@@ -191,6 +193,9 @@ async def start_game(
         count = db.scalar(select(func.count()).select_from(JevGame).where(JevGame.day == day))
         if not premium and count >= 100:
             raise HTTPException(429, "Today's Jev capacity is full. CPU remains available.")
+        state = new_game(secrets.randbelow(2**30))
+        state.current = opening.choose_breaker()
+        state.message = f"Player {state.current + 1} breaks — coin toss"
         game = JevGame(
             id=secrets.token_hex(16),
             account_id=account["id"],
@@ -198,7 +203,7 @@ async def start_game(
             network_hash=network_key(request),
             started_at=now,
             updated_at=now,
-            state=json.dumps(asdict(new_game(secrets.randbelow(2**30)))),
+            state=json.dumps(asdict(state)),
             status="active",
             revision=0,
         )
@@ -209,7 +214,7 @@ async def start_game(
             raise HTTPException(
                 409, "A daily game was already started. Refresh to resume."
             ) from None
-        return public_game(game, premium)
+        return public_game(game, premium, created=True)
 
 
 def decision_context(gs: GameState) -> dict:

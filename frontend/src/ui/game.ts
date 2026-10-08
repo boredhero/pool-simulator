@@ -1,4 +1,7 @@
+import {CoinToss,randomBreaker} from './coinToss';
+import {placementLane} from './placementCamera';
 import type { PerspectiveCamera } from 'three';
+import { WinnerDialog } from './winner';
 import { animateOpponentCue, cuePresentation, freezeShot, type SelectedShot, type CuePhase } from './opponentCue';
 import { Tutorial, type TutorialAction } from './tutorial';
 import { practiceTable } from './tutorialPractice';
@@ -44,6 +47,9 @@ const freshEv = (): ShotEvents => ({
 
 export class Game {
   tutorial = new Tutorial();
+  coin = new CoinToss();
+  private coinRooms=new WeakSet<RoomClient>();
+  winnerDialog = new WinnerDialog(()=>this.restartAfterWin());
   gs: GameState;
   options: TableOptions;
   calledBall: number | null = null;
@@ -97,6 +103,7 @@ export class Game {
   constructor(canvas: HTMLCanvasElement) {
     this.scene = init(canvas);
     this.gs = newGame(1);
+    this.queueLocalCoin();
     this.el = Object.fromEntries(
       ['msg', 'turn', 'version', 'onlinebtn', 'onlinepanel', 'pname', 'rcode', 'createbtn', 'joinbtn',
         'roominfo', 'chargefill', 'spin', 'cpubtn', 'jevbtn', 'opponentstatus', 'rack', 'settingsbtn', 'settingspanel',
@@ -109,7 +116,7 @@ export class Game {
     this.accountPanel=new AccountPanel(()=>!!this.room,account=>{
       this.account=account;
       if (!account && this.jevOpponent) {
-        this.cancelOpponent();
+        this.coin.cancel();this.cancelOpponent();
         this.jevRequest?.abort(); this.jevRequest=null;this.jevGame=null;
         this.jevOpponent=false; this.cpuOpponent=true;
         this.el.jevbtn.classList.remove('on');this.el.jevbtn.setAttribute('aria-pressed','false');
@@ -210,7 +217,15 @@ export class Game {
     this.practiceCameraPose=[...camera.position.toArray(),...this.scene.controls.target.toArray()];
   }
 
-  reset(rules: MatchConfig = this.gs.rules): void {
+  private queueLocalCoin():void {
+    this.gs.current=randomBreaker();this.gs.message=`Player ${this.gs.current+1} to break`;
+    this.coin.queue(this.gs,this.gs.current);
+  }
+
+  coinPending():boolean {return !this.tutorial.active&&this.coin.pending(this.gs);}
+  get openingBusy():boolean {return this.coinPending();}
+
+  reset(rules: MatchConfig = this.gs.rules,toss=true): void {
     if(this.tutorial.active)this.tutorial.close();
     if (this.room) return;
     this.cancelOpponent();this.pendingNetwork=[];
@@ -222,7 +237,9 @@ export class Game {
       this.el.jevbtn.classList.remove('on');this.el.jevbtn.setAttribute('aria-pressed','false');
     }
     this.el.opponentstatus.textContent = '';
+    this.coin.cancel();
     this.gs = newGame((Math.random() * 1e9) | 0, rules);
+    if(toss)this.queueLocalCoin();
     this.cameraShotPending=false;this.scene.cameraRig.cancel();
     this.mode = 'aim'; this.pulling = false; this.pressPt = null;
     this.angle=this.targetAngle=0;
@@ -236,7 +253,7 @@ export class Game {
   }
 
   humanCueControls():boolean {
-    return !this.opponentAction&&!this.jevRequest&&this.gs.winner===null
+    return !this.coinPending()&&!this.opponentAction&&!this.jevRequest&&this.gs.winner===null
       && (this.mode==='aim'||this.mode==='place')
       && (this.room?this.room.ready&&this.seat===this.gs.current:!this.cpuOpponent||this.gs.current===0);
   }
@@ -310,7 +327,7 @@ export class Game {
   }
 
   canShoot(): boolean {
-    if (this.mode !== 'aim' || this.gs.winner !== null) return false;
+    if (this.coinPending()||this.mode !== 'aim' || this.gs.winner !== null) return false;
     if (this.room && (!this.room.ready || this.seat !== this.gs.current)) return false;
     return true;
   }
@@ -329,7 +346,14 @@ export class Game {
     return Math.min(1, d / PULL_FULL);
   }
 
-  frameBalls(whole=false): void {
+  private pendingPlacementCamera:{revision:number;seat:number;room:RoomClient;x:number;y:number}|null=null;
+
+  frameBalls(whole=false,placement=false): void {
+    if(placement){
+      if(this.tutorial.active||!this.options.autoCamera||this.cameraMode||this.scene.cameraRig.interacting)return;
+      const lane=placementLane(this.gs);
+      if(lane){this.scene.cameraRig.frame([lane.cue,lane.ghost,lane.object,lane.pocket],lane.cue,[],lane.theta);return;}
+    }
     const eligible=legalTargets(this.gs);
     const targets=this.gs.balls.filter(b=>!b.potted&&b.n!==null&&eligible.includes(b.n));
     const points=this.gs.balls.filter(b=>!b.potted&&(whole||b.n===null||eligible.includes(b.n))).map(b=>({x:b.x,y:b.y}));
@@ -338,7 +362,7 @@ export class Game {
       for(const x of [0,edge])for(const y of [0,TABLE_H])points.push({x,y});
     }
     const facing=this.scene.cameraRig.frame(points,!whole&&!this.gs.ballInHand&&!this.cue().potted?this.cue():undefined,targets);
-    if(facing!==undefined&&this.humanTurn()&&!this.pulling)
+    if(!placement&&facing!==undefined&&this.humanTurn()&&!this.pulling)
       this.targetAngle=Math.atan2(-Math.cos(facing),-Math.sin(facing));
   }
 
@@ -372,10 +396,13 @@ export class Game {
     const tryPlace = (cx: number, cy: number) => {
       if(!this.humanCueControls())return;
       if (this.room) {
-        if (this.seat === this.gs.current) this.room.place(cx, cy);
+        if (this.seat === this.gs.current) {
+          this.pendingPlacementCamera={revision:this.scene.cameraRig.revision,seat:this.seat,room:this.room,x:cx,y:cy};
+          this.room.place(cx, cy);
+        }
       } else if (placeCue(this.gs, cx, cy)) {
         this.mode = 'aim';
-        if(this.options.autoCamera)this.frameBalls();
+        this.frameBalls(false,true);
       }
       this.hud();
     };
@@ -561,6 +588,7 @@ export class Game {
 
   async startJev(fresh=false): Promise<void> {
     if(this.tutorial.active)return;
+    this.coin.cancel();
     if(fresh){this.cancelOpponent();this.jevRequest?.abort();this.jevRequest=null;}
     if(this.jevRequest)return;
     this.cancelOpponent();
@@ -569,7 +597,7 @@ export class Game {
     try {
       const game=await jevRequest('/games',fresh?{new_game:true}:{},controller.signal);
       if(controller.signal.aborted||this.room)return;
-      this.reset();
+      this.reset(this.gs.rules,false);
       this.pendingNetwork=[];
       this.jevOpponent=true;this.cpuOpponent=true;
       this.jevGame={id:game.id,revision:game.state.revision};
@@ -577,6 +605,7 @@ export class Game {
       this.el.cpubtn.classList.remove('on');this.el.cpubtn.setAttribute('aria-pressed','false');
       this.el.cpubtn.textContent='Play vs CPU';
       this.applyJevState(game.state);
+      if(game.created===true)this.coin.queue(this.gs,this.gs.current);
       this.el.opponentstatus.textContent=game.expiresAt===null
         ? 'Premium · Unlimited Jev AI · New rack starts another game'
         : 'Daily Jev game · resets at midnight UTC · select Jev again to resume';
@@ -593,7 +622,7 @@ export class Game {
   }
 
   async playJevTurn(power?: number): Promise<void> {
-    if(!this.jevGame||this.jevRequest||this.opponentAction)return;
+    if(this.coinPending()||!this.jevGame||this.jevRequest||this.opponentAction)return;
     const game=this.jevGame,state=this.gs,generation=this.opponentGeneration;
     const controller=new AbortController();this.jevRequest=controller;
     const opponent=power===undefined,action=opponent?this.beginOpponent():null;
@@ -602,21 +631,28 @@ export class Game {
     const cue=this.cue();
     const shot=opponent?undefined:{aim:this.angle,power,tipX:this.tipX,tipY:this.tipY,
       calledBall:this.calledBall,calledPocket:this.calledPocket,x:cue.x,y:cue.y};
-    this.el.opponentstatus.textContent=shot?'Checking your shot…':'Jev AI is choosing a shot…';
+    this.el.opponentstatus.textContent=shot?'Your shot · syncing with the server…':'Jev AI is choosing a shot…';
+    // Predict a human stroke immediately, as online rooms do. Only the server
+    // result may advance the turn, award a win, or allow the next shot.
+    if(shot){
+      this.jevPlayback=true;
+      try {this.fire(shot.power);} finally {this.jevPlayback=false;}
+    }
     try {
       const result=await jevRequest(`/games/${game.id}/turn`,{revision:game.revision,shot},controller.signal);
       if(!valid())return;
-      const selected=freezeShot({...result.shot,placement:result.placement});
-      if(opponent && !await this.showOpponentShot(selected,valid))return;
-      if(!valid())return;
-      if(this.opponentAction===action)this.opponentAction=null;
-      Object.assign(cue,{x:selected.placement.x,y:selected.placement.y,potted:false});
-      this.gs.ballInHand=false;this.mode='aim';
-      this.angle=this.targetAngle=selected.aim;
-      this.calledBall=selected.calledBall;this.calledPocket=selected.calledPocket;
-      this.setSpin(selected.tipX,selected.tipY,true);
-      this.jevPlayback=true;
-      try {this.fire(selected.power,selected.vmax,selected.elevation);} finally {this.jevPlayback=false;}
+      if(opponent){
+        const selected=freezeShot({...result.shot,placement:result.placement});
+        if(!await this.showOpponentShot(selected,valid)||!valid())return;
+        if(this.opponentAction===action)this.opponentAction=null;
+        Object.assign(cue,{x:selected.placement.x,y:selected.placement.y,potted:false});
+        this.gs.ballInHand=false;this.mode='aim';
+        this.angle=this.targetAngle=selected.aim;
+        this.calledBall=selected.calledBall;this.calledPocket=selected.calledPocket;
+        this.setSpin(selected.tipX,selected.tipY,true);
+        this.jevPlayback=true;
+        try {this.fire(selected.power,selected.vmax,selected.elevation);} finally {this.jevPlayback=false;}
+      }
       this.pendingNetwork.push(()=>{if(valid())this.applyJevState(result.state);});
       this.el.opponentstatus.textContent=result.source==='jev'?`Jev AI selected a ${result.family??'planned'} shot`:
         result.source==='cpu-fallback'?'Jev AI unavailable or capacity reached · CPU took this shot':
@@ -624,7 +660,7 @@ export class Game {
         result.expiresAt===null?'Premium · Unlimited Jev AI':'Daily Jev game';
     } catch(error) {
       if(valid()){
-        this.mode='wait';
+        if(this.mode!=='rolling')this.mode='wait';
         this.el.opponentstatus.textContent=(error instanceof Error?error.message:'Connection lost')+' Select Jev AI to resume.';
       }
     } finally {
@@ -661,7 +697,7 @@ export class Game {
   }
 
   async cpuMove(): Promise<void> {
-    if(this.jevRequest||this.opponentAction||!this.cpuOpponent||this.gs.current!==1
+    if(this.coinPending()||this.jevRequest||this.opponentAction||!this.cpuOpponent||this.gs.current!==1
       ||this.room||this.gs.winner!==null||!['aim','place'].includes(this.mode))return;
     if(this.jevGame){await this.playJevTurn();return;}
     const state=this.gs,generation=this.opponentGeneration,action=this.beginOpponent();
@@ -695,6 +731,10 @@ export class Game {
     const fnow = performance.now();
     const fdt = this.lastFrame ? Math.min((fnow - this.lastFrame) / 1000, 0.1) : 0.016;
     this.lastFrame = fnow;
+    const coinPoint=this.scene.controls.object.position.clone().set(0,.03,0).project(this.scene.controls.object);
+    const canvasRect=this.scene.renderer.domElement.getBoundingClientRect();
+    this.coin.update(this.gs,fdt,this.tutorial.active||document.hidden||!!document.querySelector('dialog[open]'),[this.playerName(0),this.playerName(1)],
+      {x:canvasRect.left+(coinPoint.x+1)*canvasRect.width/2,y:canvasRect.top+(1-coinPoint.y)*canvasRect.height/2});
     let ballDt = fdt;
     for (const b of this.gs.balls) {
       if (b.potted) continue;
@@ -708,7 +748,7 @@ export class Game {
       }
       this.lastSpeed.set(b.id, v);
     }
-    if (!this.opponentAction && (this.mode === 'aim' || this.mode === 'place') && this.cpuOpponent && this.gs.current === 1 && this.gs.winner === null && !this.room) {
+    if (!this.coinPending()&&!this.opponentAction && (this.mode === 'aim' || this.mode === 'place') && this.cpuOpponent && this.gs.current === 1 && this.gs.winner === null && !this.room) {
       this.cpuTimer += fdt;
       if (this.cpuTimer > 1.2) {
         this.cpuTimer = 0;
@@ -739,7 +779,7 @@ export class Game {
             },
           );
           this.mode = 'wait';
-        } else if (!this.room) {
+        } else if (!this.room && !this.jevGame) {
           applyShot(this.gs, this.ev);
           this.calledBall = this.calledPocket = null;
           this.mode = this.gs.winner !== null ? 'over' : this.gs.ballInHand ? 'place' : 'aim';
@@ -749,7 +789,7 @@ export class Game {
         this.hud();
       }
     }
-    if (this.mode !== 'rolling') {
+    if (this.mode !== 'rolling'&&!this.coinPending()) {
       document.getElementById('playbackstate')!.textContent='';
       // Results and following shots can arrive before this client's slower playback.
       while(this.pendingNetwork.length) {
@@ -803,10 +843,31 @@ export class Game {
     } else {
       this.scene.setPlace(false, 0, 0, false);
     }
+    this.showWinner();
   }
 
   playerName(seat:number): string {
-    return this.roomNames?.[seat] ?? (seat===1 && this.cpuOpponent && !this.room ? (this.jevOpponent ? 'Jev AI' : 'CPU') : `Player ${seat+1}`);
+    return this.roomNames?.[seat] ?? (seat===1 && this.cpuOpponent && !this.room ? (this.jevOpponent ? 'Jev AI' : 'CPU') : seat===0&&!this.room&&this.account?this.account.username:`Player ${seat+1}`);
+  }
+
+  private showWinner():void {
+    if(this.tutorial.active||this.mode!=='over'||this.gs.winner===null){this.winnerDialog.sync(null);return;}
+    if(this.opponentAction||this.jevRequest||this.pendingNetwork.length||!allAsleep(this.gs.balls))return;
+    const online=!!this.room,jev=!!this.jevGame;
+    this.winnerDialog.sync({game:this.gs,name:this.playerName(this.gs.winner),
+      detail:this.gs.message.replace(/\bPlayer ([12])\b/g,(_,seat)=>this.playerName(Number(seat)-1)),
+      action:online?'New online session':jev?(this.account?.premium?'Play Jev again':'Play a local rack'):'Play again',
+      note:online?'Start a fresh room and share its new invite with your friend.':jev&&!this.account?.premium?'Your daily Jev game is complete. You can keep playing locally.':''});
+  }
+
+  private async restartAfterWin():Promise<void> {
+    if(this.room){
+      this.leaveRoom('Starting a new online session.');
+      this.el.onlinepanel.classList.add('open');this.connectRoom(true);
+    } else if(this.jevGame&&this.account?.premium){
+      const previous=this.jevGame.id;await this.startJev(true);
+      if(this.jevGame?.id===previous)throw new Error(this.el.opponentstatus.textContent||'Could not start another Jev game.');
+    } else this.reset();
   }
 
   hud(): void {
@@ -906,6 +967,7 @@ export class Game {
   applyServerState(s: RoomState): void {
     this.cancelOpponent();
     const wasPlacing=this.gs.ballInHand;
+    const placementCamera=this.pendingPlacementCamera;this.pendingPlacementCamera=null;
     for (const sb of s.balls) {
       const b = this.gs.balls.find((q) => q.id === sb.id);
       if (!b) continue;
@@ -927,7 +989,11 @@ export class Game {
     this.gs.message = s.message;
     this.mode = s.winner !== null ? 'over' : s.ball_in_hand && s.current === this.seat ? 'place' : 'aim';
     this.pulling = false; this.pressPt = null;
-    if(wasPlacing&&!s.ball_in_hand&&s.winner===null&&this.options.autoCamera&&!this.cameraMode)this.frameBalls();
+    if(wasPlacing&&!s.ball_in_hand&&s.winner===null&&placementCamera&&placementCamera.room===this.room&&Math.hypot(this.cue().x-placementCamera.x,this.cue().y-placementCamera.y)<.002&&placementCamera.seat===this.seat&&s.current===this.seat&&placementCamera.revision===this.scene.cameraRig.revision)this.frameBalls(false,true);
+    const toss=s as RoomState&{break_starter?:number|null};
+    if(this.room&&!this.coinRooms.has(this.room)&&s.ready&&s.revision===0&&(toss.break_starter===0||toss.break_starter===1)){
+      this.coinRooms.add(this.room);this.coin.queue(this.gs,toss.break_starter);
+    }
     this.lastPotted = this.gs.balls.filter((b) => b.potted).length;
     this.lastSpeed.clear();
     this.hud();
@@ -952,7 +1018,7 @@ export class Game {
     }
     this.jevRequest?.abort();this.jevRequest=null;this.jevGame=null;this.jevOpponent=false;
     this.el.opponentstatus.textContent="";
-    this.cancelOpponent();
+    this.cancelOpponent();this.coin.cancel();
     const rc = new RoomClient();
     this.room = rc;
     this.seat = null;
@@ -962,7 +1028,7 @@ export class Game {
       const link=new URL('/',location.href);link.hash='join='+rc.code;
       (document.getElementById('roomlink') as HTMLInputElement).value=link.href;
     };
-    rc.onState = s => { if(this.mode==='rolling' || this.pendingNetwork.length)this.pendingNetwork.push(()=>handleState(s)); else handleState(s); };
+    rc.onState = s => { if(this.coinPending()||this.mode==='rolling' || this.pendingNetwork.length)this.pendingNetwork.push(()=>handleState(s)); else handleState(s); };
     const handleShot: typeof rc.onShot = (by, shot) => {
       if (by === this.seat) return;
       const c = this.cue();
@@ -978,7 +1044,7 @@ export class Game {
       this.cameraShotPending=true;this.cameraShotRevision=this.scene.cameraRig.revision; this.lastT = 0; this.accumulator = 0;
       this.hud();
     };
-    rc.onShot = (by,shot) => { if(by===this.seat)return; if(this.mode==='rolling' || this.pendingNetwork.length)this.pendingNetwork.push(()=>handleShot(by,shot)); else handleShot(by,shot); };
+    rc.onShot = (by,shot) => { if(by===this.seat)return; if(this.coinPending()||this.mode==='rolling' || this.pendingNetwork.length)this.pendingNetwork.push(()=>handleShot(by,shot)); else handleShot(by,shot); };
     rc.onError = (e) => {if(!rc.code)this.leaveRoom(e);else this.el.msg.textContent=e;this.el.roominfo.textContent=e;};
     rc.onClose = message=>{if(this.room===rc)this.leaveRoom(message);};
     rc.onJoined = (names) => { this.roomNames = names; this.hud(); };

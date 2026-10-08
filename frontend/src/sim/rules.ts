@@ -75,6 +75,8 @@ export function applyShot(gs: GameState, ev: ShotEvents, before = gs.shot ?? beg
   for (const n of ev.potted) if (!gs.returnOrder.includes(n)) gs.returnOrder.push(n);
   const me = before.current, other = (1 - me) as 0 | 1;
   const onEight = !before.open && before.group !== null && before.remaining.length === 0;
+  const tournament = gs.rules.preset === 'tournament';
+  const breakOff = tournament && before.breakShot && ev.offTable.length > 0;
   const eightDown = ev.potted.includes(8), eightOff = ev.offTable.includes(8);
   const scratch = ev.cuePotted || ev.offTable.includes(null);
   let foul: string | null = null;
@@ -83,12 +85,12 @@ export function applyShot(gs: GameState, ev: ShotEvents, before = gs.shot ?? beg
   if (!foul && before.kitchen && (ev.firstContactX ?? TABLE_W) < TABLE_W / 4 && !ev.cueLeftKitchen) foul = 'The cue ball must leave the kitchen first';
   if (!foul && !ev.potted.length && !ev.railAfterContact) foul = 'No rail after contact';
   if (!foul && scratch) foul = 'Scratch';
-  if (!foul && ev.offTable.length) foul = 'Ball off the table';
+  if ((!foul || tournament) && ev.offTable.length) foul = 'Ball off the table';
   const called = before.calledBall !== null && ev.pockets?.some(p => p.n === before.calledBall && p.pocket === before.calledPocket);
   const eightCalled = gs.rules.calls === 'none' || (before.calledBall === 8 && called);
-  const spotBreakEight = before.breakShot && eightDown && gs.rules.eightOnBreak === 'spot';
+  const spotBreakEight = before.breakShot && (eightDown || (tournament && eightOff)) && gs.rules.eightOnBreak === 'spot';
   if (spotBreakEight) spotBall(gs, 8);
-  if (eightOff || (onEight && scratch && gs.rules.scratchOnEightLoss) || (eightDown && !spotBreakEight && !(before.breakShot && !foul) && !(onEight && !foul && eightCalled))) {
+  if ((eightOff && !spotBreakEight) || (onEight && scratch && gs.rules.scratchOnEightLoss) || (eightDown && !spotBreakEight && !(before.breakShot && !foul) && !(onEight && !foul && eightCalled))) {
     gs.winner = other; gs.message = `Player ${other + 1} wins — ${foul ?? (onEight ? '8-Ball in the wrong pocket' : 'early 8-Ball')}`; return gs;
   }
   if (eightDown && before.breakShot && !foul) {
@@ -97,16 +99,19 @@ export function applyShot(gs: GameState, ev: ShotEvents, before = gs.shot ?? beg
   } else if (eightDown && onEight && !foul && eightCalled) {
     gs.winner = me; gs.message = `Player ${me + 1} wins!`; return gs;
   }
-  if (before.breakShot && gs.rules.strictBreak && !ev.potted.length && (ev.objectRails?.length ?? 0) < 4) {
+  if (before.breakShot && gs.rules.strictBreak && !breakOff && !ev.potted.length && (ev.objectRails?.length ?? 0) < 4) {
     const options = gs.rules;
     Object.assign(gs, newGame(1, options)); gs.current = other; gs.message = `Illegal break — reracked for Player ${other + 1}`;
     return gs;
   }
-  for (const n of ev.offTable) if (n !== null && n !== 8) spotBall(gs, n);
+  for (const n of ev.offTable) if (n !== null && n !== 8) {
+    if (tournament) { if (!gs.returnOrder.includes(n)) gs.returnOrder.push(n); }
+    else spotBall(gs, n);
+  }
   gs.breakShot = false; gs.kitchenShot = false;
   if (foul) {
     gs.current = other;
-    const zone = scratch && (gs.rules.scratch === 'kitchen' || before.breakShot) ? 'kitchen' : 'anywhere';
+    const zone = breakOff || (scratch && (gs.rules.scratch === 'kitchen' || before.breakShot)) ? 'kitchen' : 'anywhere';
     grantPlacement(gs, zone);
     gs.message = `Foul: ${foul} · Player ${other + 1}, place ${zone === 'kitchen' ? 'behind the head string' : 'anywhere'}`;
     return gs;
@@ -137,4 +142,4 @@ export function placeCue(gs: GameState, x: number, y: number): boolean {
   gs.kitchenShot = gs.placement === 'kitchen'; gs.ballInHand = false; gs.placement = 'none';
   return true;
 }
-export const eightBall: Ruleset<GameState, ShotContext> = { id: 'eight-ball', version: 1, create: newGame, begin: beginShot, resolve: applyShot, targets: legalTargets, canPlace };
+export const eightBall: Ruleset<GameState, ShotContext> = { id: 'eight-ball', version: 2, create: newGame, begin: beginShot, resolve: applyShot, targets: legalTargets, canPlace };

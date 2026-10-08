@@ -1,5 +1,19 @@
 [
   {
+    "version": "0.9.4",
+    "date": "2026-10-08",
+    "title": "Clearer views, account access and winning moments",
+    "changes": [
+      "After cue-ball placement, automatic camera framing can find a clear legal shot lane and show the cue, target and pocket without changing the shot or called pocket.",
+      "Signed-in usernames and account settings are visible from the main HUD. The refined mouse/trackpad selector sits above legal controls, and the app is named Pool Simulator.",
+      "Completed racks show the winner, a brief reduced-motion-aware confetti celebration and replay actions for local, CPU, Jev and online sessions.",
+      "Fixed an airborne jaw collision and added mirrored flight regressions. Tournament off-table objects stay out; the 8 off on the break is spotted with opponent kitchen placement. Bar keeps its house rules.",
+      "The tutorial teaches the actual selected interface: mouse/trackpad pull-and-release with the live power bar, or touch power and Shoot controls.",
+      "A denarius coin toss chooses the opening player in local, CPU, Jev and online games. Server games keep their chosen breaker on resume.",
+      "Human shots against Jev start moving immediately while the server validates and resolves the shot. Delayed results reconcile after playback without a second strike."
+    ]
+  },
+  {
     "version": "0.9.3",
     "date": "2026-10-08",
     "title": "Welcome flow and guided practice",
