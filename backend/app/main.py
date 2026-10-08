@@ -45,7 +45,9 @@ async def lifespan(app: FastAPI):
             await maintenance
 
 
-app = FastAPI(title="pool-simulator", lifespan=lifespan)
+app = FastAPI(
+    title="pool-simulator", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None
+)
 app.add_middleware(BodyLimit)
 app.include_router(router, prefix="/api")
 app.include_router(jev_router, prefix="/api")
@@ -105,7 +107,12 @@ if DIST.exists():
 
     @app.get("/{full_path:path}")
     def spa(full_path: str = ""):
-        if full_path.startswith("api/"):
+        if full_path.startswith("api/") or full_path.rstrip("/") in {
+            "docs",
+            "docs/oauth2-redirect",
+            "redoc",
+            "openapi.json",
+        }:
             raise HTTPException(404, "Not found")
         f = (DIST / full_path).resolve()
         if not f.is_relative_to(DIST.resolve()):
