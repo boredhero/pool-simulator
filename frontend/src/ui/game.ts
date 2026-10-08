@@ -1,8 +1,9 @@
+import { advancePlayback } from './playback';
 import { sightStyle } from '../render/railSights';
 import { cueElevation } from '../sim/cue';
 import { type MatchConfig } from '../sim/config';
 import { TableOptions } from './tableOptions';
-import { allAsleep, DT, step, strike, type Ball, type ShotEvents } from '../sim/physics';
+import { allAsleep, strike, type Ball, type ShotEvents } from '../sim/physics';
 import { applyShot, beginShot, callRequired, canPlace, legalTargets, newGame, placeCue, type GameState } from '../sim/rules';
 import { breakShot, chooseShot } from '../sim/ai';
 import { Sfx } from './sfx';
@@ -58,6 +59,8 @@ export class Game {
   sfx = new Sfx();
   lastSpeed = new Map<number, number>();
   lastPotted = 0;
+  lastLiveFacts = '';
+  pendingNetwork: Array<() => void> = [];
   lastT = 0;
   lastFrame = 0;
   pulling = false;
@@ -325,6 +328,7 @@ export class Game {
     const fnow = performance.now();
     const fdt = this.lastFrame ? Math.min((fnow - this.lastFrame) / 1000, 0.1) : 0.016;
     this.lastFrame = fnow;
+    let ballDt = fdt;
     for (const b of this.gs.balls) {
       if (b.potted) continue;
       const v = Math.hypot(b.vx, b.vy);
@@ -337,14 +341,6 @@ export class Game {
       }
       this.lastSpeed.set(b.id, v);
     }
-    const potted = this.gs.balls.filter((b) => b.potted).length;
-    if (potted > this.lastPotted) {
-      this.sfx.pot();
-      this.renderScorecard();
-      const names = this.ev.potted.map(n => String(n)).join(', ');
-      if (this.mode === 'rolling') this.el.msg.textContent = this.ev.cuePotted ? 'Scratch · waiting for the balls to stop' : `Pocketed ${names || 'ball'} · balls still rolling`;
-    }
-    this.lastPotted = potted;
     if ((this.mode === 'aim' || this.mode === 'place') && this.aiOpponent && this.gs.current === 1 && this.gs.winner === null && !this.room) {
       this.aiTimer += 1 / 60;
       if (this.aiTimer > 1.2) {
@@ -357,15 +353,14 @@ export class Game {
     if (this.mode === 'rolling') {
       const now = performance.now();
       if (!this.lastT) this.lastT = now;
-      let acc = this.accumulator + Math.min((now - this.lastT) / 1000, 0.25);
+      const elapsed = Math.min((now - this.lastT) / 1000, .25);
       this.lastT = now;
-      let n = 0;
-      while (acc >= DT && !allAsleep(this.gs.balls) && n < 60) {
-        step(this.gs.balls, DT, this.ev, 0, this.contact);
-        acc -= DT;
-        n++;
-      }
-      this.accumulator = acc;
+      const playback = advancePlayback(this.gs.balls,this.ev,this.contact,this.accumulator+elapsed,this.options.fastForward);
+      this.accumulator = playback.remaining;
+      ballDt = playback.simulated;
+      const badge=document.getElementById('playbackstate')!;
+      const caption=playback.accelerated ? 'Fast-forwarding · 4×' : '';
+      if(badge.textContent!==caption)badge.textContent=caption;
       if (allAsleep(this.gs.balls)) {
         if (this.room && this.whoShot === this.seat) {
           this.room.done(
@@ -387,8 +382,24 @@ export class Game {
         this.hud();
       }
     }
+    if (this.mode !== 'rolling') {
+      document.getElementById('playbackstate')!.textContent='';
+      // Results and following shots can arrive before this client's slower playback.
+      while(this.pendingNetwork.length) {
+        this.pendingNetwork.shift()!();
+        if ((this.mode as Mode) === 'rolling') break;
+      }
+    }
+    const potted=this.gs.balls.filter(b=>b.potted).length;
+    if(potted>this.lastPotted)this.sfx.pot();
+    this.lastPotted=potted;
+    const liveFacts=JSON.stringify([this.mode,this.ev.potted,this.ev.cuePotted,this.ev.offTable,this.ev.firstContact,this.ev.railAfterContact]);
+    if(liveFacts!==this.lastLiveFacts) {
+      this.lastLiveFacts=liveFacts;this.renderScorecard();
+      if(this.mode==='rolling' && (this.ev.potted.length || this.ev.cuePotted))this.el.msg.textContent=this.ev.cuePotted?'Scratch · balls still rolling':`Pocketed ${this.ev.potted.join(', ')} · balls still rolling`;
+    }
     const returnOrder = [...new Set([...this.gs.returnOrder, ...(this.mode === 'rolling' || this.mode === 'wait' ? this.ev.potted : [])])].filter(n => this.gs.balls.some(b => b.n === n && b.potted));
-    this.scene.setBalls(this.gs.balls, fdt, returnOrder);
+    this.scene.setBalls(this.gs.balls, ballDt, returnOrder);
     // Ease aim toward target (kills mouse jitter twitch), frame-rate independent.
     {
       let d = this.targetAngle - this.angle;
@@ -441,10 +452,18 @@ export class Game {
       'Player 1',
       this.aiOpponent ? 'AI' : 'Player 2',
     ];
+    const live=this.mode==='rolling' || this.mode==='wait';
+    let displayedGroups=this.gs.groups;
+    if(live && this.gs.open && this.gs.shot && this.ev.potted.length) {
+      const preview:GameState={...this.gs,groups:[...this.gs.groups],returnOrder:[...this.gs.returnOrder],balls:this.gs.balls.map(b=>({...b}))};
+      applyShot(preview,this.ev,this.gs.shot);
+      displayedGroups=preview.groups;
+    }
     for (const i of [0, 1]) {
-      const g = this.gs.groups[i];
+      const g = displayedGroups[i];
+      const provisional=this.gs.groups[i]!==g;
       const card = document.createElement('div');
-      card.className = 'pcard' + (this.gs.current === i && this.gs.winner === null ? ' active' : '');
+      card.className = 'pcard' + (provisional ? ' provisional' : '') + (this.gs.current === i && this.gs.winner === null ? ' active' : '');
       const head = document.createElement('div');
       head.className = 'pname';
       const label = g === 'solid' ? 'Solids' : 'Stripes';
@@ -460,6 +479,7 @@ export class Game {
       if (onEight) nums.push(8);
       const left = nums.filter((n) => !this.gs.balls.find((q) => q.n === n)?.potted).length;
       gr.textContent = g === null ? 'Open table · groups unassigned' : onEight ? 'On the 8-Ball' : `${label} · ${left} remaining`;
+      if(provisional)gr.textContent = `${label} · pending shot result`;
       head.appendChild(nm);
       head.appendChild(gr);
       card.appendChild(head);
@@ -477,6 +497,11 @@ export class Game {
         row.appendChild(d);
       }
       card.appendChild(row);
+      if(live && i === (this.gs.shot?.current ?? this.gs.current) && (this.ev.potted.length || this.ev.cuePotted)) {
+        const pots=document.createElement('div');pots.className='live-pots';
+        pots.textContent=`This shot: ${this.ev.potted.length ? this.ev.potted.join(' · ') : 'no object balls'}${this.ev.cuePotted ? ' · scratch' : ''}`;
+        card.appendChild(pots);
+      }
       box.appendChild(card);
     }
   }
@@ -517,11 +542,12 @@ export class Game {
     const rc = new RoomClient();
     this.room = rc;
     this.seat = null;
-    rc.onState = (s) => {
+    const handleState = (s: RoomState) => {
       if (this.seat === null && rc.seat !== null) this.seat = rc.seat;
       this.applyServerState(s);
     };
-    rc.onShot = (by, shot) => {
+    rc.onState = s => { if(this.mode==='rolling' || this.pendingNetwork.length)this.pendingNetwork.push(()=>handleState(s)); else handleState(s); };
+    const handleShot: typeof rc.onShot = (by, shot) => {
       if (by === this.seat) return;
       const c = this.cue();
       if (c.potted) return;
@@ -535,6 +561,7 @@ export class Game {
       this.mode = 'rolling'; this.lastT = 0; this.accumulator = 0;
       this.hud();
     };
+    rc.onShot = (by,shot) => { if(by===this.seat)return; if(this.mode==='rolling' || this.pendingNetwork.length)this.pendingNetwork.push(()=>handleShot(by,shot)); else handleShot(by,shot); };
     rc.onError = (e) => { this.el.msg.textContent = `net: ${e}`; };
     rc.onJoined = (names) => { this.roomNames = names; this.hud(); };
     rc.onOpen = () => (create ? rc.create(name, this.gs.rules) : rc.join(code, name));

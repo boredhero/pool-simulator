@@ -4,17 +4,24 @@ const select = (id: string) => el<HTMLSelectElement>(id);
 const input = (id: string) => el<HTMLInputElement>(id);
 
 export class TableOptions {
+  fastForward = false;
   constructor(start: (rules: MatchConfig) => void) {
+    try { this.fastForward = localStorage.getItem('pool:fast-forward') === '1'; } catch { /* private storage */ }
+    input('fastforward').checked = this.fastForward;
+    input('fastforward').addEventListener('change', () => { this.fastForward = input('fastforward').checked; try { localStorage.setItem('pool:fast-forward', this.fastForward ? '1' : '0'); } catch { /* private storage */ } });
+    let dismissed = false;
+    try { dismissed = localStorage.getItem('pool:help-dismissed') === '1'; } catch { /* private storage */ }
     select('rulespreset').addEventListener('change', () => this.write(matchConfig({ preset: select('rulespreset').value as MatchConfig['preset'] })));
     el('applyrules').addEventListener('click', () => { start(this.read()); el('settingspanel').classList.remove('open'); });
-    const show = (open: boolean) => {
+    const show = (open: boolean, remember = false) => {
+      if (!open && remember) { dismissed = true; try { localStorage.setItem('pool:help-dismissed', '1'); } catch { /* private storage */ } }
       el('helppanel').classList.toggle('open', open);
       el('helpbtn').setAttribute('aria-expanded', String(open));
       if (open) { el('settingspanel').classList.remove('open'); el('onlinepanel').classList.remove('open'); }
     };
-    el('helpbtn').addEventListener('click', () => show(!el('helppanel').classList.contains('open')));
-    el('closehelp').addEventListener('click', () => show(false));
-    for (const id of ['settingsbtn', 'onlinebtn']) el(id).addEventListener('click', () => show(false));
+    el('helpbtn').addEventListener('click', () => show(!el('helppanel').classList.contains('open'), true));
+    el('closehelp').addEventListener('click', () => show(false, true));
+    for (const id of ['settingsbtn', 'onlinebtn']) el(id).addEventListener('click', () => show(false, true));
     const tab = (touch: boolean) => {
       el('touchguide').hidden = !touch; el('mouseguide').hidden = touch;
 
@@ -25,9 +32,9 @@ export class TableOptions {
     addEventListener('pointerdown', e => tab(e.pointerType !== 'mouse'), {passive: true});
     addEventListener('pointermove', e => { if (e.pointerType === 'mouse' && (e.movementX || e.movementY)) tab(false); }, {passive: true});
     const desktop = matchMedia('(min-width: 1101px)');
-    show(desktop.matches);
-    desktop.addEventListener('change', e => show(e.matches));
-    addEventListener('keydown', e => { if (e.key === 'Escape') { show(false); el('settingspanel').classList.remove('open'); el('onlinepanel').classList.remove('open'); } });
+    show(desktop.matches && !dismissed);
+    desktop.addEventListener('change', e => show(e.matches && !dismissed));
+    addEventListener('keydown', e => { if (e.key === 'Escape') { show(false, true); el('settingspanel').classList.remove('open'); el('onlinepanel').classList.remove('open'); } });
     this.write(matchConfig());
   }
   read(): MatchConfig {

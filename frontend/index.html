@@ -84,6 +84,7 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
 #scorecard,#helppanel,#settingspanel,#onlinepanel{top:var(--below-header,136px)}
 .kitchen-guide{position:fixed;z-index:3;transform:translate(-50%,-100%);pointer-events:none;padding:10px 16px;background:#211d18f5;border:1px solid #efd395;border-radius:12px;text-align:center;box-shadow:0 5px 20px #0005;max-width:280px}.kitchen-guide[hidden]{display:none}.kitchen-guide strong{display:block;font-size:20px;color:#ffe1a6}.kitchen-guide span{display:block;font-size:16px;line-height:1.3;color:#f2e7d2}.kitchen-guide::after{content:'';position:absolute;top:100%;left:50%;width:2px;height:30px;background:#efd395}
 @media(max-width:600px){.kitchen-guide{max-width:235px;width:235px;padding:8px 12px}.kitchen-guide strong{font-size:18px}}
+#playbackstate{color:#acd2ad;font-size:14px;text-transform:none;letter-spacing:0;margin-left:8px}.live-pots{margin-top:10px;padding-top:8px;border-top:1px solid #70644d;color:#f4dcae;font-size:16px}.pcard.provisional .grp{color:#ffdda1}
 </style>
 </head>
 <body>
@@ -102,7 +103,7 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
   </div>
   <div class="hint" id="hint">Aim on the felt · pull back and release to shoot · right-drag to orbit</div>
   <div class="control-tray">
-    <div class="power-control"><span class="control-label">Shot power</span><div id="chargebar"><div id="chargefill"></div></div><div class="control-help">Pull farther for a stronger shot</div></div>
+    <div class="power-control"><span class="control-label">Shot power <span id="playbackstate" role="status"></span></span><div id="chargebar"><div id="chargefill"></div></div><div class="control-help">Pull farther for a stronger shot</div></div>
     <div class="spin-control"><span class="control-label">Spin</span><div id="spin" title="Tip offset (english)" aria-label="Cue ball spin control"></div></div>
     <div class="row actions"><button id="aibtn">Play vs AI</button><button id="rack">New rack</button></div>
   </div>
@@ -135,6 +136,10 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
     <label for="breakspeed">Maximum break speed (m/s)</label><input id="breakspeed" type="number" min="1" max="12" step="0.1" value="8.5">
   </fieldset>
   <button id="applyrules">Start new rack with these rules</button>
+  <hr>
+  <h2>Playback</h2>
+  <label class="check"><input id="fastforward" type="checkbox" aria-describedby="fastforwardhelp"> Fast-forward fine movements</label>
+  <p id="fastforwardhelp" class="guide-note">Off by default. Plays the slow final rolls at 4× speed, with the same physics and shot result. Available with every ruleset.</p>
   <hr>
   <h2>Appearance</h2>
   <label for="railsights">Rail sights</label><select id="railsights"><option value="diamonds">Diamonds</option><option value="dots">Dots</option><option value="double-diamonds">Double diamonds</option><option value="squares">Squares</option><option value="none">None</option></select>

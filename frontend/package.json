@@ -6,7 +6,10 @@
     "dev": "vite --port 5173",
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
-    "lint": "eslint src --ext .ts"
+    "lint": "eslint src --ext .ts",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "three": "^0.186.0"

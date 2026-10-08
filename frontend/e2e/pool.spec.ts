@@ -1,19 +1,37 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
-test.setTimeout(120 * 1000);
+test.beforeEach(async ({page}) => {
+  // This suite covers the standalone frontend. Backend API tests cover /api/version.
+  await page.route('**/api/version', route => route.fulfill({json:{version:'e2e'}}));
+});
+
+async function openGame(page: Page, reload = false) {
+  if (reload) await page.reload(); else await page.goto('/');
+  await page.waitForFunction(() => !!(window as any).__pool, undefined, {timeout:10000});
+  await expect(page.locator('#version')).toHaveText('ve2e');
+  // Keep actual game updates, controls, layout, and scene meshes running. UI
+  // assertions don't need repeated software WebGL draws; the smoke below
+  // verifies real rendering before and after its real mouse-driven shot.
+  await page.evaluate(() => {
+    const w=window as any, renderer=w.__pool.scene.renderer;
+    w.__draw=renderer.render.bind(renderer);
+    w.__renderedCalls=renderer.info.render.calls;
+    renderer.render=()=>{};
+  });
+}
 
 test('loads, renders table, breaks and resolves', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
-  await page.goto('/');
+  await openGame(page);
   await expect(page).toHaveTitle(/Play Pool/);
   const canvas = page.locator('#game-canvas');
   await expect(canvas).toBeVisible();
   const box = await canvas.boundingBox();
   expect(box?.width).toBeGreaterThan(200);
   await expect(page.locator('link[rel="icon"]')).toHaveCount(1);
-  await page.waitForTimeout(1500);
-  await page.screenshot({ path: 'e2e/table.png' });
+  expect(await page.evaluate(() => (window as any).__renderedCalls)).toBeGreaterThan(0);
+  if (await page.locator('#helppanel').isVisible()) await page.locator('#closehelp').click();
   // Aim at the apex ball, hold to charge full power, release to break.
   const cbox = (await canvas.boundingBox())!;
   // Press mid-felt, drag back ~400px for full power, release to break.
@@ -29,21 +47,25 @@ test('loads, renders table, breaks and resolves', async ({ page }) => {
   // Shot must actually be underway now.
   await page.waitForFunction(
     () => (window as unknown as { __pool: { mode: string } }).__pool.mode === 'rolling',
-    { timeout: 5000 },
+    undefined, { timeout: 5000 },
   );
-  // Rolling: charge meter was active; wait for resolution.
-  await page.waitForFunction(
-    () => (window as unknown as { __pool: { mode: string } }).__pool.mode !== 'rolling',
-    { timeout: 90000 },
-  );
-  const msg = await page.locator('#msg').textContent();
-  expect(msg).toMatch(/Player [12]/);
-  await page.screenshot({ path: 'e2e/break.png' });
-  expect(errors.filter((e) => !e.includes('WebGL'))).toEqual([]);
+  // Exercise the same game frame/physics path without waiting on GPU frames
+  // or real-time playback. No balls are forcibly stopped or rules bypassed.
+  const result=await page.evaluate(() => {
+    const g=(window as any).__pool;
+    let frames=0;
+    while(g.mode==='rolling' && frames<180) {g.accumulator+=.25;g.frame();frames++;}
+    g.scene.renderer.render=(window as any).__draw;
+    return {mode:g.mode, firstContact:g.ev.firstContact, asleep:g.gs.balls.every((b:any)=>b.asleep||b.potted)};
+  });
+  expect(result.mode).not.toBe('rolling');expect(result.firstContact).not.toBeNull();expect(result.asleep).toBe(true);
+  await expect(page.locator('#msg')).toContainText(/Player [12]/);
+  await page.evaluate(() => new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));
+  expect(errors).toEqual([]);
 });
 
 test('adaptive controls, readable settings, and desktop version card', async ({ page }) => {
-  await page.setViewportSize({width:1440,height:900}); await page.goto('/');
+  await page.setViewportSize({width:1440,height:900}); await openGame(page);
   await expect(page.locator('#mouseguide')).toBeVisible();
   await expect(page.locator('.guide-tabs')).toHaveCount(0);
   await expect(page.locator('#version')).toHaveCSS('position','fixed');
@@ -66,7 +88,7 @@ test('adaptive controls, readable settings, and desktop version card', async ({ 
 });
 
 test('pocket indicators update before rest without overwriting the next turn', async ({ page }) => {
-  await page.goto('/');
+  await openGame(page);
   const result = await page.evaluate(() => {
     const g=(window as any).__pool; g.gs.open=false; g.gs.groups=['solid','stripe'];g.gs.breakShot=false;
     g.hud();
@@ -86,7 +108,7 @@ test('pocket indicators update before rest without overwriting the next turn', a
 });
 
 test('bar break assigns both cards before the same player shoots again', async ({page}) => {
-  await page.goto('/');
+  await openGame(page);
   const result=await page.evaluate(()=>{
     const g=(window as any).__pool;
     g.gs.balls.find((b:any)=>b.n===1).potted=true;
@@ -99,11 +121,11 @@ test('bar break assigns both cards before the same player shoots again', async (
 });
 
 test('kitchen guide and locally persisted sight shape', async ({page})=>{
-  await page.goto('/');
+  await openGame(page);
   expect(await page.locator('#railsights').inputValue()).toBe('diamonds');
   await page.locator('#settingsbtn').click();
   await page.locator('#railsights').selectOption('double-diamonds');
-  await page.reload();
+  await openGame(page, true);
   expect(await page.locator('#railsights').inputValue()).toBe('double-diamonds');
   await page.evaluate(()=>{const g=(window as any).__pool;g.gs.ballInHand=true;g.gs.placement='kitchen';g.gs.kitchenShot=true;g.mode='place';g.frame();});
   await expect(page.locator('#headstringguide')).toBeVisible();
@@ -116,7 +138,7 @@ test('kitchen guide and locally persisted sight shape', async ({page})=>{
 
 
 test('capture history survives consecutive shots and clears with a new rack', async ({page})=>{
-  await page.goto('/');
+  await openGame(page);
   const result=await page.evaluate(()=>{
     const g=(window as any).__pool;g.gs.breakShot=false;
     const capture=(numbers:number[])=>{
@@ -127,4 +149,47 @@ test('capture history survives consecutive shots and clears with a new rack', as
     const order=[...g.gs.returnOrder];g.reset();return {order,reset:g.gs.returnOrder};
   });
   expect(result.order).toEqual([12,3,10]);expect(result.reset).toEqual([]);
+});
+
+test('dismissal and independent playback preference survive reload',async({page})=>{
+  await page.setViewportSize({width:1440,height:900});await openGame(page);
+  await page.locator('#closehelp').click();await openGame(page, true);
+  await expect(page.locator('#helppanel')).toBeHidden();
+  await page.locator('#helpbtn').click();await expect(page.locator('#helppanel')).toBeVisible();
+  await page.locator('#settingsbtn').click();await expect(page.locator('#fastforward')).not.toBeChecked();
+  await page.locator('#fastforward').check();await page.locator('#rulespreset').selectOption('custom');
+  await expect(page.locator('#fastforward')).toBeChecked();await openGame(page, true);
+  await expect(page.locator('#helppanel')).toBeHidden();
+  expect(await page.evaluate(()=>(window as any).__pool.options.fastForward)).toBe(true);
+  await page.locator('#settingsbtn').click();await expect(page.locator('#fastforward')).toBeChecked();
+});
+
+test('live break groups are provisional and a later scratch retracts them',async({page})=>{
+  await openGame(page);
+  const result=await page.evaluate(()=>{
+    const g=(window as any).__pool;
+    g.gs.shot={current:0,open:true,breakShot:true,group:null,remaining:g.gs.balls.filter((b:any)=>b.n!==null&&b.n!==8).map((b:any)=>b.n),kitchen:false,calledBall:null,calledPocket:null};
+    g.gs.balls.find((b:any)=>b.n===1).potted=true;
+    const moving=g.gs.balls.find((b:any)=>b.n===2);moving.x=1;moving.y=.5;moving.vx=.2;moving.asleep=false;
+    g.ev={firstContact:1,potted:[1],offTable:[],railAfterContact:true,cuePotted:false};g.mode='rolling';g.frame();
+    const live={text:document.getElementById('scorecard')!.textContent,groups:[...g.gs.groups],mode:g.mode};
+    g.ev.cuePotted=true;g.frame();
+    return {live,after:document.getElementById('scorecard')!.textContent,groups:g.gs.groups};
+  });
+  expect(result.live.mode).toBe('rolling');expect(result.live.text).toContain('Solids · pending');
+  expect(result.live.text).toContain('This shot: 1');expect(result.live.groups).toEqual([null,null]);
+  expect(result.after).toContain('scratch');expect(result.after).not.toContain('pending shot result');expect(result.groups).toEqual([null,null]);
+});
+
+test('queued network results wait for local playback and stop at the next shot',async({page})=>{
+  await openGame(page);
+  const result=await page.evaluate(()=>{
+    const g=(window as any).__pool,order:string[]=[];
+    const b=g.gs.balls[0];b.vx=.1;b.asleep=false;g.mode='rolling';
+    g.pendingNetwork.push(()=>order.push('result'),()=>{order.push('next shot');g.mode='rolling';b.asleep=false;b.vx=.1;},()=>order.push('next result'));
+    g.frame();const during=[...order];
+    for(const ball of g.gs.balls){ball.asleep=true;ball.vx=ball.vy=ball.vz=ball.wx=ball.wy=ball.wz=0;}
+    g.frame();return{during,order,queued:g.pendingNetwork.length,mode:g.mode};
+  });
+  expect(result.during).toEqual([]);expect(result.order).toEqual(['result','next shot']);expect(result.queued).toBe(1);expect(result.mode).toBe('rolling');
 });

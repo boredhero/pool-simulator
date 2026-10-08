@@ -156,23 +156,22 @@ def _friction(b: Ball, dt: float) -> None:
     ux = b.vx - BALL_R * b.wy
     uy = b.vy + BALL_R * b.wx
     s = (ux**2 + uy**2) ** 0.5
-    slip_min = max(1e-4, 1.5 * MU_S * G * dt)
-    if s > slip_min:
-        ax, ay = -MU_S * G * ux / s, -MU_S * G * uy / s
-        b.vx += ax * dt
-        b.vy += ay * dt
-        k = (5 * MU_S * G) / (2 * BALL_R) * dt
-        b.wx += -k * uy / s
-        b.wy += k * ux / s
-    else:
-        v = (b.vx**2 + b.vy**2) ** 0.5
-        if v > 1e-9:
-            d = min(v, MU_R * G * dt)
-            b.vx -= d * b.vx / v
-            b.vy -= d * b.vy / v
-        k = min(1.0, 10 * dt)
-        b.wx += (-b.vy / BALL_R - b.wx) * k
-        b.wy += (b.vx / BALL_R - b.wy) * k
+    # Exact solid-sphere slip transition; never reverse friction past zero slip.
+    slide_time = min(dt, s / (3.5 * MU_S * G))
+    if s > 1e-12:
+        impulse = MU_S * G * slide_time
+        b.vx -= impulse * ux / s
+        b.vy -= impulse * uy / s
+        b.wx -= 2.5 * impulse * uy / (BALL_R * s)
+        b.wy += 2.5 * impulse * ux / (BALL_R * s)
+    if slide_time < dt:
+        speed = math.hypot(b.vx, b.vy)
+        deceleration = min(speed, MU_R * G * (dt - slide_time))
+        if speed > 1e-12:
+            b.vx -= deceleration * b.vx / speed
+            b.vy -= deceleration * b.vy / speed
+        b.wx = -b.vy / BALL_R
+        b.wy = b.vx / BALL_R
     if b.wz != 0:
         d = min(abs(b.wz), SPIN_DECAY * dt)
         b.wz -= (1 if b.wz > 0 else -1) * d

@@ -129,31 +129,20 @@ function friction(b: Ball, dt: number): void {
   const ux = b.vx - BALL_R * b.wy;
   const uy = b.vy + BALL_R * b.wx;
   const s = Math.hypot(ux, uy);
-  // One sliding step removes |du| = 1.5*MU_S*G*dt of slip; below that the
-  // explicit torque update would overshoot and go unstable -> roll instead.
-  const SLIP_MIN = 1.5 * MU_S * G * dt;
-  if (s > Math.max(1e-4, SLIP_MIN)) {
-    // Sliding branch.
-    const ax = (-MU_S * G * ux) / s;
-    const ay = (-MU_S * G * uy) / s;
-    b.vx += ax * dt;
-    b.vy += ay * dt;
-    const k = ((5 * MU_S * G) / (2 * BALL_R)) * dt;
-    // Torque r x F with r = -R*zhat: wx_dot = -k*uy/s, wy_dot = +k*ux/s.
-    b.wx += (-k * uy) / s;
-    b.wy += (k * ux) / s;
-  } else {
-    // Rolling branch.
-    const v = Math.hypot(b.vx, b.vy);
-    if (v > 1e-9) {
-      const d = Math.min(v, MU_R * G * dt);
-      b.vx -= (d * b.vx) / v;
-      b.vy -= (d * b.vy) / v;
-    }
-    // Relax spin toward pure rolling (vx = R*wy, vy = -R*wx).
-    const k = Math.min(1, 10 * dt);
-    b.wx += ((-b.vy / BALL_R - b.wx) * k);
-    b.wy += ((b.vx / BALL_R - b.wy) * k);
+  // Solid-sphere contact slip decays at (1 + 5/2)*mu*g. Stop the
+  // sliding impulse exactly at zero slip, then roll for the remaining time.
+  const slideTime = Math.min(dt, s / (3.5 * MU_S * G));
+  if (s > 1e-12) {
+    const impulse = MU_S * G * slideTime;
+    b.vx -= impulse * ux / s; b.vy -= impulse * uy / s;
+    b.wx -= 2.5 * impulse * uy / (BALL_R * s);
+    b.wy += 2.5 * impulse * ux / (BALL_R * s);
+  }
+  if (slideTime < dt) {
+    const speed = Math.hypot(b.vx, b.vy);
+    const deceleration = Math.min(speed, MU_R * G * (dt - slideTime));
+    if (speed > 1e-12) { b.vx -= deceleration * b.vx / speed; b.vy -= deceleration * b.vy / speed; }
+    b.wx = -b.vy / BALL_R; b.wy = b.vx / BALL_R;
   }
   // Sidespin decay.
   if (b.wz !== 0) {

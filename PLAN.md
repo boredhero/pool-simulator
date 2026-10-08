@@ -129,3 +129,64 @@ Flow: work on `develop`, PR to `main` (protected: PR + `ci` check), merge to shi
   and can orbit down to inspect the cabinet.
 - References: [Brunswick Gold Crown VI aprons, legs and rail castings](https://www.brunswickbilliards.com/products/gold-crown-vi-9-foot-pool-table)
   and [Valley ball-view doors](https://www.valley-dynamoparts.com/product_categories.php?catid=16&line=2).
+
+## Settling, optional fast playback, and live feedback
+- Fixed both simulators' sliding-to-rolling transition. For a solid sphere,
+  contact slip decreases at `(7/2) * mu_s * g`; the previous `3/2` threshold
+  allowed the sliding impulse to overshoot and alternate indefinitely at low
+  speeds (reproduced with 0.014 m/s and zero spin). Clamp sliding duration to
+  the exact transition, then apply rolling drag during the remaining step.
+  Regression tests check settling, non-increasing energy, analytical rolling
+  deceleration, and shared Python/TypeScript flight fixtures.
+- Research did **not** establish a credible population mean/median for full
+  pool-break settling. [Dr. Dave's break model](https://drdavepoolinfo.com/technical_proofs/new/TP_B-6.pdf)
+  uses the same representative sliding/rolling coefficients, 0.2/0.01.
+  [Mathavan et al. (2009)](https://drdavepoolinfo.com/physics_articles/ajp_09_hsv_article.pdf)
+  measures 0.124–0.126 m/s² rolling deceleration on a snooker table; our
+  0.0981 m/s² is not calibrated to that table. Neither source provides an
+  average full-break rest time. Real calibration needs uncut, timed shots.
+- Reproducible 16-shot local benchmark: seeds 1–16, small aim offsets,
+  80–100% break power, automatic cue elevation. Run from `backend` with
+  `PYTHONPATH=. .venv/bin/python scripts/benchmark_settling.py`.
+  Before fix: mean 13.166 s, median 7.660 s, range 6.142–30.767 s.
+  After fix: mean 6.149 s, median 6.000 s, range 5.379–6.971 s.
+  All shots settled below the 45 s cap. These are simulated seconds from a
+  small synthetic sample, not real-world statistics or a universal target.
+- **Fast-forward fine movements** defaults off and persists locally, separately
+  from match rules. When all live balls are grounded and both translation and
+  rolling surface speed are below 0.25 m/s, spend wall time at 4× playback.
+  Every contact still uses the unchanged 1/240 s step; tests verify identical
+  final ball states and contact events. Recheck eligibility every step.
+  Queue online snapshots/following shots until local playback finishes so
+  players can use different viewing speeds without snapping the slower view.
+- Cards update immediately after simulated captures, including on an open
+  break. Provisional groups are clearly marked pending and retract on a later
+  foul; authoritative rules resolve only when the shot ends. The shooting
+  player's card also lists captures/scratches while other balls move.
+- Dismissing instructions persists across reloads and viewport changes. The
+  information button always allows reopening the guide manually.
+
+## Faster local iteration and reliable CI
+- Run `npm run test:watch` in `frontend` for immediate physics/rules feedback.
+  Run `npm run test:e2e` (or `test:e2e:ui`) for browser checks. Locally these
+  use a separate Vite server on 4173 and read current source without rebuilding;
+  the watched game on 5173 remains available. CI checks the production build.
+- Browser tests intercept the version endpoint with a deterministic fixture;
+  backend tests separately cover its real implementation. No missing-backend
+  proxy requests are needed for these standalone frontend tests.
+- The browser smoke uses actual mouse input and real WebGL frames, but advances
+  the real game frame/physics logic synchronously to resolve the shot. Other UI
+  assertions skip redundant WebGL draws after initialization; they still run
+  game updates, input handling, DOM layout, and scene synchronization.
+  This is not a replacement for visual inspection or multiplayer integration.
+- Two isolated browser workers run in parallel. Bounded action/test timeouts,
+  proper waitForFunction options, and failure trace/screenshot uploads replace
+  two-minute silent waits. Frontend unit tests now run in CI as well.
+- Develop updates run checks through the open PR's synchronize event. The `ci`
+  job remains the required aggregate check, not a deployment attempt. Release
+  images build only on main, without the redundant host-side frontend build.
+  The Docker build now respects TypeScript failures; deployment waits for tests.
+- References: [Playwright API mocking](https://playwright.dev/docs/mock),
+  [waitForFunction signature](https://playwright.dev/docs/api/class-page#page-wait-for-function),
+  [parallelism](https://playwright.dev/docs/test-parallel), and
+  [GitHub PR event branch filters](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request).

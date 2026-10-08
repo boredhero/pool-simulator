@@ -57,3 +57,24 @@ def test_shared_flight_fixtures():
             step([b], DT, ev, 0, {"v": False})
         for k, v in f["expected"].items():
             assert abs(getattr(b, k) - v) < 1e-7
+
+
+def test_tiny_slide_settles_without_energy_gain():
+    b = Ball(x=1, y=0.6, vx=0.014, asleep=False)
+    energy = b.vx**2
+    for _ in range(240):
+        step([b], DT, ShotEvents(), 0, {"v": False})
+        after = b.vx**2 + b.vy**2 + 0.4 * BALL_R**2 * (b.wx**2 + b.wy**2)
+        assert after <= energy + 1e-12
+        energy = after
+        if b.asleep:
+            break
+    assert b.asleep
+
+
+def test_rolling_deceleration():
+    b = Ball(x=1, y=0.6, vx=0.1, wy=0.1 / BALL_R, asleep=False)
+    for _ in range(120):
+        step([b], DT, ShotEvents(), 0, {"v": False})
+    assert abs(b.vx - (0.1 - 0.01 * 9.81 * 0.5)) < 1e-10
+    assert abs(b.wy * BALL_R - b.vx) < 1e-10
