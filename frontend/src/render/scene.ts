@@ -1,3 +1,4 @@
+import { CameraRig } from './cameraRig';
 import { ballTexture, type CueStyle } from './ballTextures';
 import { cushionGeometry } from './cushionGeometry';
 import { constrainTableCamera } from './cameraBounds';
@@ -20,6 +21,7 @@ export const toSim = (rx: number, rz: number): [number, number] => [rx + TABLE_W
 export interface SceneHandle {
   renderer: THREE.WebGLRenderer;
   controls: OrbitControls;
+  cameraRig: CameraRig;
   /** Sync ball meshes from sim state (rolls them by their spin state). */
   setBalls(
     list: Array<{ n: number | null; x: number; y: number; z: number; potted: boolean; wx: number; wy: number; wz: number }>,
@@ -78,6 +80,7 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
     ONE: -1 as unknown as THREE.TOUCH,
     TWO: THREE.TOUCH.DOLLY_ROTATE,
   };
+  const cameraRig=new CameraRig(camera,controls,canvas);
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
   // Broad amber overhead illumination, like a shaded billiard lamp. The
@@ -281,7 +284,9 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     const nextPortrait = w < h;
-    if (portrait !== nextPortrait) {
+    const orientationChanged=portrait !== nextPortrait;
+    cameraRig.cancel();
+    if (orientationChanged) {
       portrait = nextPortrait;
       controls.target.set(0, portrait ? 0 : -.16, 0);
       if (portrait) camera.position.set(-2.3, 3.4, 0);
@@ -289,7 +294,7 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
       camera.lookAt(controls.target);
     }
     // Fit the whole surround with room for the HUD; retain the current orbit.
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; orientationChanged && i < 30; i++) {
       camera.updateMatrixWorld();
       let fits = true;
       for (const x of [-TABLE_W / 2 - RAIL_W, TABLE_W / 2 + RAIL_W]) {
@@ -318,6 +323,7 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
   const frame = () => {
     if (!running) return;
     controls.update();
+    cameraRig.update(performance.now());
     constrainTableCamera(camera, controls);
     for (const cb of cbs) cb();
     if (kitchen.visible && !kitchenDismissed) {
@@ -338,6 +344,7 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
   return {
     renderer,
     controls,
+    cameraRig,
     setBalls(list, dt, returnOrder = []) {
       cueObstacles = list;
       const axis = new THREE.Vector3();

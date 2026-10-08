@@ -87,6 +87,8 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
 #playbackstate{color:#acd2ad;font-size:14px;text-transform:none;letter-spacing:0;margin-left:8px}.live-pots{margin-top:10px;padding-top:8px;border-top:1px solid #70644d;color:#f4dcae;font-size:16px}.pcard.provisional .grp{color:#ffdda1}
 #dismissheadstring{pointer-events:auto;min-height:36px;margin-top:10px;font-size:14px;padding:4px 10px}
 .spin-control{display:grid;grid-template-columns:auto auto;grid-template-rows:auto auto;gap:2px 10px}.spin-control .control-label{grid-column:1;grid-row:1}#spin{grid-column:2;grid-row:1 / span 2}#spin:focus-visible{outline:3px solid #e7c384;outline-offset:4px}#resetspin{grid-column:1;grid-row:2;font-size:15px;min-height:36px;padding:0 8px}#resetspin:disabled{opacity:.45;cursor:default}@media(max-width:600px){#resetspin{min-height:44px}}
+#viewpanel{display:none;position:fixed;z-index:8;right:24px;top:var(--below-header,136px);width:310px;padding:18px;background:#211d18;border:1px solid #75634a;border-radius:16px}#viewpanel.open{display:grid;gap:12px}#viewpanel .row button{flex:1;font-size:16px;padding:0 8px}@media(max-width:600px){#viewpanel{right:12px;width:min(310px,calc(100vw - 24px))}.toolbar{gap:4px}.toolbar button{padding:0 7px}}
+#changelog{width:min(1050px,94vw);height:88dvh;max-height:94dvh;padding:0;color:#eee5d6;background:#211d18;border:1px solid #75634a;border-radius:20px}#changelog::backdrop{background:#000b;backdrop-filter:blur(5px)}.changelog-header{position:sticky;top:0;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:22px 28px;background:#211d18;border-bottom:1px solid #75634a}.changelog-header h2{margin:0;font-size:28px}#changelog-content{padding:8px 28px 28px;font-size:18px;line-height:1.65}#changelog-content h3{font-size:24px;margin-bottom:0}#changelog-content time{color:#c3b494;font-size:16px}#changelog-content li{margin:12px 0}#version{cursor:pointer}@media(max-width:600px){.status-meta{flex-wrap:wrap}#version{min-height:32px;padding:3px 6px}.changelog-header,#changelog-content{padding:16px}#changelog-content{font-size:17px}.toolbar button{font-size:14px}}
 </style>
 </head>
 <body>
@@ -94,12 +96,13 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
 <div class="hud">
   <div class="topbar">
     <div class="status">
-      <div class="status-meta"><span id="turn">Player 1</span><span id="version"></span></div>
+      <div class="status-meta"><span id="turn">Player 1</span><button id="version" aria-label="Open changelog" aria-haspopup="dialog"></button></div>
       <div id="msg" role="status" aria-live="polite">Player 1 to break</div>
     </div>
     <div class="toolbar">
       <button id="helpbtn" aria-label="How to play" aria-expanded="false" aria-controls="helppanel"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.5" r=".9" fill="currentColor" stroke="none"/></svg></button>
       <button id="settingsbtn" title="Table and rules">⚙ <span class="settings-label">Table</span></button>
+      <button id="viewbtn" aria-expanded="false" aria-controls="viewpanel">View</button>
       <button id="onlinebtn">Online</button>
     </div>
   </div>
@@ -116,7 +119,7 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
   <h2>Aim. Pull. Release.</h2>
 
   <dl id="mouseguide"><dt>01 · Line it up</dt><dd>Move over the felt to aim.</dd><dt>02 · Take the shot</dt><dd>Press, drag back to build power, then release. Your aim locks while pulling.</dd><dt>03 · Find your view</dt><dd>Right-drag to orbit. Scroll to zoom.</dd></dl>
-  <dl id="touchguide" hidden><dt>01 · Line it up</dt><dd>Touch the felt in the direction you want to aim.</dd><dt>02 · Take the shot</dt><dd>Keep your finger down, pull back, then release. A longer pull means more power.</dd><dt>03 · Find your view</dt><dd>Use two fingers to orbit and pinch to zoom. This cancels a shot pull.</dd></dl>
+  <dl id="touchguide" hidden><dt>01 · Line it up</dt><dd>Touch the felt in the direction you want to aim.</dd><dt>02 · Take the shot</dt><dd>Keep your finger down, pull back, then release. A longer pull means more power.</dd><dt>03 · Find your view</dt><dd>Tap View → Move camera for one-finger orbit and two-finger pinch/pan. Return to play when ready. Two-finger orbit/pinch also works during play and cancels a shot pull.</dd></dl>
   <p class="guide-note"><strong>Add spin</strong> · Drag the blue dot on the cue ball below. Reset returns it to center. Arrow keys adjust a focused spin control; hold Shift for finer steps. Cue elevation is assisted around obstacles and changes the shot.</p>
   <p class="guide-note"><strong>After a foul</strong> · Tap or click a green legal spot to place the cue ball. The outline shows your placement area.</p>
   <p class="guide-note"><strong>Call a shot</strong> · When prompted, choose your ball, then tap its destination pocket on the table.</p>
@@ -140,6 +143,10 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
   </fieldset>
   <button id="applyrules">Start new rack with these rules</button>
   <hr>
+  <h2>Camera</h2>
+  <label class="check"><input id="autocamera" type="checkbox"> Auto-frame after shots</label>
+  <p class="guide-note">Bring the remaining balls into view after they stop. On by default on phones; off on desktop. Moving the camera yourself takes priority.</p>
+  <hr>
   <h2>Playback</h2>
   <label class="check"><input id="fastforward" type="checkbox" aria-describedby="fastforwardhelp"> Fast-forward fine movements</label>
   <p id="fastforwardhelp" class="guide-note">Off by default. Plays the slow final rolls at 4× speed, with the same physics and shot result. Available with every ruleset.</p>
@@ -157,6 +164,12 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
   <label>Custom rails</label>
   <input type="color" id="woodcustom" value="#4a2c14" />
 </div>
+<div id="viewpanel" aria-label="Camera controls">
+  <button id="cameramode" aria-pressed="false">Move camera</button>
+  <p class="guide-note">Camera mode: drag one finger to orbit; pinch and drag two fingers to zoom and pan. Shooting is paused until you return to play.</p>
+  <div class="row"><button id="focusballs">Focus balls</button><button id="wholetable">Whole table</button></div>
+  <div class="row"><button id="zoomin" aria-label="Zoom in">Zoom +</button><button id="zoomout" aria-label="Zoom out">Zoom −</button></div>
+</div>
 <div id="onlinepanel">
   <label for="pname">Your name</label>
   <input id="pname" placeholder="your name" maxlength="24" />
@@ -166,6 +179,7 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
   <span id="roominfo">solo table</span>
 </div>
 </div>
+<dialog id="changelog" aria-labelledby="changelog-title"><header class="changelog-header"><h2 id="changelog-title">What's new</h2><button id="changelog-close" autofocus aria-label="Close changelog">Close</button></header><div id="changelog-content"></div></dialog>
 <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

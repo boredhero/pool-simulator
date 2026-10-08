@@ -254,3 +254,10 @@ Flow: work on `develop`, PR to `main` (protected: PR + `ci` check), merge to shi
   visible delivery deviation, showing the actual impact point. It needs play
   testing. Resolve actual shot parameters once for server/replay consistency;
   never add independent random errors inside the client and server simulators.
+
+
+### 0.3.0 camera and release history
+- Explicit mobile camera mode separates one-finger orbit and two-finger pinch/pan from shooting; placement commits on tap release to avoid pinch gestures placing the cue ball.
+- Optional post-shot group framing preserves azimuth, includes all remaining balls, respects placement space and HUD, yields to manual input, and honors reduced motion. Defaults on for mobile and off for desktop; preference persists.
+- Version badge opens a native dialog backed by root changelog.json; contributor docs require keeping it current.
+- Camera interaction research: https://www.w3.org/WAI/WCAG21/Understanding/pointer-gestures and https://threejs.org/docs/pages/OrbitControls.html.

@@ -257,3 +257,44 @@ test('spin resets both axes and supports keyboard adjustments on desktop and mob
   await page.setViewportSize({width:390,height:844});await expect(reset).toBeVisible();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
+
+test('version opens a readable changelog and restores keyboard focus', async ({page})=>{
+  await openGame(page);
+  await page.locator('#version').click();
+  await expect(page.locator('#changelog')).toBeVisible();
+  await expect(page.locator('#changelog-content')).toContainText('v0.3.0');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#changelog')).not.toBeVisible();
+  await expect(page.locator('#version')).toBeFocused();
+});
+
+test('camera preferences adapt to mobile and persist an explicit override',async({page})=>{
+  await openGame(page);
+  await expect(page.locator('#autocamera')).not.toBeChecked();
+  await page.setViewportSize({width:390,height:844});
+  await openGame(page,true);
+  await expect(page.locator('#autocamera')).toBeChecked();
+  for(const id of ['viewbtn','version','settingsbtn']) {const box=(await page.locator('#'+id).boundingBox())!;expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(390);}
+  await page.screenshot({path:'/tmp/pool-mobile-camera.png'});
+  await page.locator('#viewbtn').click();
+  await page.getByRole('button',{name:'Move camera',exact:true}).click();
+  expect(await page.evaluate(()=>(window as any).__pool.cameraMode)).toBe(true);
+  await page.keyboard.press('Escape');
+  expect(await page.evaluate(()=>(window as any).__pool.cameraMode)).toBe(false);
+  await page.locator('#settingsbtn').click();
+  await page.locator('#autocamera').uncheck();
+  await openGame(page,true);
+  await expect(page.locator('#autocamera')).not.toBeChecked();
+});
+
+test('automatic framing waits for rest and yields to manual camera movement',async({page})=>{
+  await openGame(page);
+  const result=await page.evaluate(()=>{
+    const g=(window as any).__pool;let framed=0;g.frameBalls=()=>framed++;g.options.autoCamera=true;
+    g.cameraShotPending=true;g.cameraShotRevision=g.scene.cameraRig.revision;g.mode='wait';g.frame();const waiting=framed;
+    g.mode='aim';g.frame();const settled=framed;g.frame();const once=framed;
+    g.cameraShotPending=true;g.cameraShotRevision=g.scene.cameraRig.revision;g.scene.cameraRig.cancel(true);g.frame();
+    return{waiting,settled,once,manual:framed};
+  });
+  expect(result).toEqual({waiting:0,settled:1,once:1,manual:1});
+});

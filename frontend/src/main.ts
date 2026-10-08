@@ -1,4 +1,6 @@
+import { setupChangelog } from './ui/changelog';
 import { Game } from './ui/game';
+setupChangelog();
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
 const game = new Game(canvas);
 (window as unknown as { __pool: Game }).__pool = game;

@@ -1,0 +1,16 @@
+[
+  {
+    "version": "0.3.0",
+    "date": "2026-10-08",
+    "title": "A better view of the table",
+    "changes": [
+      "New camera controls: enter Move camera mode to orbit with one finger and pinch or pan with two. Focus balls, Whole table, and zoom buttons make adjusting the view easier.",
+      "Optional automatic framing follows the remaining balls after a shot settles. Enabled by default on mobile, disabled on desktop; manual camera movement takes priority.",
+      "Click the version badge to read this release history.",
+      "Warmer lighting, shadows, detailed felt and wood, improved cushions and pockets, table legs, and a visible ball return.",
+      "Improved cue geometry and assisted elevation, collision handling, and rolling behavior. Optional fast-forward for fine movements.",
+      "Clearer player cards and adaptive instructions, immediate pocket indicators, configurable rail sights and cue ball markings, and a spin reset button.",
+      "Bar 8-Ball placement guidance and persistent tutorial dismissal. Browser tests run separately from required deployment checks."
+    ]
+  }
+]

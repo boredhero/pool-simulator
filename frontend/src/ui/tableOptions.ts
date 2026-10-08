@@ -5,7 +5,12 @@ const input = (id: string) => el<HTMLInputElement>(id);
 
 export class TableOptions {
   fastForward = false;
+  autoCamera = false;
   constructor(start: (rules: MatchConfig) => void) {
+    let savedCamera:string|null=null;try{savedCamera=localStorage.getItem('pool:auto-camera');}catch{}
+    this.autoCamera=savedCamera===null?(matchMedia('(pointer: coarse)').matches||matchMedia('(max-width: 700px)').matches):savedCamera==='1';
+    input('autocamera').checked=this.autoCamera;
+    input('autocamera').addEventListener('change',()=>{this.autoCamera=input('autocamera').checked;try{localStorage.setItem('pool:auto-camera',this.autoCamera?'1':'0');}catch{}});
     try { this.fastForward = localStorage.getItem('pool:fast-forward') === '1'; } catch { /* private storage */ }
     input('fastforward').checked = this.fastForward;
     input('fastforward').addEventListener('change', () => { this.fastForward = input('fastforward').checked; try { localStorage.setItem('pool:fast-forward', this.fastForward ? '1' : '0'); } catch { /* private storage */ } });
