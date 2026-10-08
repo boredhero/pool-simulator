@@ -4,6 +4,7 @@ import { needsWelcome, setupWelcome } from './ui/welcome';
 import { setupChangelog } from './ui/changelog';
 import { Game } from './ui/game';
 import { setupDraggablePanels } from './ui/draggablePanel';
+import { setupMobileHud } from './ui/mobileHud';
 import { setupCameraFly } from './ui/cameraFlyControls';
 setupChangelog();
 initPrivacy({deferNotice:needsWelcome()});
@@ -11,6 +12,7 @@ const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
 const game = new Game(canvas);
 setupDraggablePanels();
 setupCameraFly(game.scene.cameraRig);
+setupMobileHud();
 setupWelcome(()=>game.tutorial.start());
 (window as unknown as { __pool: Game }).__pool = game;
 if ('serviceWorker' in navigator && location.protocol === 'https:') {

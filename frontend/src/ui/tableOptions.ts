@@ -40,8 +40,8 @@ export class TableOptions {
     const coarse = matchMedia('(pointer: coarse)');
     tab(coarse.matches);
     coarse.addEventListener('change', e => tab(e.matches));
-    addEventListener('pointerdown', e => tab(e.pointerType !== 'mouse'), {passive: true});
-    addEventListener('pointermove', e => { if (e.pointerType === 'mouse' && (e.movementX || e.movementY)) tab(false); }, {passive: true});
+    addEventListener('pointerdown', e => tab(coarse.matches || e.pointerType !== 'mouse'), {passive: true});
+    addEventListener('pointermove', e => { if (!coarse.matches && e.pointerType === 'mouse' && (e.movementX || e.movementY)) tab(false); }, {passive: true});
     const desktop = matchMedia('(min-width: 1101px)');
     show(desktop.matches && !dismissed);
     desktop.addEventListener('change', e => show(e.matches && !dismissed));

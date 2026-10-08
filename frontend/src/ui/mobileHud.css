@@ -36,3 +36,44 @@
   html.touch-input body:not(.tutorial-practice) .control-tray.expanded{flex-wrap:wrap}
   html.touch-input body:not(.tutorial-practice) .control-tray.expanded .actions{flex-basis:100%}
 }
+
+.settings-mobile-icon{display:none}
+@media(max-width:900px) and (pointer:coarse){
+  .topbar{left:8px;right:8px;width:auto;padding:4px 8px;gap:2px 4px}
+  .topbar #settingsbtn{display:flex;align-items:center;justify-content:center}
+  .settings-desktop-label{display:none}.settings-mobile-icon{display:block}
+  .topbar #scorecard{position:static;order:3;flex:1 0 100%;width:100%;gap:0;margin-top:2px;border-top:1px solid #635747;pointer-events:auto;flex-direction:row}
+  .topbar #scorecard .pcard{flex:1;min-width:0;min-height:44px;padding:4px 8px;border:0;border-radius:0;background:transparent;box-shadow:none;box-sizing:border-box}
+  .topbar #scorecard .pcard+.pcard{border-left:1px solid #635747}
+  .topbar #scorecard .pcard.active{background:#bad3a114;box-shadow:inset 0 -2px #bad3a1}
+  .topbar #scorecard .pname{font-size:12px;line-height:16px;gap:2px;flex-wrap:wrap}
+  .topbar #scorecard .grp{font-size:10px;line-height:14px;white-space:normal}
+  .topbar #msg{font-size:13px;line-height:16px;padding-top:0}
+  .topbar #opponentstatus{font-size:11px;line-height:14px}
+  #mobile-settings-about{border-top:1px solid #635747;padding-top:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  #mobile-settings-about h2{flex-basis:100%;margin:0;font-size:18px}
+  #mobile-settings-about #version{position:static;min-height:44px;font-size:13px;padding:0 10px}
+  #mobile-settings-about .legal-links{position:static;flex-wrap:wrap;font-size:12px;gap:6px}
+  #mobile-settings-about .legal-links a,#mobile-settings-about .legal-links button{min-height:44px;padding:0 8px}
+  html.touch-input body:not(.tutorial-practice) .control-tray{bottom:max(8px,env(safe-area-inset-bottom))}
+  html.touch-input body:not(.tutorial-practice) .spin-control{gap:4px}
+  html.touch-input body:not(.tutorial-practice) .spin-control .control-label{font-size:11px}
+  html.touch-input body:not(.tutorial-practice) #resetspin{padding:0 6px;font-size:12px}
+  html.touch-input body:not(.tutorial-practice) #morecontrols{padding:0 7px;font-size:12px}
+}
+@media(max-width:900px) and (pointer:coarse) and (orientation:landscape){
+  .topbar{left:8px;right:auto;top:8px;width:160px;max-height:calc(100dvh - 16px);overflow-y:auto;padding:6px;box-sizing:border-box}
+  .topbar #accountidentity{flex:1 0 100%;box-sizing:border-box}
+  .topbar .toolbar{display:grid;grid-template-columns:1fr 1fr;width:100%;gap:4px}
+  .topbar .toolbar button,.topbar #helpbtn,.topbar #settingsbtn{width:100%}
+  .topbar #scorecard{flex-direction:column}
+  .topbar #scorecard .pcard+.pcard{border-left:0;border-top:1px solid #635747}
+  html.touch-input body:not(.tutorial-practice) .control-tray{left:auto;right:8px;top:8px;bottom:auto;width:180px;max-height:calc(100dvh - 16px);overflow-y:auto;box-sizing:border-box;flex-direction:column;align-items:stretch;flex-wrap:nowrap;padding:6px}
+  html.touch-input body:not(.tutorial-practice) .control-tray .touch-shot{flex:none;grid-template-columns:1fr auto;grid-template-rows:auto 44px;gap:4px}
+  html.touch-input body:not(.tutorial-practice) .touch-shot label{grid-column:1 / -1;grid-row:1}
+  html.touch-input body:not(.tutorial-practice) .touch-shot input{grid-column:1;grid-row:2}
+  html.touch-input body:not(.tutorial-practice) .touch-shot button{grid-column:2;grid-row:2;padding:0 9px}
+  html.touch-input body:not(.tutorial-practice) .control-tray .spin-control{flex:none;margin:0;justify-content:space-between}
+  html.touch-input body:not(.tutorial-practice) .control-tray.expanded .actions{flex:none;flex-direction:column}
+  #settingspanel,#onlinepanel,#viewpanel,#helppanel{top:8px;max-height:calc(100dvh - 16px)}
+}

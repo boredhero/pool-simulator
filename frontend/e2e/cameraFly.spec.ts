@@ -1,6 +1,9 @@
 import { acceptWelcomeBeforeLoad, waitForOpening } from './welcomeFixture';
 import { expect, test, type Page } from '@playwright/test';
 
+// Camera checks need an idle rack; coin animation has its own browser coverage.
+test.use({ reducedMotion: 'reduce' });
+
 async function position(page: Page) {
   return page.evaluate(() => (window as any).__pool.scene.controls.target.toArray() as number[]);
 }
@@ -20,7 +23,7 @@ test.beforeEach(async ({ page }) => {
   });
   await page.goto('/');
   await waitForOpening(page);
-  await expect(page.locator('#camera-fly-toggle')).toBeVisible();
+  await expect(page.locator(await page.evaluate(()=>matchMedia('(max-width: 900px) and (pointer: coarse)').matches)?'#mobile-move-camera':'#camera-fly-toggle')).toBeVisible();
   if (await page.locator('#privacynotice').isVisible()) await page.locator('#privacyessential').click();
   if (await page.locator('#helppanel').isVisible()) await page.locator('#closehelp').click();
   await page.evaluate(() => (window as any).__pool.scene.cameraRig.cancel(true));
@@ -65,8 +68,8 @@ test.describe('mobile camera pad', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
   test('touch hold translates, cancellation stops, and the pad can be hidden', async ({ page }) => {
     const toggle = page.locator('#camera-fly-toggle');
-    await expect(toggle).toBeInViewport();
-    await toggle.tap();
+    await page.locator('#mobile-move-camera').tap();
+    await expect(page.locator('.control-tray')).not.toBeVisible();
     const arrow = page.getByRole('button', { name: 'Fly camera forward', exact: true });
     await expect(arrow).toBeInViewport();
     const box = (await arrow.boundingBox())!;
@@ -81,7 +84,8 @@ test.describe('mobile camera pad', () => {
     await expect(arrow).not.toHaveClass(/held/);
     await toggle.tap();
     await expect(page.locator('#camera-fly-pad')).not.toBeVisible();
-    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.locator('#mobile-move-camera')).toBeInViewport();
+    await expect(page.locator('#touchshoot')).toBeVisible();
   });
 });
 

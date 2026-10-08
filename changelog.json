@@ -2,10 +2,11 @@
   {
     "version": "1.0.1",
     "date": "2026-10-08",
-    "title": "Rule-aware opponents and aligned camera controls",
+    "title": "Rule-aware opponents and a roomier mobile table",
     "changes": [
-      "Desktop Camera now sits directly above the input-mode selector with matching gaps down to the legal links, and expands upward. Mobile placement is preserved.",
-      "Mobile close zoom preserves the viewing angle near rails instead of forcing an overhead view. An ongoing touch-aim drag can continue beyond the felt edge without taking a shot.",
+      "Desktop Camera now sits directly above the input-mode selector with matching gaps down to the legal links, and expands upward.",
+      "Mobile play has a compact combined header and score row, with version and legal links in settings. Portrait uses top/bottom bars and landscape uses side panels. Move Camera swaps the shot tray for camera controls; Done returns to play.",
+      "Mobile close zoom preserves the viewing angle near rails instead of forcing an overhead view. An ongoing touch-aim drag can continue beyond the felt edge without taking a shot. Circular touch aiming follows the visible cue-ball center through complete rotations.",
       "New Jev games use your selected Bar, Tournament or Custom rules. Resumed games retain their original rules, and Jev receives the full authoritative rule context.",
       "Premium players can explicitly start a new Jev game with edited rules. Existing games never change rules mid-rack.",
       "CPU and Jev planner power respects custom speed caps; constrained server fallbacks call a legal target.",
