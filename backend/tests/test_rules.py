@@ -53,12 +53,12 @@ def test_placement_policy():
     assert gs.kitchen_shot and not gs.ball_in_hand
 
 
-def test_legal_dry_break_keeps_layout_and_passes_open_table():
+def test_bar_soft_dry_break_keeps_layout_and_passes_open_table():
     gs = new_game()
     begin_shot(gs)
     gs.balls[1].x, gs.balls[1].y = 0.8, 0.3
     layout = [(b.x, b.y) for b in gs.balls]
-    apply_shot(gs, ShotEvents(first_contact=1, rail_after_contact=True, object_rails=[1, 2, 3, 4]))
+    apply_shot(gs, ShotEvents(first_contact=1, rail_after_contact=True, object_rails=[1]))
     assert [(b.x, b.y) for b in gs.balls] == layout
     assert gs.current == 1 and gs.open and not gs.break_shot and not gs.ball_in_hand
     begin_shot(gs)

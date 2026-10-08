@@ -58,7 +58,7 @@
     ]
   },
   {
-    "name": "illegal break reracks for opponent",
+    "name": "tournament illegal break reracks for opponent",
     "state": {},
     "ev": {
       "firstContact": 1,
@@ -76,7 +76,8 @@
       "current": 1,
       "breakShot": true,
       "ballInHand": false
-    }
+    },
+    "preset": "tournament"
   },
   {
     "name": "four rails is legal break",
@@ -682,6 +683,57 @@
         1
       ],
       "placement": "kitchen"
+    }
+  },
+  {
+    "name": "bar empty soft break preserves open table without rerack",
+    "state": {},
+    "ev": {
+      "firstContact": 1,
+      "potted": [],
+      "offTable": [],
+      "railAfterContact": true,
+      "cuePotted": false,
+      "objectRails": [
+        1
+      ]
+    },
+    "expected": {
+      "current": 1,
+      "breakShot": false,
+      "ballInHand": false,
+      "open": true,
+      "groups": [
+        null,
+        null
+      ]
+    }
+  },
+  {
+    "name": "bar break pot with scratch stays down but assigns no group",
+    "state": {},
+    "ev": {
+      "firstContact": 1,
+      "potted": [
+        5
+      ],
+      "offTable": [],
+      "railAfterContact": true,
+      "cuePotted": true
+    },
+    "expected": {
+      "current": 1,
+      "breakShot": false,
+      "ballInHand": true,
+      "placement": "kitchen",
+      "open": true,
+      "groups": [
+        null,
+        null
+      ],
+      "returnOrder": [
+        5
+      ]
     }
   }
 ]

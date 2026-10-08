@@ -56,6 +56,6 @@ export class TableOptions {
   }
   summary(c: MatchConfig): void {
     el('kitchenhelp').hidden=c.scratch!=='kitchen';
-    el('rulesummary').textContent = `${rulesName(c)} · Scratch: ${c.scratch === 'kitchen' ? 'behind the head string' : 'ball in hand anywhere'}. Calls: ${c.calls === 'eight' ? '8-Ball only' : c.calls === 'all' ? 'every ball' : 'none'}. ${c.assignOnBreak ? 'Groups may be assigned on the break.' : 'Table stays open after the break.'} 8 on break: ${c.eightOnBreak === 'win' ? 'win' : 'respot'}. ${c.strictBreak ? 'Illegal break: rerack for the opponent.' : ''}`;
+    el('rulesummary').textContent = `${rulesName(c)} · Scratch: ${c.scratch === 'kitchen' ? 'behind the head string' : 'ball in hand anywhere'}. Calls: ${c.calls === 'eight' ? '8-Ball only' : c.calls === 'all' ? 'every ball' : 'none'}. ${c.assignOnBreak ? 'Groups may be assigned on the break.' : 'Table stays open after the break.'} Groups require a legal pot; a scratch leaves an open table unassigned. 8 on break: ${c.eightOnBreak === 'win' ? 'win' : 'respot'}. ${c.strictBreak ? 'Illegal break: rerack for the opponent.' : 'Empty break: keep the layout and pass the turn; no rerack.'}`;
   }
 }
