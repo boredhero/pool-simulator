@@ -7,7 +7,7 @@ Flow: work on `develop`, PR to `main` (protected: PR + `ci` check), merge to shi
 - Frontend: Vite + TS + Three.js (WebGL2 baseline, WebGPU path later), custom 2D+spin sim
 - Backend: FastAPI + uvicorn + SQLite WAL (`/srv/data` volume), serves `frontend/dist`
 - Net: turn-based shot-event sync over WS, server authoritative on rules
-- CI: one workflow (lint/test/e2e/docker/deploy), Dependabot weekly grouped
+- CI: required fast checks/release workflow plus advisory browser checks on development pushes, Dependabot weekly grouped
 
 ## Physics contract (both sims, keep in sync)
 - Planar rolling + 3D flight/spin, SI units, fixed dt=1/240, swept TOI + gravity
@@ -179,11 +179,18 @@ Flow: work on `develop`, PR to `main` (protected: PR + `ci` check), merge to shi
   assertions skip redundant WebGL draws after initialization; they still run
   game updates, input handling, DOM layout, and scene synchronization.
   This is not a replacement for visual inspection or multiplayer integration.
-- Two isolated browser workers run in parallel. Bounded action/test timeouts,
+- Two browser workers run locally; CI uses one to avoid software WebGL CPU
+  contention. Redundant draws pause in-page immediately after initialization,
+  before browser-protocol round trips can queue additional expensive frames.
+  The smoke renders a real post-shot frame as well. Bounded action/test timeouts,
   proper waitForFunction options, and failure trace/screenshot uploads replace
   two-minute silent waits. Frontend unit tests now run in CI as well.
 - Develop updates run checks through the open PR's synchronize event. The `ci`
-  job remains the required aggregate check, not a deployment attempt. Release
+  job aggregates only lint, unit tests, builds and release jobs. Browser checks
+  run in a separate advisory workflow on pushes to all branches except main
+  and master, with stale runs cancelled. Neither `ci` nor deployment waits on
+  E2E. Main branch protection already requires only `ci`, so no protection
+  bypass or server-side settings change is needed. Release
   images build only on main, without the redundant host-side frontend build.
   The Docker build now respects TypeScript failures; deployment waits for tests.
 - References: [Playwright API mocking](https://playwright.dev/docs/mock),

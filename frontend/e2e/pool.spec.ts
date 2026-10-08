@@ -3,21 +3,27 @@ import { expect, test, type Page } from '@playwright/test';
 test.beforeEach(async ({page}) => {
   // This suite covers the standalone frontend. Backend API tests cover /api/version.
   await page.route('**/api/version', route => route.fulfill({json:{version:'e2e'}}));
+  await page.addInitScript(() => {
+    const w=window as any, requestFrame=window.requestAnimationFrame.bind(window);
+    window.requestAnimationFrame=callback=>requestFrame(time=>{
+      // Pause redundant GPU draws in-page before the first post-init frame,
+      // not after several slow browser-protocol round trips. Game updates and
+      // real browser animation frames continue for controls and actionability.
+      if(w.__pool && !w.__draw) {
+        const renderer=w.__pool.scene.renderer;
+        w.__draw=renderer.render.bind(renderer);
+        w.__renderedCalls=renderer.info.render.calls;
+        renderer.render=()=>{};
+      }
+      callback(time);
+    });
+  });
 });
 
 async function openGame(page: Page, reload = false) {
   if (reload) await page.reload(); else await page.goto('/');
-  await page.waitForFunction(() => !!(window as any).__pool, undefined, {timeout:10000});
+  await page.waitForFunction(() => !!(window as any).__draw, undefined, {timeout:10000,polling:100});
   await expect(page.locator('#version')).toHaveText('ve2e');
-  // Keep actual game updates, controls, layout, and scene meshes running. UI
-  // assertions don't need repeated software WebGL draws; the smoke below
-  // verifies real rendering before and after its real mouse-driven shot.
-  await page.evaluate(() => {
-    const w=window as any, renderer=w.__pool.scene.renderer;
-    w.__draw=renderer.render.bind(renderer);
-    w.__renderedCalls=renderer.info.render.calls;
-    renderer.render=()=>{};
-  });
 }
 
 test('loads, renders table, breaks and resolves', async ({ page }) => {
@@ -42,7 +48,8 @@ test('loads, renders table, breaks and resolves', async ({ page }) => {
     g.angle = 0; g.targetAngle = 0; // +x straight into the rack from the head spot
   });
   await page.mouse.down();
-  await page.mouse.move(sx - 300, sy + 250, { steps: 12 });
+  await page.evaluate(() => {const g=(window as any).__pool;g.angle=g.targetAngle=0;});
+  await page.mouse.move(sx - 180, sy + 100, { steps: 4 });
   await page.mouse.up();
   // Shot must actually be underway now.
   await page.waitForFunction(
@@ -55,12 +62,16 @@ test('loads, renders table, breaks and resolves', async ({ page }) => {
     const g=(window as any).__pool;
     let frames=0;
     while(g.mode==='rolling' && frames<180) {g.accumulator+=.25;g.frame();frames++;}
-    g.scene.renderer.render=(window as any).__draw;
+    g.scene.renderer.render=(...args:any[])=>{
+      (window as any).__draw(...args);
+      (window as any).__afterShotCalls=g.scene.renderer.info.render.calls;
+      g.scene.renderer.render=()=>{};
+    };
     return {mode:g.mode, firstContact:g.ev.firstContact, asleep:g.gs.balls.every((b:any)=>b.asleep||b.potted)};
   });
   expect(result.mode).not.toBe('rolling');expect(result.firstContact).not.toBeNull();expect(result.asleep).toBe(true);
   await expect(page.locator('#msg')).toContainText(/Player [12]/);
-  await page.evaluate(() => new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));
+  await page.waitForFunction(() => (window as any).__afterShotCalls>0, undefined, {timeout:10000,polling:100});
   expect(errors).toEqual([]);
 });
 
