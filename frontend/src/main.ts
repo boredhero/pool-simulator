@@ -1,14 +1,16 @@
 import { initPrivacy } from './ui/privacy';
+import { needsWelcome, setupWelcome } from './ui/welcome';
 import { setupChangelog } from './ui/changelog';
 import { Game } from './ui/game';
 import { setupDraggablePanels } from './ui/draggablePanel';
 import { setupCameraFly } from './ui/cameraFlyControls';
 setupChangelog();
-initPrivacy();
+initPrivacy({deferNotice:needsWelcome()});
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
 const game = new Game(canvas);
 setupDraggablePanels();
 setupCameraFly(game.scene.cameraRig);
+setupWelcome(()=>document.getElementById('starttutorial')!.click());
 (window as unknown as { __pool: Game }).__pool = game;
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
