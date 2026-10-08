@@ -31,7 +31,7 @@ the camera movement pad remains separate and available to touch users.
 
 ## Opening coin and responsive Jev shots
 
-A denarius-style coin animation reveals the opening player for every new local
+A gold coin animation reveals the opening player for every new local
 rack and server game. Offline racks use browser cryptographic randomness. Jev
 chooses and persists its breaker on creation; resuming never rerolls. Online
 rooms choose once when both players join and broadcast the same result. The

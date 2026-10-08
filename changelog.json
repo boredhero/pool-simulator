@@ -1,5 +1,15 @@
 [
   {
+    "version": "0.9.5",
+    "date": "2026-10-08",
+    "title": "A gold coin on the table",
+    "changes": [
+      "The opening toss uses a plain gold coin with H and T faces. It flies in from offscreen, flips, and lands on the felt to reveal who breaks.",
+      "Reduced motion shows the selected face without the flight animation. Server-selected breakers and resume behavior remain unchanged.",
+      "Close-button X icons are centered consistently across panels and the tutorial."
+    ]
+  },
+  {
     "version": "0.9.4",
     "date": "2026-10-08",
     "title": "Clearer views, account access and winning moments",
@@ -9,7 +19,7 @@
       "Completed racks show the winner, a brief reduced-motion-aware confetti celebration and replay actions for local, CPU, Jev and online sessions.",
       "Fixed an airborne jaw collision and added mirrored flight regressions. Tournament off-table objects stay out; the 8 off on the break is spotted with opponent kitchen placement. Bar keeps its house rules.",
       "The tutorial teaches the actual selected interface: mouse/trackpad pull-and-release with the live power bar, or touch power and Shoot controls.",
-      "A denarius coin toss chooses the opening player in local, CPU, Jev and online games. Server games keep their chosen breaker on resume.",
+      "A coin toss chooses the opening player in local, CPU, Jev and online games. Server games keep their chosen breaker on resume.",
       "Human shots against Jev start moving immediately while the server validates and resolves the shot. Delayed results reconcile after playback without a second strike."
     ]
   },

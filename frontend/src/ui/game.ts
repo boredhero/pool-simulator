@@ -47,7 +47,8 @@ const freshEv = (): ShotEvents => ({
 
 export class Game {
   tutorial = new Tutorial();
-  coin = new CoinToss();
+  coin:CoinToss;
+  private lastCoinStatus='';
   private coinRooms=new WeakSet<RoomClient>();
   winnerDialog = new WinnerDialog(()=>this.restartAfterWin());
   gs: GameState;
@@ -102,6 +103,7 @@ export class Game {
 
   constructor(canvas: HTMLCanvasElement) {
     this.scene = init(canvas);
+    this.coin=new CoinToss(this.scene.coin);
     this.gs = newGame(1);
     this.queueLocalCoin();
     this.el = Object.fromEntries(
@@ -731,10 +733,8 @@ export class Game {
     const fnow = performance.now();
     const fdt = this.lastFrame ? Math.min((fnow - this.lastFrame) / 1000, 0.1) : 0.016;
     this.lastFrame = fnow;
-    const coinPoint=this.scene.controls.object.position.clone().set(0,.03,0).project(this.scene.controls.object);
-    const canvasRect=this.scene.renderer.domElement.getBoundingClientRect();
-    this.coin.update(this.gs,fdt,this.tutorial.active||document.hidden||!!document.querySelector('dialog[open]'),[this.playerName(0),this.playerName(1)],
-      {x:canvasRect.left+(coinPoint.x+1)*canvasRect.width/2,y:canvasRect.top+(1-coinPoint.y)*canvasRect.height/2});
+    this.coin.update(this.gs,fdt,this.tutorial.active||document.hidden||!!document.querySelector('dialog[open]'),[this.playerName(0),this.playerName(1)]);
+    if(this.coin.status!==this.lastCoinStatus){this.lastCoinStatus=this.coin.status;this.hud();}
     let ballDt = fdt;
     for (const b of this.gs.balls) {
       if (b.potted) continue;
@@ -882,7 +882,7 @@ export class Game {
     else if (this.mode === 'wait' && this.room) msg += ' — waiting…';
     else if (this.room && this.seat !== null && this.seat !== this.gs.current && this.mode === 'aim') msg += ' — opponent aiming…';
     if(msg.startsWith('Illegal break'))msg += ' · no ball pocketed and fewer than four object balls reached a rail';
-    this.el.msg.textContent = msg.replace(/\bPlayer ([12])\b/g,(_,seat)=>this.playerName(Number(seat)-1));
+    this.el.msg.textContent = (this.coinPending()&&this.coin.status?this.coin.status:msg).replace(/\bPlayer ([12])\b/g,(_,seat)=>this.playerName(Number(seat)-1));
     this.el.turn.textContent = this.gs.winner !== null ? 'Game over' : this.playerName(this.gs.current);
     this.el.turn.classList.toggle('me', !this.room || this.seat === this.gs.current);
     this.el.roominfo.textContent = this.room ? (this.room.code ? `Room ${this.room.code} · ${this.room.ready?'Connected · your seat '+((this.seat??0)+1):'Waiting for your friend'}`:'Connecting…') : 'No room connected';

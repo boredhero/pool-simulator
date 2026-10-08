@@ -1,3 +1,4 @@
+import './ui/closeButton.css';
 import { initPrivacy } from './ui/privacy';
 import { needsWelcome, setupWelcome } from './ui/welcome';
 import { setupChangelog } from './ui/changelog';

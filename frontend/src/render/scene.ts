@@ -1,3 +1,4 @@
+import {GoldCoin} from './goldCoin';
 import { guideColor } from './guideColor';
 import { PocketDrops } from './pocketDrop';
 import { CameraRig } from './cameraRig';
@@ -22,6 +23,7 @@ export const toSim = (rx: number, rz: number): [number, number] => [rx + TABLE_W
 
 export interface SceneHandle {
   renderer: THREE.WebGLRenderer;
+  coin: GoldCoin;
   controls: OrbitControls;
   cameraRig: CameraRig;
   /** Sync ball meshes from sim state (rolls them by their spin state). */
@@ -320,6 +322,7 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
   addEventListener('resize', resize);
   resize();
 
+  const coin=new GoldCoin(scene,camera);
   let running = true;
   const cbs: Array<() => void> = [];
   document.addEventListener('visibilitychange', () => {
@@ -349,6 +352,7 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
   let cueObstacles: Parameters<typeof cueElevation>[4] = [];
   return {
     renderer,
+    coin,
     controls,
     cameraRig,
     setBalls(list, dt, returnOrder = [], visualDt = dt) {

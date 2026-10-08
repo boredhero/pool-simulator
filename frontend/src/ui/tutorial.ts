@@ -18,7 +18,7 @@ export class Tutorial {
   private profile:TutorialProfile='mouse';
   constructor(){
     const panel=document.getElementById('tutorial')!;
-    panel.innerHTML='<header><strong id="tutorialtitle"></strong><button id="tutorialclose" type="button" aria-label="Close practice and return to game">×</button></header><p id="tutorialbody"></p><footer><button id="tutorialback" type="button">Back</button><span id="tutorialprogress" role="status"></span><button id="tutorialnext" type="button">Next</button></footer>';
+    panel.innerHTML='<header><strong id="tutorialtitle"></strong><button class="icon-close" id="tutorialclose" type="button" aria-label="Close practice and return to game">×</button></header><p id="tutorialbody"></p><footer><button id="tutorialback" type="button">Back</button><span id="tutorialprogress" role="status"></span><button id="tutorialnext" type="button">Next</button></footer>';
     document.getElementById('starttutorial')!.addEventListener('click',()=>this.start());
     document.getElementById('tutorialclose')!.addEventListener('click',()=>this.close());
     document.getElementById('tutorialnext')!.addEventListener('click',()=>{if(++this.index===actions.length)this.close();else this.show();});
