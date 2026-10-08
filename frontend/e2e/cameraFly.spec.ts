@@ -159,7 +159,37 @@ test('trackpad momentum never steers or fires the cue and Shift spin precision s
   });
   expect(result.after).toBe(result.aim);expect(result.mode).toBe('aim');expect(result.pulling).toBe(false);expect(result.canShoot).toBe(false);
   await page.waitForTimeout(600);
-  await page.locator('#spin').focus();const height=(await pose(page)).height;
+  await page.locator('#spin').focus();
+  await page.evaluate(()=>{const controls=(window as any).__pool.scene.controls;for(let i=0;i<120;i++)controls.update();controls.enableDamping=false;controls.update();});
+  const height=(await pose(page)).height;
   await page.keyboard.down('ShiftLeft');await page.waitForTimeout(180);await page.keyboard.press('ArrowDown');await page.keyboard.up('ShiftLeft');
   expect((await pose(page)).height).toBeCloseTo(height,3);
+});
+
+
+test('camera HUD keeps mode and disclosure together, reveals help on demand and stays clear of shooting',async({page})=>{
+  await page.setViewportSize({width:1024,height:768});
+  const hud=page.locator('#camera-fly-hud'),toggle=page.locator('#camera-fly-toggle');
+  await expect(page.locator('#camera-input-profile')).toBeVisible();
+  await expect(page.locator('#camera-input-hint')).not.toBeVisible();
+  const collapsed=(await hud.boundingBox())!;expect(collapsed.height).toBeLessThan(60);
+  await toggle.click();
+  await expect(page.locator('#camera-input-hint')).toBeVisible();
+  await expect(toggle).toHaveAccessibleName('Hide camera controls');
+  const box=(await hud.boundingBox())!,tray=(await page.locator('.control-tray').boundingBox())!;
+  expect(box.y).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(1024);
+  expect(box.y+box.height).toBeLessThan(tray.y);
+  for(const name of ['Fly camera rise','Fly camera lower','Fly camera turn-left','Fly camera turn-right']) {
+    const control=page.getByRole('button',{name,exact:true});await expect(control).toBeInViewport();
+    const button=(await control.boundingBox())!;expect(button.height).toBeGreaterThanOrEqual(44);expect(button.width).toBeGreaterThanOrEqual(44);
+  }
+  await toggle.click();await expect(page.locator('#camera-input-hint')).not.toBeVisible();
+});
+
+
+test('legal links and privacy control share one visual family',async({page})=>{
+  const styles=await page.locator('.legal-links a,.legal-links button').evaluateAll(elements=>elements.map(element=>{const style=getComputedStyle(element);return {radius:style.borderRadius,height:style.minHeight,border:style.borderTopWidth,background:style.backgroundColor};}));
+  expect(styles).toHaveLength(3);expect(styles[1]).toEqual(styles[0]);expect(styles[2]).toEqual(styles[0]);
+  const footer=(await page.locator('.legal-links').boundingBox())!,tray=(await page.locator('.control-tray').boundingBox())!;
+  expect(footer.y).toBeGreaterThan(tray.y+tray.height);
 });
