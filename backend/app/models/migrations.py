@@ -42,3 +42,18 @@ def upgrade_terms(connection) -> None:
             text("UPDATE terms_acceptances SET version = :current WHERE version = :legacy"),
             {"current": current, "legacy": LEGACY_VERSION},
         )
+
+
+def upgrade_match_modes(connection) -> None:
+    """Existing ledger rows describe online matches; preserve their counters."""
+    op = Operations(MigrationContext.configure(connection))
+    columns = {c["name"] for c in inspect(connection).get_columns("game_matches")}
+    if "mode" not in columns:
+        op.add_column(
+            "game_matches", Column("mode", String(16), nullable=False, server_default="online")
+        )
+    if "shot_stats_complete" not in columns:
+        op.add_column(
+            "game_matches",
+            Column("shot_stats_complete", Boolean, nullable=False, server_default="1"),
+        )
