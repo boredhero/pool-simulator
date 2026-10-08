@@ -3,6 +3,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TOUCH, MOUSE } from 'three';
 import { BALL_R, TABLE_H, TABLE_W } from '../sim/table';
 import { translateCamera } from './cameraFly';
+import { mobileSafeFrame } from './mobileSafeFrame';
 
 export type Point={x:number;y:number;potted?:boolean};
 export type SafeFrame={left:number;right:number;top:number;bottom:number};
@@ -122,7 +123,10 @@ export class CameraRig {
     const top=Math.min(rect.height*.45,(mobile?Math.max(header.bottom,cards.bottom):header.bottom)+20);
     const bottom=Math.min(rect.height-20,Math.max(top+80,tray.top-20));
     const left=mobile?20:Math.min(cards.right+24,rect.width*.3);
-    const safe={left:2*left/rect.width-1,right:1-40/rect.width,top:1-2*top/rect.height,bottom:1-2*bottom/rect.height};
+    const hud=document.getElementById('camera-fly-hud')?.getBoundingClientRect();
+    const safe=mobile?mobileSafeFrame(rect,[header,cards],[tray,...(hud?[hud]:[])]):
+      {left:2*left/rect.width-1,right:1-40/rect.width,top:1-2*top/rect.height,bottom:1-2*bottom/rect.height};
+    if(!safe)return undefined;
     const currentTheta=new Spherical().setFromVector3(this.camera.position.clone().sub(this.controls.target)).theta;
     const facing=cue?{cue,theta:laneTheta??majorityFacing(cue,targets,currentTheta)}:undefined;
     const pose=framePose(this.camera,this.controls.target,points,safe,facing);

@@ -1,5 +1,6 @@
 import {CoinToss,randomBreaker} from './coinToss';
 import {placementLane} from './placementCamera';
+import {mobileShotFocus} from './mobileShotFocus';
 import type { PerspectiveCamera } from 'three';
 import { WinnerDialog } from './winner';
 import { animateOpponentCue, cuePresentation, freezeShot, type SelectedShot, type CuePhase } from './opponentCue';
@@ -353,8 +354,17 @@ export class Game {
   private pendingPlacementCamera:{revision:number;seat:number;room:RoomClient;x:number;y:number}|null=null;
 
   frameBalls(whole=false,placement=false): void {
+    if(placement&&(this.tutorial.active||!this.options.autoCamera||this.cameraMode||this.scene.cameraRig.interacting))return;
+    if(!whole&&!this.tutorial.active&&this.scene.renderer.domElement.getBoundingClientRect().width<900){
+      const focus=mobileShotFocus(this.gs,this.calledBall,this.calledPocket);
+      if(focus){
+        const facing=this.scene.cameraRig.frame(focus.points,focus.cue,[],focus.theta);
+        if(!placement&&facing!==undefined&&this.humanTurn()&&!this.pulling)
+          this.targetAngle=Math.atan2(-Math.cos(facing),-Math.sin(facing));
+        return;
+      }
+    }
     if(placement){
-      if(this.tutorial.active||!this.options.autoCamera||this.cameraMode||this.scene.cameraRig.interacting)return;
       const lane=placementLane(this.gs);
       if(lane){this.scene.cameraRig.frame([lane.cue,lane.ghost,lane.object,lane.pocket],lane.cue,[],lane.theta);return;}
     }
