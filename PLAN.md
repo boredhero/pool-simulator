@@ -21,6 +21,10 @@ Flow: work on `develop`, PR to `main` (protected: PR + `ci` check), merge to shi
 - P0 skeleton, P1 solo sim+rules+controls, P2 Python mirror+API, P3 WS rooms,
   P4 PWA+audio+e2e, P5 L1 AI, P6 UX (hold/pull shooting, scorecards, themes,
   lobby), P7 research constants, P8 pockets (segmented rails, holes, lip dip)
+- Table graphics repair: continuous beveled wood surround, true pocket cutouts
+  and recessed wells, leather facings, sloped cushions and instanced jaws tied
+  to sim geometry, softer materials/shadows, desktop/portrait camera fitting.
+  Geometry ray tests cover clear pockets and continuous outside rails.
 
 ## Open / known gaps
 - Pocket forgiveness for casual play (strict-pro now); cloth-speed setting

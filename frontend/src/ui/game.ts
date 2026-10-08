@@ -33,8 +33,8 @@ export class Game {
   gs: GameState;
   scene: SceneHandle;
   mode: Mode = 'aim';
-  angle = Math.PI; // aim direction, sim plane (eased toward targetAngle)
-  targetAngle = Math.PI;
+  angle = 0; // aim direction, sim plane (eased toward targetAngle)
+  targetAngle = 0;
   power = 0.5; // last fired power (drives cue rest offset)
   tipX = 0; tipY = 0;
   roomNames: string[] | null = null;
