@@ -28,6 +28,8 @@ export class AdminPanel {
       this.dialog.showModal();void this.load();
     });
     el('adminclose').addEventListener('click',()=>this.dialog.close());
+    // Keep game-level shortcuts from closing the panel underneath this modal.
+    this.dialog.addEventListener('keydown',event=>event.stopPropagation());
     this.dialog.addEventListener('close',()=>{
       this.pending?.abort();this.sequence++;
       this.opener?.focus();
