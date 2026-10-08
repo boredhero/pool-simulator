@@ -78,7 +78,20 @@ export function strike(b: Ball, dx: number, dy: number, power: number, tipX: num
 }
 
 function friction(b: Ball, dt: number): void {
-  // Slip velocity at cloth contact: u = v + R*zhat x w  => (vx - R*wy, vy + R*wx)
+  // Pocket lip gravity: overhanging slow balls get pulled in, never rest on air.
+  const spd0 = Math.hypot(b.vx, b.vy);
+  if (spd0 < 1.5) {
+    for (const p of POCKETS) {
+      const dx = p.x - b.x, dy = p.y - b.y;
+      const d = Math.hypot(dx, dy);
+      const cr = captureRadius(p, spd0);
+      if (d < cr + BALL_R && d > 1e-6) {
+        const a = 0.5 + 3.0 * (1 - d / (cr + BALL_R));
+        b.vx += ((a * dx) / d) * dt;
+        b.vy += ((a * dy) / d) * dt;
+      }
+    }
+  }
   const ux = b.vx - BALL_R * b.wy;
   const uy = b.vy + BALL_R * b.wx;
   const s = Math.hypot(ux, uy);
