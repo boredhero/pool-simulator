@@ -1,6 +1,6 @@
 [
   {
-    "name": "bar break leaves groups open",
+    "name": "bar break immediately assigns the pocketed group",
     "state": {},
     "ev": {
       "firstContact": 1,
@@ -12,8 +12,12 @@
       "cuePotted": false
     },
     "expected": {
-      "open": true,
-      "current": 0
+      "open": false,
+      "current": 0,
+      "groups": [
+        "solid",
+        "stripe"
+      ]
     }
   },
   {
@@ -557,5 +561,49 @@
     "respot": [
       8
     ]
+  },
+  {
+    "name": "mixed bar break keeps table open",
+    "state": {},
+    "ev": {
+      "firstContact": 1,
+      "potted": [
+        1,
+        9
+      ],
+      "offTable": [],
+      "railAfterContact": true,
+      "cuePotted": false
+    },
+    "expected": {
+      "current": 0,
+      "open": true,
+      "groups": [
+        null,
+        null
+      ]
+    }
+  },
+  {
+    "name": "tournament scoring break stays open",
+    "preset": "tournament",
+    "state": {},
+    "ev": {
+      "firstContact": 1,
+      "potted": [
+        1
+      ],
+      "offTable": [],
+      "railAfterContact": true,
+      "cuePotted": false
+    },
+    "expected": {
+      "current": 0,
+      "open": true,
+      "groups": [
+        null,
+        null
+      ]
+    }
   }
 ]

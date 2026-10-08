@@ -44,7 +44,8 @@ Flow: work on `develop`, PR to `main` (protected: PR + `ci` check), merge to shi
 
 ## Model and preset decisions
 - Bar is a named house preset, not a universal bar standard: scratch in the
-  kitchen, other fouls anywhere, call the 8, 8 on a legal break wins, scratch
+  kitchen, other fouls anywhere, call the 8, single-group break pots assign that group, mixed break pots leave
+  the table open, 8 on a legal break wins, scratch
   while on the 8 loses. Kitchen shots must leave the kitchen before contacting
   an object inside it. If all legal targets are inside, spot the nearest one.
 - Tourny is a tournament-inspired preset: call every scoring shot, normal
@@ -88,3 +89,28 @@ Flow: work on `develop`, PR to `main` (protected: PR + `ci` check), merge to shi
 ## Key docs
 - README.md (quickstart), CLAUDE.md (agent rules), contracts/ (shot schema)
 - Research reports live in chat history (GPU SOTA, physics, backend, feel, pockets, materials)
+
+## Latest visual and group-assignment refinements
+- Original procedural maple/walnut cue with ferrule, chalked leather tip,
+  brushed joint, pearl points/rings, linen grip and rubber bumper. Clearance
+  dimensions match its 1.45 m length and larger butt in both simulators.
+- Kitchen placement has a shaded region, dashed head string and in-scene label;
+  the guide remains while aiming the required shot out of the kitchen.
+- Appearance offers dots, elongated diamonds (default), double diamonds, squares or none,
+  saved locally. Real references: [A.E. Schmidt sights](https://shop.aeschmidtbilliards.com/products/mother-of-pearl-diamond-rail-sight),
+  [Alexander double diamonds](https://aeschmidtbilliards.com/product/alexander-pool-table/),
+  [Imperial Aris square sights](https://imperialusa.com/products/aris-8-pool-table).
+- User selected immediate single-group break assignment for Bar. Tourny still
+  stays open after the break; Custom exposes the switch. Both player cards
+  refresh as soon as that scoring shot resolves, before the next shot starts.
+- Material review fixed cloth bump height being derived from the albedo red
+  channel: independent neutral height maps now give every theme the same fine,
+  isotropic weave. Bed/cushion sheen is reduced and theme-tinted. Wood uses
+  coherent periodic grain with subtle height/roughness maps; theme changes keep
+  its pattern deterministic. Anisotropy is capped and shared by all maps.
+  References: [Three texture data/color spaces](https://threejs.org/docs/pages/Texture.html),
+  [material maps](https://threejs.org/docs/pages/MeshStandardMaterial.html),
+  [physical sheen](https://threejs.org/docs/pages/MeshPhysicalMaterial.html), and
+  [Simonis nap-free worsted cloth](https://www.simoniscloth.com/product/simonis-860/).
+  A remaining refinement is individual longitudinal UV mapping on the short
+  end rails; the current continuous surround retains its original UV layout.

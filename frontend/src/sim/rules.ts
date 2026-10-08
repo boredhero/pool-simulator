@@ -86,10 +86,10 @@ export function applyShot(gs: GameState, ev: ShotEvents, before = gs.shot ?? beg
   const spotBreakEight = before.breakShot && eightDown && gs.rules.eightOnBreak === 'spot';
   if (spotBreakEight) spotBall(gs, 8);
   if (eightOff || (onEight && scratch && gs.rules.scratchOnEightLoss) || (eightDown && !spotBreakEight && !(before.breakShot && !foul) && !(onEight && !foul && eightCalled))) {
-    gs.winner = other; gs.message = `Player ${other + 1} wins — ${foul ?? (onEight ? '8-ball in the wrong pocket' : 'early 8-ball')}`; return gs;
+    gs.winner = other; gs.message = `Player ${other + 1} wins — ${foul ?? (onEight ? '8-Ball in the wrong pocket' : 'early 8-Ball')}`; return gs;
   }
   if (eightDown && before.breakShot && !foul) {
-    if (gs.rules.eightOnBreak === 'win') { gs.winner = me; gs.message = `Player ${me + 1} wins — 8-ball on the break`; return gs; }
+    if (gs.rules.eightOnBreak === 'win') { gs.winner = me; gs.message = `Player ${me + 1} wins — 8-Ball on the break`; return gs; }
     spotBall(gs, 8);
   } else if (eightDown && onEight && !foul && eightCalled) {
     gs.winner = me; gs.message = `Player ${me + 1} wins!`; return gs;
@@ -118,6 +118,8 @@ export function applyShot(gs: GameState, ev: ShotEvents, before = gs.shot ?? beg
   const continues = validPot && pots.some(n => gs.open || groupOf(n) === gs.groups[me]);
   gs.current = continues ? me : other; gs.ballInHand = false; gs.placement = 'none';
   gs.message = `Player ${gs.current + 1} ${continues ? 'shoots again' : 'to shoot'}`;
+  if (before.breakShot && gs.open) gs.message += gs.rules.assignOnBreak && pots.length ? ' · mixed break pots, table open' : ' · table open after the break';
+  else if (before.open && !gs.open) gs.message += ` · Player ${me + 1} has ${gs.groups[me] === 'solid' ? 'solids' : 'stripes'}`;
   return gs;
 }
 export function canPlace(gs: GameState, x: number, y: number): boolean {

@@ -84,3 +84,32 @@ test('pocket indicators update before rest without overwriting the next turn', a
   expect(result.live.mode).toBe('rolling');
   expect(result.finalMessage).toBe(result.expected);
 });
+
+test('bar break assigns both cards before the same player shoots again', async ({page}) => {
+  await page.goto('/');
+  const result=await page.evaluate(()=>{
+    const g=(window as any).__pool;
+    g.gs.balls.find((b:any)=>b.n===1).potted=true;
+    g.ev={firstContact:1,potted:[1],offTable:[],railAfterContact:true,cuePotted:false};g.mode='rolling';
+    g.frame();
+    return {mode:g.mode,current:g.gs.current,groups:g.gs.groups,text:document.getElementById('scorecard')!.textContent,message:document.getElementById('msg')!.textContent};
+  });
+  expect(result.mode).toBe('aim');expect(result.current).toBe(0);
+  expect(result.groups).toEqual(['solid','stripe']);expect(result.text).toContain('Solids');expect(result.text).toContain('Stripes');expect(result.message).toContain('shoots again');
+});
+
+test('kitchen guide and locally persisted sight shape', async ({page})=>{
+  await page.goto('/');
+  expect(await page.locator('#railsights').inputValue()).toBe('diamonds');
+  await page.locator('#settingsbtn').click();
+  await page.locator('#railsights').selectOption('double-diamonds');
+  await page.reload();
+  expect(await page.locator('#railsights').inputValue()).toBe('double-diamonds');
+  await page.evaluate(()=>{const g=(window as any).__pool;g.gs.ballInHand=true;g.gs.placement='kitchen';g.gs.kitchenShot=true;g.mode='place';g.frame();});
+  await expect(page.locator('#headstringguide')).toBeVisible();
+  await expect(page.locator('#headstringguide')).toContainText('Place inside');
+  await page.evaluate(()=>{const g=(window as any).__pool;g.gs.ballInHand=false;g.mode='aim';g.frame();});
+  await expect(page.locator('#headstringguide')).toContainText('leave the kitchen first');
+  await page.evaluate(()=>{const g=(window as any).__pool;g.gs.kitchenShot=false;g.frame();});
+  await expect(page.locator('#headstringguide')).toBeHidden();
+});

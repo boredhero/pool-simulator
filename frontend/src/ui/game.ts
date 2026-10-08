@@ -1,3 +1,4 @@
+import { sightStyle } from '../render/railSights';
 import { cueElevation } from '../sim/cue';
 import { type MatchConfig } from '../sim/config';
 import { TableOptions } from './tableOptions';
@@ -124,6 +125,12 @@ export class Game {
   }
 
   buildThemePanel(): void {
+    const railSelect = document.getElementById('railsights') as HTMLSelectElement;
+    railSelect.value = sightStyle(localStorage.getItem('pool:sights'));
+    this.scene.setSights(sightStyle(railSelect.value));
+    railSelect.addEventListener('change', () => {
+      const style = sightStyle(railSelect.value); this.scene.setSights(style); localStorage.setItem('pool:sights', style);
+    });
     this.applyTheme(localStorage.getItem('pool:felt') ?? FELTS[0], localStorage.getItem('pool:wood') ?? WOODS[0], false);
     (this.el.feltcustom as HTMLInputElement).addEventListener('input', (e) => {
       this.applyTheme((e.target as HTMLInputElement).value, localStorage.getItem('pool:wood') ?? WOODS[0]);
@@ -394,6 +401,7 @@ export class Game {
     this.scene.setCall(this.calledPocket, aiming && callRequired(this.gs));
     this.scene.setCue(aiming, this.cue().x, this.cue().y, this.angle, pull, this.tipX, this.tipY);
     (this.el.chargefill as HTMLElement).style.width = pulling ? `${this.pullPower() * 100}%` : '0%';
+    this.scene.setKitchen((this.mode === 'place' && this.gs.placement === 'kitchen') || (aiming && this.gs.kitchenShot), aiming);
     if (this.mode === 'place') {
       this.scene.setPlace(true, this.placeX, this.placeY, canPlace(this.gs, this.placeX, this.placeY), this.gs.placement);
     } else {
@@ -450,7 +458,7 @@ export class Game {
       );
       if (onEight) nums.push(8);
       const left = nums.filter((n) => !this.gs.balls.find((q) => q.n === n)?.potted).length;
-      gr.textContent = g === null ? 'Open table · groups unassigned' : onEight ? 'On the 8-ball' : `${label} · ${left} remaining`;
+      gr.textContent = g === null ? 'Open table · groups unassigned' : onEight ? 'On the 8-Ball' : `${label} · ${left} remaining`;
       head.appendChild(nm);
       head.appendChild(gr);
       card.appendChild(head);

@@ -171,12 +171,12 @@ def apply_shot(gs: GameState, ev: ShotEvents, before: ShotContext | None = None)
         )
     ):
         gs.winner = other
-        reason = foul or ("8-ball in the wrong pocket" if on_eight else "early 8-ball")
+        reason = foul or ("8-Ball in the wrong pocket" if on_eight else "early 8-Ball")
         gs.message = f"Player {other + 1} wins — {reason}"
         return gs
     if eight_down and before.break_shot and not foul:
         if gs.rules["eightOnBreak"] == "win":
-            gs.winner, gs.message = me, f"Player {me + 1} wins — 8-ball on the break"
+            gs.winner, gs.message = me, f"Player {me + 1} wins — 8-Ball on the break"
             return gs
         spot_ball(gs, 8)
     elif eight_down and on_eight and not foul and eight_called:
@@ -220,6 +220,15 @@ def apply_shot(gs: GameState, ev: ShotEvents, before: ShotContext | None = None)
     gs.ball_in_hand, gs.placement = False, "none"
     action = "shoots again" if continues else "to shoot"
     gs.message = f"Player {gs.current + 1} {action}"
+    if before.break_shot and gs.open:
+        gs.message += (
+            " · mixed break pots, table open"
+            if gs.rules["assignOnBreak"] and pots
+            else " · table open after the break"
+        )
+    elif before.open and not gs.open:
+        group_name = "solids" if gs.groups[me] == "solid" else "stripes"
+        gs.message += f" · Player {me + 1} has {group_name}"
     return gs
 
 

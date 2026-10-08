@@ -43,6 +43,6 @@ export class TableOptions {
     el('rulesnotice').textContent = online ? 'This room uses its host’s rules. Start a new room to change them.' : 'Preset rules are locked. Custom changes apply when you start a new rack.';
   }
   summary(c: MatchConfig): void {
-    el('rulesummary').textContent = `${rulesName(c)} · Scratch: ${c.scratch === 'kitchen' ? 'behind the head string' : 'ball in hand anywhere'}. Calls: ${c.calls === 'eight' ? '8-ball only' : c.calls === 'all' ? 'every ball' : 'none'}. ${c.assignOnBreak ? 'Groups may be assigned on the break.' : 'Table stays open after the break.'} 8 on break: ${c.eightOnBreak === 'win' ? 'win' : 'respot'}. ${c.strictBreak ? 'Illegal break: rerack for the opponent.' : ''}`;
+    el('rulesummary').textContent = `${rulesName(c)} · Scratch: ${c.scratch === 'kitchen' ? 'behind the head string' : 'ball in hand anywhere'}. Calls: ${c.calls === 'eight' ? '8-Ball only' : c.calls === 'all' ? 'every ball' : 'none'}. ${c.assignOnBreak ? 'Groups may be assigned on the break.' : 'Table stays open after the break.'} 8 on break: ${c.eightOnBreak === 'win' ? 'win' : 'respot'}. ${c.strictBreak ? 'Illegal break: rerack for the opponent.' : ''}`;
   }
 }

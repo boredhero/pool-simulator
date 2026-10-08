@@ -1,8 +1,8 @@
 import { BALL_R, TABLE_H, TABLE_W } from './table';
 const RAIL_W = 0.17;
 
-export const CUE_LENGTH = 1.35;
-const CLEARANCE = 0.012; // thick end of the shaft plus a small clearance
+export const CUE_LENGTH = 1.45;
+const CLEARANCE = 0.0165; // thick end of the shaft plus a small clearance
 
 /** Automatic assisted elevation about the cue-ball center, in radians.
  * Conservative obstacle bounds keep the full shaft above rails and balls.

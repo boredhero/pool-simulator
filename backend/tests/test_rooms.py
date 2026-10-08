@@ -102,4 +102,4 @@ def test_room_rules_revision_and_authoritative_calls():
         ws.send_json({"t": "done", "ev": {"potted": [8]}})
         result = ws.receive_json()
         assert result["revision"] == 1
-        assert result["winner"] is None  # Fake client 8-ball event cannot decide the match.
+        assert result["winner"] is None  # Fake client 8-Ball event cannot decide the match.

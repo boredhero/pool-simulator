@@ -7,7 +7,7 @@ from app.sim.table import BALL_R, TABLE_H, TABLE_W
 
 def cue_elevation(x, y, angle, pull, balls):
     dx, dy = -math.cos(angle), -math.sin(angle)
-    reach, clearance, rail = 1.35 + BALL_R + pull, 0.012, 0.17
+    reach, clearance, rail = 1.45 + BALL_R + pull, 0.0165, 0.17
     slope = math.tan(3 * math.pi / 180)
 
     def clear(distance, height):

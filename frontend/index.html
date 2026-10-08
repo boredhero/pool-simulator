@@ -82,6 +82,8 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
 @media(max-width:900px){#scorecard{width:auto}.pcard .pname{font-size:20px}.pcard .grp{font-size:16px}}
 @media(max-width:600px){#msg{font-size:21px}#turn{font-size:14px}#version{font-size:13px}.toolbar button{font-size:16px;padding:0 9px}.topbar{gap:10px}.pcard{padding:10px}.pcard .pname{font-size:20px}.pcard .grp{font-size:15px}.pball{width:25px;height:25px}.pball span{font-size:12px;width:17px;height:17px}.control-label,.spin-control .control-label{font-size:15px}.control-help{font-size:15px}.control-tray{gap:10px}#helppanel{width:auto}.status-meta{gap:6px}#callpanel{bottom:190px}#callpanel label,#callstatus,#clearcall{font-size:16px}}
 #scorecard,#helppanel,#settingspanel,#onlinepanel{top:var(--below-header,136px)}
+.kitchen-guide{position:fixed;z-index:3;transform:translate(-50%,-100%);pointer-events:none;padding:10px 16px;background:#211d18f5;border:1px solid #efd395;border-radius:12px;text-align:center;box-shadow:0 5px 20px #0005;max-width:280px}.kitchen-guide[hidden]{display:none}.kitchen-guide strong{display:block;font-size:20px;color:#ffe1a6}.kitchen-guide span{display:block;font-size:16px;line-height:1.3;color:#f2e7d2}.kitchen-guide::after{content:'';position:absolute;top:100%;left:50%;width:2px;height:30px;background:#efd395}
+@media(max-width:600px){.kitchen-guide{max-width:235px;width:235px;padding:8px 12px}.kitchen-guide strong{font-size:18px}}
 </style>
 </head>
 <body>
@@ -120,12 +122,12 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
 <div id="callpanel" hidden><label for="callball">Call your shot</label><select id="callball" aria-label="Called ball"></select><span id="callstatus">Tap a pocket on the table</span><button id="clearcall">Change pocket</button></div>
 <div id="settingspanel">
   <h2>Table &amp; rules</h2>
-  <label for="rulespreset">Game</label><select id="rulespreset"><option value="bar">8-ball (Bar)</option><option value="tournament">8-ball (Tourny)</option><option value="custom">8-ball (Custom)</option></select>
+  <label for="rulespreset">Game</label><select id="rulespreset"><option value="bar">8-Ball (Bar)</option><option value="tournament">8-Ball (Tourny)</option><option value="custom">8-Ball (Custom)</option></select>
   <p class="guide-note" id="rulesnotice">Preset rules are locked. Choose Custom to make them your own.</p>
   <fieldset id="rulefields">
     <label for="scratchrule">Scratch placement</label><select id="scratchrule"><option value="kitchen">Behind the head string</option><option value="anywhere">Anywhere (except break)</option></select>
-    <label for="callsrule">Call shots</label><select id="callsrule"><option value="none">No calls</option><option value="eight">8-ball only</option><option value="all">Every ball</option></select>
-    <label for="eightbreakrule">8-ball on the break</label><select id="eightbreakrule"><option value="win">Win</option><option value="spot">Spot it; keep playing</option></select>
+    <label for="callsrule">Call shots</label><select id="callsrule"><option value="none">No calls</option><option value="eight">8-Ball only</option><option value="all">Every ball</option></select>
+    <label for="eightbreakrule">8-Ball on the break</label><select id="eightbreakrule"><option value="win">Win</option><option value="spot">Spot it; keep playing</option></select>
     <label class="check"><input id="scratch8rule" type="checkbox"> Scratch while on the 8 loses</label>
     <label class="check"><input id="assignrule" type="checkbox"> Assign groups on the break</label>
     <label class="check"><input id="strictbreakrule" type="checkbox"> Legal break: pot or four object rails</label>
@@ -134,6 +136,8 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
   </fieldset>
   <button id="applyrules">Start new rack with these rules</button>
   <hr>
+  <h2>Appearance</h2>
+  <label for="railsights">Rail sights</label><select id="railsights"><option value="diamonds">Diamonds</option><option value="dots">Dots</option><option value="double-diamonds">Double diamonds</option><option value="squares">Squares</option><option value="none">None</option></select>
   <label>Felt</label>
   <div class="swatches" id="feltsw"></div>
   <label>Rails</label>
