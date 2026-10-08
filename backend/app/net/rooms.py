@@ -15,6 +15,7 @@ from fastapi import HTTPException, WebSocket, WebSocketDisconnect
 
 from app.services.auth import COOKIE, account_for_token, allowed_origin, rate_limit
 from app.services.matches import abandon_match, record_shot, start_match
+from app.sim import opening
 from app.sim.config import match_config
 from app.sim.cue import cue_elevation
 from app.sim.physics import Ball, ShotEvents, simulate_shot, strike
@@ -104,6 +105,7 @@ class Room:
     busy: bool = False
     closed: bool = False
     match_id: str | None = None
+    break_starter: int | None = None
     started: bool = False
     touched: float = field(default_factory=time.monotonic)
 
@@ -117,6 +119,7 @@ class Room:
             "balls": ball_dump(self.gs.balls),
             "return_order": self.gs.return_order,
             "current": self.gs.current,
+            "break_starter": self.break_starter,
             "groups": self.gs.groups,
             "open": self.gs.open,
             "ball_in_hand": self.gs.ball_in_hand,
@@ -263,6 +266,9 @@ async def handle(ws: WebSocket) -> None:
                 )
                 room.accounts[seat] = identity["id"] if identity else None
                 if seat == 1:
+                    room.break_starter = opening.choose_breaker()
+                    room.gs.current = room.break_starter
+                    room.gs.message = f"Player {room.break_starter + 1} breaks — coin toss"
                     room.match_id = await asyncio.to_thread(
                         start_match, room.names, room.accounts, room.gs.rules
                     )

@@ -53,3 +53,9 @@ def clean_accounts_and_matches():
         ):
             db.query(model).delete()
     yield
+
+
+@pytest.fixture(autouse=True)
+def deterministic_breaker(monkeypatch):
+    # Existing shot-flow tests intentionally exercise seat zero first. Coin tests override this.
+    monkeypatch.setattr("app.sim.opening.choose_breaker", lambda: 0)
