@@ -190,3 +190,51 @@ describe('determinism + sleep', () => {
     }
   });
 });
+
+describe('ball separation regressions', () => {
+  it('hits a sleeping ball regardless of its position in the array', () => {
+    for (const reverse of [false, true]) {
+      const target = makeBall(1, 1, 1, TABLE_H / 2);
+      const cue = awake(makeBall(0, null, 0.8, TABLE_H / 2));
+      cue.vx = 2;
+      const balls = reverse ? [cue, target] : [target, cue];
+      const ev = freshEv(), contact = cm();
+      for (let i = 0; i < 60; i++) {
+        step(balls, 1 / 240, ev, 0, contact);
+        expect(Math.hypot(cue.x - target.x, cue.y - target.y)).toBeGreaterThanOrEqual(2 * BALL_R - 1e-7);
+      }
+      expect(ev.firstContact).toBe(1);
+      expect(target.x).toBeGreaterThan(1);
+    }
+  });
+
+  it('repairs stationary and coincident overlaps without adding energy', () => {
+    for (const gap of [0, BALL_R]) {
+      const a = makeBall(0, null, 1, TABLE_H / 2);
+      const b = makeBall(1, 1, 1 + gap, TABLE_H / 2);
+      step([a, b], 1 / 240, freshEv(), 0, cm());
+      expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThanOrEqual(2 * BALL_R - 1e-7);
+      expect([a.vx, a.vy, b.vx, b.vy]).toEqual([0, 0, 0, 0]);
+    }
+  });
+});
+
+it('keeps every live pair separated throughout seeded full-power breaks', async () => {
+  const { newGame } = await import('../src/sim/rules');
+  for (const seed of [1, 7, 42]) {
+    const balls = newGame(seed).balls;
+    balls[0].asleep = false;
+    balls[0].vx = 8.5;
+    const ev = freshEv(), contact = cm();
+    let smallestGap = Infinity;
+    for (let tick = 0; tick < 240 * 45 && !allAsleep(balls); tick++) {
+      step(balls, 1 / 240, ev, 0, contact);
+      for (let i = 0; i < balls.length; i++) for (let j = i + 1; j < balls.length; j++) {
+        const a = balls[i], b = balls[j];
+        if (!a.potted && !b.potted) smallestGap = Math.min(smallestGap, Math.hypot(a.x - b.x, a.y - b.y));
+      }
+    }
+    expect(smallestGap, `seed ${seed}`).toBeGreaterThanOrEqual(2 * BALL_R - 1e-7);
+    expect(allAsleep(balls)).toBe(true);
+  }
+});

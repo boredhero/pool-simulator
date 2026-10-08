@@ -23,7 +23,7 @@ SLEEP_W = 0.5
 TIP_C = 2.5
 TIP_MAX = 0.55
 SQUIRT_K = 5.7 * 3.141592653589793 / 180.0
-VMAX_NORMAL = 4.5
+VMAX_NORMAL = 3.5
 VMAX_BREAK = 8.5
 VMIN = 0.55
 
@@ -122,21 +122,18 @@ def _earliest_contact(balls: list[Ball], dt: float):
     r2 = BALL_R * 2
     live = [b for b in balls if not b.potted]
     for i, a in enumerate(live):
-        if a.asleep and a.vx == 0 and a.vy == 0:
-            continue
         for b in live[i + 1 :]:
             dx, dy = a.x - b.x, a.y - b.y
             dvx, dvy = a.vx - b.vx, a.vy - b.vy
             qa = dvx * dvx + dvy * dvy
-            if qa < 1e-12:
-                continue
             qb = 2 * (dx * dvx + dy * dvy)
             qc = dx * dx + dy * dy - r2 * r2
             if qc < 0:
-                d = (dx * dx + dy * dy) ** 0.5 or 1e-9
-                best = (0.0, "bb", a.id, b.id, dx / d, dy / d)
+                d = (dx * dx + dy * dy) ** 0.5
+                nx, ny = (dx / d, dy / d) if d > 1e-9 else (1.0, 0.0)
+                best = (0.0, "bb", a.id, b.id, nx, ny)
                 continue
-            if qb >= 0:
+            if qa < 1e-12 or qb >= 0:
                 continue
             disc = qb * qb - 4 * qa * qc
             if disc < 0:
@@ -182,6 +179,8 @@ def _earliest_contact(balls: list[Ball], dt: float):
             qb = 2 * (dx * a.vx + dy * a.vy)
             qc = dx * dx + dy * dy - rr * rr
             if qc < 0:
+                if qb >= 0:  # Already leaving the jaw.
+                    continue
                 d = (dx * dx + dy * dy) ** 0.5 or 1e-9
                 if best is None or 0 < best[0]:
                     best = (0.0, "jaw", a.id, -1, dx / d, dy / d)
@@ -219,14 +218,14 @@ def _resolve_bb(a: Ball, b: Ball, nx: float, ny: float, ev: ShotEvents, cue_id: 
         if ev.first_contact is None and (a.id == cue_id or b.id == cue_id):
             other = b if a.id == cue_id else a
             ev.first_contact = other.n
-    else:
-        ox, oy = a.x - b.x, a.y - b.y
-        d = (ox * ox + oy * oy) ** 0.5 or 1e-9
-        push = (BALL_R * 2 - d) / 2 + 1e-6
-        a.x += ox / d * push
-        a.y += oy / d * push
-        b.x -= ox / d * push
-        b.y -= oy / d * push
+    # Position-only correction, including impacts and coincident centers.
+    distance = ((a.x - b.x) ** 2 + (a.y - b.y) ** 2) ** 0.5
+    if distance < BALL_R * 2:
+        push = (BALL_R * 2 - distance) / 2 + 1e-8
+        a.x += nx * push
+        a.y += ny * push
+        b.x -= nx * push
+        b.y -= ny * push
 
 
 def _resolve_rail(a: Ball, nx: float, ny: float, ev: ShotEvents, contact_made: dict) -> None:
@@ -257,7 +256,7 @@ def step(balls: list[Ball], dt: float, ev: ShotEvents, cue_id: int, contact_made
             prev[b.id] = (b.x, b.y)
             _friction(b, dt)
     remaining = dt
-    for _ in range(6):
+    for _ in range(64):
         if remaining <= 1e-9:
             break
         c = _earliest_contact(balls, remaining)
@@ -274,8 +273,6 @@ def step(balls: list[Ball], dt: float, ev: ShotEvents, cue_id: int, contact_made
             _resolve_bb(by_id[c[2]], by_id[c[3]], c[4], c[5], ev, cue_id)
         else:
             _resolve_rail(by_id[c[2]], c[4], c[5], ev, contact_made)
-        if c[0] == 0:
-            break
     if remaining > 1e-9:
         for b in balls:
             if not b.potted and not b.asleep:

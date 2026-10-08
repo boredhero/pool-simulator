@@ -96,3 +96,53 @@ def test_pocket_capture():
         if all_asleep(balls):
             break
     assert b.potted
+
+
+def test_sleeping_target_array_order():
+    from app.sim.table import BALL_R
+
+    for reverse in (False, True):
+        target = Ball(id=1, n=1, x=1, y=TABLE_H / 2)
+        cue = _ball(0, None, 0.8, TABLE_H / 2)
+        cue.vx = 2
+        balls = [cue, target] if reverse else [target, cue]
+        ev, contact = _ev(), _cm()
+        for _ in range(60):
+            step(balls, 1 / 240, ev, 0, contact)
+            assert ((cue.x - target.x) ** 2 + (cue.y - target.y) ** 2) ** 0.5 >= 2 * BALL_R - 1e-7
+        assert ev.first_contact == 1
+        assert target.x > 1
+
+
+def test_stationary_and_coincident_overlap():
+    from app.sim.table import BALL_R
+
+    for gap in (0, BALL_R):
+        a = Ball(id=0, x=1, y=TABLE_H / 2)
+        b = Ball(id=1, n=1, x=1 + gap, y=TABLE_H / 2)
+        step([a, b], 1 / 240, _ev(), 0, _cm())
+        assert ((a.x - b.x) ** 2 + (a.y - b.y) ** 2) ** 0.5 >= 2 * BALL_R - 1e-7
+        assert (a.vx, a.vy, b.vx, b.vy) == (0, 0, 0, 0)
+
+
+def test_break_separation_every_step():
+    from app.sim.rules import new_game
+    from app.sim.table import BALL_R
+
+    for seed in (1, 7, 42):
+        balls = new_game(seed).balls
+        balls[0].asleep = False
+        balls[0].vx = 8.5
+        ev, contact = _ev(), _cm()
+        smallest_gap = float("inf")
+        for _ in range(240 * 45):
+            if all_asleep(balls):
+                break
+            step(balls, 1 / 240, ev, 0, contact)
+            for i, a in enumerate(balls):
+                for b in balls[i + 1 :]:
+                    if not a.potted and not b.potted:
+                        distance = ((a.x - b.x) ** 2 + (a.y - b.y) ** 2) ** 0.5
+                        smallest_gap = min(smallest_gap, distance)
+        assert smallest_gap >= 2 * BALL_R - 1e-7, (seed, smallest_gap)
+        assert all_asleep(balls)
