@@ -1,47 +1,84 @@
-type Action='aim'|'spin'|'camera'|'shot';
-const steps:Array<{action:Action;title:string;target:string;desktop:string;touch:string}>=[
-  {action:'aim',title:'Line up the cue',target:'game-canvas',desktop:'Move the pointer over the felt to aim. Try turning the cue toward a ball.',touch:'Touch the felt and keep holding. Swing your finger sideways to turn the cue, then lift to keep your aim.'},
-  {action:'spin',title:'Try spin, then reset',target:'spincontrols',desktop:'Drag the dot on the white ball below to move the tip contact. Reset centers it again.',touch:'Drag the dot on the white ball below to add spin. Tap Reset whenever you want a centered hit.'},
-  {action:'camera',title:'Find your view',target:'viewbtn',desktop:'Choose your camera input mode in the HUD. Right-drag with a mouse, or two-finger scroll in Trackpad Mode. Pinch zooms; Option-scroll pans. WASD moves, Space rises, Left Shift descends, Q/E turns.',touch:'Drag two fingers together to orbit, and spread or pinch to zoom. View → Move camera also offers one-finger orbit. Return to play before shooting.'},
-  {action:'shot',title:'Choose power and shoot',target:'touchshoot',desktop:'On your turn, press on the felt, pull back to build power, and release. This is a real shot in your current game. Place or call the cue ball/shot first if prompted.',touch:'On your turn, set the power slider, then tap Shoot. This is a real shot in your current game. Place the cue ball or call your shot first if prompted.'},
-];
+import './tutorial.css';
+export type TutorialAction='aim'|'spin'|'camera'|'shot';
+export type TutorialProfile='mouse'|'trackpad'|'touch';
+interface PracticeHooks {begin():boolean;stage(action:TutorialAction):void;end():void;frame():void}
+const actions:TutorialAction[]=['aim','spin','camera','shot'];
+const titles=['Line up the yellow ball','Try spin, then reset','Move your view','Take the practice shot'];
+const copy:Record<TutorialProfile,string[]>={
+  mouse:['Move over the felt to aim at the yellow ball.','Drag the white-ball dot, then Reset to center it.','Right-drag the felt to orbit. Scroll to zoom.','Press on the felt, pull back, then release. Or use Shoot below.'],
+  trackpad:['Move your pointer over the felt toward the yellow ball.','Drag the white-ball dot, then Reset to center it.','Two-finger scroll to orbit. Pinch to zoom; Option-scroll pans.','Click and drag back on the felt, then release. Or use Shoot below.'],
+  touch:['Drag one finger on the felt toward the yellow ball, then lift.','Drag the white-ball dot, then tap Reset.','Move two fingers together to orbit. Pinch to zoom.','Set power below, then tap Shoot. This table is only for practice.'],
+};
 export class Tutorial {
   private index=-1;
   private done=false;
+  private staging=false;
+  private hooks?:PracticeHooks;
+  private frameId=0;
+  private profile:TutorialProfile='mouse';
   constructor(){
-    document.getElementById('starttutorial')!.addEventListener('click',()=>{
-      document.getElementById('helppanel')!.classList.remove('open');
-      document.getElementById('helpbtn')!.setAttribute('aria-expanded','false');
-      this.index=0;this.show();
-    });
+    const panel=document.getElementById('tutorial')!;
+    panel.innerHTML='<header><strong id="tutorialtitle"></strong><button id="tutorialclose" type="button" aria-label="Close practice and return to game">×</button></header><p id="tutorialbody"></p><footer><button id="tutorialback" type="button">Back</button><span id="tutorialprogress" role="status"></span><button id="tutorialnext" type="button">Next</button></footer>';
+    document.getElementById('starttutorial')!.addEventListener('click',()=>this.start());
     document.getElementById('tutorialclose')!.addEventListener('click',()=>this.close());
-    document.getElementById('tutorialnext')!.addEventListener('click',()=>{
-      if(++this.index===steps.length){this.close();return;}this.show();
-    });
+    document.getElementById('tutorialnext')!.addEventListener('click',()=>{if(++this.index===actions.length)this.close();else this.show();});
     document.getElementById('tutorialback')!.addEventListener('click',()=>{if(this.index>0){this.index--;this.show();}});
-    addEventListener('keydown',e=>{if(e.key==='Escape'&&this.index>=0){this.close();e.preventDefault();}});
+    addEventListener('keydown',e=>{if(e.key==='Escape'&&this.active){this.close();e.preventDefault();}});
+    const adapt=()=>{if(!this.active)return;this.refreshCopy();this.reframe();};
+    addEventListener('resize',adapt);
+    document.addEventListener('change',e=>{if((e.target as HTMLElement).id==='camera-input-profile')adapt();});
+    new MutationObserver(adapt).observe(document.documentElement,{attributes:true,attributeFilter:['class']});
   }
-  record(action:Action){
-    if(this.index<0||steps[this.index].action!==action||this.done)return;
-    this.done=true;
-    document.getElementById('tutorialprogress')!.textContent='Nice—that control worked. Continue when you’re ready.';
-    document.getElementById('tutorialnext')!.textContent=this.index===steps.length-1?'Finish':'Next';
+  bind(hooks:PracticeHooks){this.hooks=hooks;}
+  get active(){return this.index>=0;}
+  get action():TutorialAction|null{return this.active?actions[this.index]:null;}
+  start():boolean {
+    if(this.active)return true;
+    if(!this.hooks?.begin()){
+      let notice=document.getElementById('tutorial-unavailable');
+      if(!notice){notice=document.createElement('p');notice.id='tutorial-unavailable';notice.setAttribute('role','status');document.getElementById('starttutorial')!.after(notice);}
+      notice.textContent='Practice needs an idle local table. Finish the shot or leave the online/Jev game first.';return false;
+    }
+    document.getElementById('tutorial-unavailable')?.remove();
+    document.getElementById('helppanel')!.classList.remove('open');
+    document.getElementById('helpbtn')!.setAttribute('aria-expanded','false');
+    for(const id of ['settingspanel','onlinepanel','viewpanel'])document.getElementById(id)?.classList.remove('open');
+    this.index=0;document.body.classList.add('tutorial-practice');this.show();document.getElementById('tutorialclose')!.focus();return true;
+  }
+  record(action:TutorialAction){
+    if(this.staging||this.action!==action||this.done)return;
+    this.done=true;document.getElementById('tutorialprogress')!.textContent='Control worked';
+    document.getElementById('tutorialnext')!.textContent=this.index===actions.length-1?'Finish':'Next';
+  }
+  private refreshCopy(){
+    this.profile=document.documentElement.classList.contains('touch-input')||matchMedia('(pointer: coarse)').matches?'touch':
+      (document.getElementById('camera-input-profile') as HTMLSelectElement|null)?.value==='trackpad'?'trackpad':'mouse';
+    const panel=document.getElementById('tutorial')!;panel.dataset.profile=this.profile;
+    document.getElementById('tutorialbody')!.textContent=copy[this.profile][this.index];
+  }
+  private reframe(){
+    cancelAnimationFrame(this.frameId);
+    this.frameId=requestAnimationFrame(()=>{if(this.active)this.hooks?.frame();});
   }
   private show(){
     this.done=false;
-    const step=steps[this.index],touch=document.documentElement.classList.contains('touch-input');
-    document.getElementById('tutorial')!.hidden=false;
-    document.getElementById('tutorialtitle')!.textContent=`${this.index+1} / ${steps.length} · ${step.title}`;
-    document.getElementById('tutorialbody')!.textContent=touch?step.touch:step.desktop;
-    document.getElementById('tutorialprogress')!.textContent='Try it on the table, or skip this step.';
-    document.getElementById('tutorialnext')!.textContent=this.index===steps.length-1?'Finish':'Skip step';
+    const panel=document.getElementById('tutorial')!;panel.hidden=false;panel.dataset.step=actions[this.index];
+    document.body.dataset.tutorialStep=actions[this.index];
+    document.getElementById('tutorialtitle')!.textContent=`${this.index+1}/4 · ${titles[this.index]}`;
+    document.getElementById('tutorialprogress')!.textContent='Practice · game saved';
+    document.getElementById('tutorialnext')!.textContent=this.index===actions.length-1?'Finish':'Skip';
     (document.getElementById('tutorialback') as HTMLButtonElement).disabled=this.index===0;
     document.querySelectorAll('.tutorial-focus').forEach(e=>e.classList.remove('tutorial-focus'));
-    document.getElementById(step.action==='shot'&&!touch?'chargebar':step.target)?.classList.add('tutorial-focus');
+    this.refreshCopy();this.staging=true;this.hooks?.stage(actions[this.index]);this.staging=false;this.reframe();
+    const target=actions[this.index]==='spin'?'spincontrols':actions[this.index]==='shot'&&this.profile==='touch'?'touchshoot':null;
+    if(target)document.getElementById(target)?.classList.add('tutorial-focus');
   }
-  private close(){
-    this.index=-1;document.getElementById('tutorial')!.hidden=true;
+  close(){
+    if(!this.active)return;
+    this.index=-1;cancelAnimationFrame(this.frameId);
+    document.getElementById('tutorial')!.hidden=true;document.body.classList.remove('tutorial-practice');delete document.body.dataset.tutorialStep;
     document.querySelectorAll('.tutorial-focus').forEach(e=>e.classList.remove('tutorial-focus'));
+    this.hooks?.end();
     try{localStorage.setItem('pool:tutorialSeen','1');}catch{/* private mode */}
     document.getElementById('helpbtn')!.focus();
   }

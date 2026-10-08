@@ -1,3 +1,4 @@
+import { acceptWelcomeBeforeLoad } from './welcomeFixture';
 import { expect, test, type Page } from '@playwright/test';
 
 async function position(page: Page) {
@@ -6,6 +7,7 @@ async function position(page: Page) {
 const distance = (a: number[], b: number[]) => Math.hypot(...a.map((v, i) => v - b[i]));
 
 test.beforeEach(async ({ page }) => {
+  await acceptWelcomeBeforeLoad(page);
   await page.route('**/api/account', route => route.fulfill({ json: { account: null, stats: null } }));
   await page.route('**/api/version', route => route.fulfill({ json: { version: 'e2e' } }));
   await page.addInitScript(() => {
