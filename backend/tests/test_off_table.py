@@ -73,3 +73,13 @@ def test_descending_ball_above_overlapped_jaw_does_not_hit_phantom_wall():
     step([b], DT, ev, 0, {"v": False})
     assert b.vx < 0 and b.z > 0.05
     assert not ev.off_table and not ev.cue_potted
+
+
+def test_new_match_and_public_state_identify_revised_rules():
+    from app.models.db import GameMatch
+    from app.net.rooms import Room
+    from app.sim.rules import eight_ball
+
+    assert eight_ball.version == 2
+    assert Room(code="TEST").state_msg()["ruleset"] == {"id": eight_ball.id, "version": 2}
+    assert GameMatch.__table__.c.ruleset.default.arg == "eight-ball:2"

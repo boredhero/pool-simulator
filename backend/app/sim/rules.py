@@ -289,7 +289,7 @@ class Ruleset(Protocol):
 
 
 class EightBall:
-    id, version = "eight-ball", 1
+    id, version = "eight-ball", 2
     create = staticmethod(new_game)
     begin = staticmethod(begin_shot)
     resolve = staticmethod(apply_shot)

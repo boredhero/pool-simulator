@@ -27,3 +27,6 @@ it('descending airborne jaw overlap does not collide with a phantom wall',()=>{
   const j=jaws()[0],b=makeBall(0,null,j.x+BALL_R+j.r-.002,j.y);Object.assign(b,{z:.08,vz:-.1,vx:-.2,asleep:false});
   const ev=facts();step([b],DT,ev,0,{v:false});expect(b.vx).toBeLessThan(0);expect(b.z).toBeGreaterThan(.05);expect(ev.offTable).toEqual([]);expect(ev.cuePotted).toBe(false);
 });
+
+import {eightBall} from '../src/sim/rules';
+it('identifies the revised rule behavior',()=>expect(eightBall.version).toBe(2));

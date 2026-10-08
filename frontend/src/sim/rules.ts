@@ -142,4 +142,4 @@ export function placeCue(gs: GameState, x: number, y: number): boolean {
   gs.kitchenShot = gs.placement === 'kitchen'; gs.ballInHand = false; gs.placement = 'none';
   return true;
 }
-export const eightBall: Ruleset<GameState, ShotContext> = { id: 'eight-ball', version: 1, create: newGame, begin: beginShot, resolve: applyShot, targets: legalTargets, canPlace };
+export const eightBall: Ruleset<GameState, ShotContext> = { id: 'eight-ball', version: 2, create: newGame, begin: beginShot, resolve: applyShot, targets: legalTargets, canPlace };
