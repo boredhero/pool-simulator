@@ -135,6 +135,8 @@ def apply_shot(gs: GameState, ev: ShotEvents, before: ShotContext | None = None)
             gs.return_order.append(n)
     me, other = before.current, 1 - before.current
     on_eight = not before.open and before.group is not None and not before.remaining
+    tournament = gs.rules["preset"] == "tournament"
+    break_off = tournament and before.break_shot and bool(ev.off_table)
     eight_down, eight_off = 8 in ev.potted, 8 in ev.off_table
     scratch = ev.cue_potted or None in ev.off_table
     foul = None
@@ -156,17 +158,21 @@ def apply_shot(gs: GameState, ev: ShotEvents, before: ShotContext | None = None)
         foul = "No rail after contact"
     if not foul and scratch:
         foul = "Scratch"
-    if not foul and ev.off_table:
+    if (not foul or tournament) and ev.off_table:
         foul = "Ball off the table"
     called = before.called_ball is not None and any(
         p["n"] == before.called_ball and p["pocket"] == before.called_pocket for p in ev.pockets
     )
     eight_called = gs.rules["calls"] == "none" or (before.called_ball == 8 and called)
-    spot_break_eight = before.break_shot and eight_down and gs.rules["eightOnBreak"] == "spot"
+    spot_break_eight = (
+        before.break_shot
+        and (eight_down or (tournament and eight_off))
+        and gs.rules["eightOnBreak"] == "spot"
+    )
     if spot_break_eight:
         spot_ball(gs, 8)
     if (
-        eight_off
+        (eight_off and not spot_break_eight)
         or (on_eight and scratch and gs.rules["scratchOnEightLoss"])
         or (
             eight_down
@@ -187,19 +193,29 @@ def apply_shot(gs: GameState, ev: ShotEvents, before: ShotContext | None = None)
     elif eight_down and on_eight and not foul and eight_called:
         gs.winner, gs.message = me, f"Player {me + 1} wins!"
         return gs
-    if before.break_shot and gs.rules["strictBreak"] and not ev.potted and len(ev.object_rails) < 4:
+    if (
+        before.break_shot
+        and gs.rules["strictBreak"]
+        and not break_off
+        and not ev.potted
+        and len(ev.object_rails) < 4
+    ):
         gs.__dict__.update(new_game(1, gs.rules).__dict__)
         gs.current, gs.message = other, f"Illegal break — reracked for Player {other + 1}"
         return gs
     for n in ev.off_table:
         if n is not None and n != 8:
-            spot_ball(gs, n)
+            if tournament:
+                if n not in gs.return_order:
+                    gs.return_order.append(n)
+            else:
+                spot_ball(gs, n)
     gs.break_shot, gs.kitchen_shot = False, False
     if foul:
         gs.current = other
         zone = (
             "kitchen"
-            if scratch and (gs.rules["scratch"] == "kitchen" or before.break_shot)
+            if break_off or (scratch and (gs.rules["scratch"] == "kitchen" or before.break_shot))
             else "anywhere"
         )
         grant_placement(gs, zone)

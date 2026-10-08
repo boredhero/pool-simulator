@@ -225,6 +225,7 @@ function earliestContact(balls: Ball[], dt: number): Contact | null {
       const bq = 2 * (dx * A.vx + dy * A.vy);
       const c = dx * dx + dy * dy - rr * rr;
       if (c < 0) {
+        if (A.z > 0.05) continue;
         if (bq >= 0) continue; // already leaving the jaw
         const d = Math.hypot(dx, dy) || 1e-9;
         if (!best || 0 < best.t) best = { t: 0, kind: 'jaw', a: A.id, b: -1, nx: dx / d, ny: dy / d };

@@ -259,6 +259,8 @@ def _earliest_contact(balls: list[Ball], dt: float):
             qb = 2 * (dx * a.vx + dy * a.vy)
             qc = dx * dx + dy * dy - rr * rr
             if qc < 0:
+                if a.z > 0.05:
+                    continue
                 if qb >= 0:  # Already leaving the jaw.
                     continue
                 d = (dx * dx + dy * dy) ** 0.5 or 1e-9

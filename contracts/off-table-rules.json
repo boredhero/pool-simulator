@@ -1,0 +1,294 @@
+[
+  {
+    "name": "bar-regular-off-None",
+    "preset": "bar",
+    "breakShot": false,
+    "off": null,
+    "potted": [],
+    "winner": null,
+    "placement": "kitchen",
+    "removed": [],
+    "respot": []
+  },
+  {
+    "name": "bar-regular-off-1",
+    "preset": "bar",
+    "breakShot": false,
+    "off": 1,
+    "potted": [],
+    "winner": null,
+    "placement": "anywhere",
+    "removed": [],
+    "respot": [
+      1
+    ]
+  },
+  {
+    "name": "bar-regular-off-9",
+    "preset": "bar",
+    "breakShot": false,
+    "off": 9,
+    "potted": [],
+    "winner": null,
+    "placement": "anywhere",
+    "removed": [],
+    "respot": [
+      9
+    ]
+  },
+  {
+    "name": "bar-regular-off-8",
+    "preset": "bar",
+    "breakShot": false,
+    "off": 8,
+    "potted": [],
+    "winner": 1,
+    "placement": "none",
+    "removed": [],
+    "respot": []
+  },
+  {
+    "name": "bar-break-off-None",
+    "preset": "bar",
+    "breakShot": true,
+    "off": null,
+    "potted": [],
+    "winner": null,
+    "placement": "kitchen",
+    "removed": [],
+    "respot": []
+  },
+  {
+    "name": "bar-break-off-1",
+    "preset": "bar",
+    "breakShot": true,
+    "off": 1,
+    "potted": [],
+    "winner": null,
+    "placement": "anywhere",
+    "removed": [],
+    "respot": [
+      1
+    ]
+  },
+  {
+    "name": "bar-break-off-9",
+    "preset": "bar",
+    "breakShot": true,
+    "off": 9,
+    "potted": [],
+    "winner": null,
+    "placement": "anywhere",
+    "removed": [],
+    "respot": [
+      9
+    ]
+  },
+  {
+    "name": "bar-break-off-8",
+    "preset": "bar",
+    "breakShot": true,
+    "off": 8,
+    "potted": [],
+    "winner": 1,
+    "placement": "none",
+    "removed": [],
+    "respot": []
+  },
+  {
+    "name": "bar-pot-and-off-1",
+    "preset": "bar",
+    "breakShot": false,
+    "off": 1,
+    "potted": [
+      2
+    ],
+    "winner": null,
+    "placement": "anywhere",
+    "removed": [
+      2
+    ],
+    "respot": [
+      1
+    ]
+  },
+  {
+    "name": "bar-pot-and-off-9",
+    "preset": "bar",
+    "breakShot": false,
+    "off": 9,
+    "potted": [
+      2
+    ],
+    "winner": null,
+    "placement": "anywhere",
+    "removed": [
+      2
+    ],
+    "respot": [
+      9
+    ]
+  },
+  {
+    "name": "bar-eight-pot-cue-off",
+    "preset": "bar",
+    "breakShot": false,
+    "off": null,
+    "potted": [
+      8
+    ],
+    "winner": 1,
+    "placement": "none",
+    "removed": [
+      8
+    ],
+    "respot": [],
+    "onEight": true
+  },
+  {
+    "name": "tournament-regular-off-None",
+    "preset": "tournament",
+    "breakShot": false,
+    "off": null,
+    "potted": [],
+    "winner": null,
+    "placement": "anywhere",
+    "removed": [],
+    "respot": []
+  },
+  {
+    "name": "tournament-regular-off-1",
+    "preset": "tournament",
+    "breakShot": false,
+    "off": 1,
+    "potted": [],
+    "winner": null,
+    "placement": "anywhere",
+    "removed": [
+      1
+    ],
+    "respot": []
+  },
+  {
+    "name": "tournament-regular-off-9",
+    "preset": "tournament",
+    "breakShot": false,
+    "off": 9,
+    "potted": [],
+    "winner": null,
+    "placement": "anywhere",
+    "removed": [
+      9
+    ],
+    "respot": []
+  },
+  {
+    "name": "tournament-regular-off-8",
+    "preset": "tournament",
+    "breakShot": false,
+    "off": 8,
+    "potted": [],
+    "winner": 1,
+    "placement": "none",
+    "removed": [],
+    "respot": []
+  },
+  {
+    "name": "tournament-break-off-None",
+    "preset": "tournament",
+    "breakShot": true,
+    "off": null,
+    "potted": [],
+    "winner": null,
+    "placement": "kitchen",
+    "removed": [],
+    "respot": []
+  },
+  {
+    "name": "tournament-break-off-1",
+    "preset": "tournament",
+    "breakShot": true,
+    "off": 1,
+    "potted": [],
+    "winner": null,
+    "placement": "kitchen",
+    "removed": [
+      1
+    ],
+    "respot": []
+  },
+  {
+    "name": "tournament-break-off-9",
+    "preset": "tournament",
+    "breakShot": true,
+    "off": 9,
+    "potted": [],
+    "winner": null,
+    "placement": "kitchen",
+    "removed": [
+      9
+    ],
+    "respot": []
+  },
+  {
+    "name": "tournament-break-off-8",
+    "preset": "tournament",
+    "breakShot": true,
+    "off": 8,
+    "potted": [],
+    "winner": null,
+    "placement": "kitchen",
+    "removed": [],
+    "respot": [
+      8
+    ]
+  },
+  {
+    "name": "tournament-pot-and-off-1",
+    "preset": "tournament",
+    "breakShot": false,
+    "off": 1,
+    "potted": [
+      2
+    ],
+    "winner": null,
+    "placement": "anywhere",
+    "removed": [
+      2,
+      1
+    ],
+    "respot": []
+  },
+  {
+    "name": "tournament-pot-and-off-9",
+    "preset": "tournament",
+    "breakShot": false,
+    "off": 9,
+    "potted": [
+      2
+    ],
+    "winner": null,
+    "placement": "anywhere",
+    "removed": [
+      2,
+      9
+    ],
+    "respot": []
+  },
+  {
+    "name": "tournament-eight-pot-cue-off",
+    "preset": "tournament",
+    "breakShot": false,
+    "off": null,
+    "potted": [
+      8
+    ],
+    "winner": 1,
+    "placement": "none",
+    "removed": [
+      8
+    ],
+    "respot": [],
+    "onEight": true
+  }
+]
