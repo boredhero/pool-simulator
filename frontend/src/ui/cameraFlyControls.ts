@@ -10,8 +10,11 @@ export function setupCameraFly(rig: CameraRig): void {
   const toggle = document.createElement('button');
   toggle.type = 'button';
   toggle.id = 'camera-fly-toggle';
-  toggle.textContent = 'Fly camera';
-  toggle.title = 'Fly camera with WASD or the arrow pad';
+  toggle.setAttribute('aria-label', 'Show camera controls');
+  const toggleLabel=document.createElement('span');toggleLabel.className='camera-toggle-label';toggleLabel.textContent='Camera';
+  const chevron=document.createElement('span');chevron.className='camera-toggle-chevron';chevron.textContent='⌃';chevron.setAttribute('aria-hidden','true');
+  toggle.append(toggleLabel,chevron);
+  toggle.title = 'Show camera controls';
   toggle.setAttribute('aria-expanded', 'false');
   toggle.setAttribute('aria-controls', 'camera-fly-pad');
   const pad = document.createElement('div');
@@ -23,7 +26,8 @@ export function setupCameraFly(rig: CameraRig): void {
   hint.className = 'camera-fly-hint';
   hint.textContent = 'WASD · Space ↑ · Left Shift ↓ · Q/E turn';
   pad.append(hint);
-  hud.append(pad, toggle);
+  const header=document.createElement('div');header.className='camera-hud-header';
+  hud.append(header,pad);
   const profile=document.createElement('select');
   profile.id='camera-input-profile';profile.setAttribute('aria-label','Camera input mode');
   for(const [value,label] of [['mouse','Mouse & Keyboard Mode'],['trackpad','Trackpad Mode']]) {
@@ -34,7 +38,7 @@ export function setupCameraFly(rig: CameraRig): void {
   const profileHint=document.createElement('span');profileHint.id='camera-input-hint';
   profile.setAttribute('aria-describedby',profileHint.id);
   const updateHint=()=>{profileHint.textContent=profile.value==='trackpad'?'Scroll to orbit · pinch to zoom · Option-scroll to pan':'Right-drag to orbit · scroll to zoom · Alt-scroll to pan';};
-  updateHint();hud.prepend(profile,profileHint);
+  updateHint();header.append(profile,toggle);pad.append(profileHint);
   document.body.append(hud);
 
   const keys = new Set<string>();
@@ -69,7 +73,11 @@ export function setupCameraFly(rig: CameraRig): void {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = `camera-fly-${name}`;
-    button.textContent = symbol;button.title=`Fly camera ${name}`;
+    const glyph=document.createElement('span');glyph.textContent=symbol;glyph.setAttribute('aria-hidden','true');
+    button.append(glyph);
+    const captions:Record<string,string>={rise:'Rise',lower:'Lower','turn-left':'Turn left','turn-right':'Turn right'};
+    if(captions[name]){const caption=document.createElement('small');caption.textContent=captions[name];button.append(caption);}
+    button.title=`Fly camera ${name}`;
     button.setAttribute('aria-label', `Fly camera ${name}`);
     button.addEventListener('pointerdown', event => {
       if (event.button !== 0 || !event.isPrimary || pointerBlocked()) return;
@@ -95,6 +103,9 @@ export function setupCameraFly(rig: CameraRig): void {
   toggle.addEventListener('click', () => {
     pad.hidden = !pad.hidden;
     toggle.setAttribute('aria-expanded', String(!pad.hidden));
+    toggle.setAttribute('aria-label',pad.hidden?'Show camera controls':'Hide camera controls');
+    toggle.title=pad.hidden?'Show camera controls':'Hide camera controls';
+    hud.classList.toggle('expanded',!pad.hidden);
     if (pad.hidden) stop();
   });
   window.addEventListener('keydown', event => {

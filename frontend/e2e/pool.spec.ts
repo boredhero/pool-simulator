@@ -546,7 +546,7 @@ test('Jev resumes its server-owned game and reset discards an in-flight turn', a
   });
   await page.locator('#jevbtn').click();
   await expect.poll(()=>page.evaluate(()=>(window as any).__pool.jevGame?.id)).toBe('daily-game');
-  await page.evaluate(()=>{const g=(window as any).__pool;g.fire(.4);});
+  await page.evaluate(()=>{const g=(window as any).__pool;g.angle=.35;g.targetAngle=.35+Math.PI;g.fire(.4);});
   await expect.poll(()=>requests).toBe(1);
   await page.locator('#rack').click();
   release!();
@@ -654,4 +654,119 @@ test('offline CPU places behind the head string and actually fires its turn', as
   expect(result.fired.hand).toBe(false);expect(result.fired.potted).toBe(false);
   expect(result.mode).not.toBe('rolling');expect(result.firstContact).toBe(1);
   expect(result.asleep).toBe(true);expect(result.message).not.toContain('Foul');
+});
+
+test('CPU presents its immutable cue, locks human controls, and strikes once in that direction',async({page})=>{
+  await openGame(page);
+  const result=await page.evaluate(async()=>{
+    const g=(window as any).__pool;g.cpuOpponent=true;g.gs.current=1;g.mode='aim';
+    g.angle=.4;g.targetAngle=.8;
+    const rendered:any[]=[],fire=g.fire.bind(g),setCue=g.scene.setCue.bind(g.scene);
+    g.scene.setCue=(...args:any[])=>{rendered.push(args);setCue(...args);};
+    const strikes:any[]=[];
+    g.fire=(...args:any[])=>{strikes.push({angle:g.angle,target:g.targetAngle,args});fire(...args);};
+    const pending=g.cpuMove();g.frame();const hidden=rendered.at(-1)[0]===false;
+    await g.cpuMove();
+    while(!g.opponentAction?.shot)await new Promise(requestAnimationFrame);
+    const selected=g.opponentAction.shot,before={angle:g.targetAngle,tip:g.tipX,ball:g.calledBall,power:g.humanPower,x:g.placeX};
+    g.setSpin(.4,.3);
+    const canvas=document.getElementById('game-canvas')!;canvas.focus();
+    canvas.dispatchEvent(new KeyboardEvent('keydown',{code:'ArrowLeft',bubbles:true}));
+    canvas.dispatchEvent(new PointerEvent('pointermove',{clientX:550,clientY:400,pointerType:'mouse',bubbles:true}));
+    const call=document.getElementById('callball') as HTMLSelectElement;call.value='8';call.dispatchEvent(new Event('change'));
+    const power=document.getElementById('touchpower') as HTMLInputElement;power.value='99';power.dispatchEvent(new Event('input'));
+    const after={angle:g.targetAngle,tip:g.tipX,ball:g.calledBall,power:g.humanPower,x:g.placeX};
+    g.frame();const visible=rendered.at(-1);await pending;
+    return {hidden,before,after,visible,selected,strikes,mode:g.mode,
+      cueAngles:rendered.filter(x=>x[0]).map(x=>x[3]),pulls:rendered.filter(x=>x[0]).map(x=>x[4])};
+  });
+  expect(result.hidden).toBe(true);expect(result.after).toEqual(result.before);
+  expect(result.visible[0]).toBe(true);expect(result.visible[3]).toBe(result.selected.aim);
+  expect(result.strikes).toHaveLength(1);expect(result.strikes[0].angle).toBe(result.selected.aim);
+  expect(result.strikes[0].target).toBe(result.selected.aim);expect(result.mode).toBe('rolling');
+  expect(result.cueAngles.every((a:number)=>a===result.selected.aim)).toBe(true);
+  expect(Math.max(...result.pulls)-Math.min(...result.pulls)).toBeGreaterThan(.04);
+});
+
+test('reracking cancels a prepared opponent stroke before it can fire',async({page})=>{
+  await openGame(page);
+  const result=await page.evaluate(async()=>{
+    const g=(window as any).__pool;g.cpuOpponent=true;g.gs.current=1;
+    let strikes=0;const fire=g.fire.bind(g);g.fire=(...args:any[])=>{strikes++;fire(...args);};
+    const pending=g.cpuMove();
+    while(!g.opponentAction?.shot)await new Promise(requestAnimationFrame);
+    g.reset();const state=g.gs;await pending;
+    return {strikes,same:g.gs===state,current:g.gs.current,mode:g.mode,action:g.opponentAction};
+  });
+  expect(result).toEqual({strikes:0,same:true,current:0,mode:'aim',action:null});
+});
+
+test('Jev cue presentation uses authoritative placement and strike before final state',async({page})=>{
+  await openGame(page);
+  const state=await page.evaluate(()=>{
+    const g=(window as any).__pool;g.cpuOpponent=true;g.jevOpponent=true;g.jevGame={id:'cue-test',revision:0};
+    g.gs.current=1;g.gs.ballInHand=true;g.gs.placement='kitchen';g.gs.kitchenShot=true;g.mode='place';
+    return {balls:g.gs.balls,return_order:[],current:0,groups:[null,null],open:true,ball_in_hand:false,
+      break_shot:false,placement:'none',kitchen_shot:false,rules:g.gs.rules,revision:1,winner:null,message:'Player 1 to shoot'};
+  });
+  const shot={aim:.15,power:.35,tipX:0,tipY:.1,calledBall:1,calledPocket:0,vmax:3.5,elevation:.12};
+  await page.route('**/api/opponents/jev/games/cue-test/turn',route=>{
+    expect(route.request().postDataJSON()).toEqual({revision:0});
+    return route.fulfill({json:{id:'cue-test',state,shot,placement:{x:.3,y:.4},by:1,source:'jev',family:'direct',expiresAt:null}});
+  });
+  const result=await page.evaluate(async()=>{
+    const g=(window as any).__pool,cues:any[]=[],strikes:any[]=[],render=g.scene.setCue.bind(g.scene),fire=g.fire.bind(g);
+    g.scene.setCue=(...args:any[])=>{if(args[0]&&g.opponentAction)cues.push(args);render(...args);};
+    g.fire=(...args:any[])=>{strikes.push({aim:g.angle,tipX:g.tipX,tipY:g.tipY,x:g.cue().x,y:g.cue().y,args});fire(...args);};
+    await g.playJevTurn();const mode=g.mode;
+    g.cpuOpponent=false;
+    for(let i=0;i<220&&g.mode==='rolling';i++){g.accumulator+=.25;g.frame();}
+    return {cues,strikes,mode,revision:g.jevGame.revision,current:g.gs.current};
+  });
+  expect(result.mode).toBe('rolling');expect(result.strikes).toHaveLength(1);
+  expect(result.strikes[0]).toEqual({aim:shot.aim,tipX:0,tipY:.1,x:.3,y:.4,args:[.35,3.5,.12]});
+  expect(result.cues.length).toBeGreaterThan(2);
+  expect(result.cues.every((c:any[])=>c[1]===.3&&c[2]===.4&&c[3]===shot.aim&&c[7]===shot.elevation)).toBe(true);
+  expect(result.revision).toBe(1);expect(result.current).toBe(0);
+});
+
+test('reduced motion shows a static opponent cue',async({page})=>{
+  await page.emulateMedia({reducedMotion:'reduce'});await openGame(page);
+  const result=await page.evaluate(async()=>{
+    const g=(window as any).__pool,cues:any[]=[],render=g.scene.setCue.bind(g.scene);
+    g.scene.setCue=(...args:any[])=>{if(args[0]&&g.opponentAction)cues.push(args);render(...args);};
+    g.cpuOpponent=true;g.gs.current=1;await g.cpuMove();
+    return {pulls:cues.map(c=>c[4]),mode:g.mode};
+  });
+  expect(result.mode).toBe('rolling');expect(result.pulls.length).toBeGreaterThan(0);
+  expect(result.pulls.every((pull:number)=>pull===.025)).toBe(true);
+});
+
+test('a delayed human Jev response cannot reverse the latched visible shot direction',async({page})=>{
+  await openGame(page);
+  const state=await page.evaluate(()=>{
+    const g=(window as any).__pool;g.cpuOpponent=true;g.jevOpponent=true;g.jevGame={id:'human-cue',revision:0};
+    g.angle=.35;g.targetAngle=.35+Math.PI;
+    return {balls:g.gs.balls,return_order:[],current:1,groups:[null,null],open:true,ball_in_hand:false,
+      break_shot:false,placement:'none',kitchen_shot:false,rules:g.gs.rules,revision:1,winner:null,message:'Player 2 to shoot'};
+  });
+  let release!:()=>void;const gate=new Promise<void>(resolve=>release=resolve);
+  await page.route('**/api/opponents/jev/games/human-cue/turn',async route=>{
+    const payload=route.request().postDataJSON();expect(payload.shot.aim).toBe(.35);
+    await gate;
+    await route.fulfill({json:{id:'human-cue',state,by:0,source:'human',placement:{x:payload.shot.x,y:payload.shot.y},
+      shot:{...payload.shot,vmax:8.5,elevation:.1},expiresAt:null}});
+  });
+  await page.evaluate(()=>{const g=(window as any).__pool;g.angle=.35;g.targetAngle=.35+Math.PI;g.fire(.4);});
+  await expect.poll(()=>page.evaluate(()=>!!(window as any).__pool.jevRequest)).toBe(true);
+  const waiting=await page.evaluate(()=>{
+    const g=(window as any).__pool,canvas=document.getElementById('game-canvas')!;canvas.focus();
+    canvas.dispatchEvent(new KeyboardEvent('keydown',{code:'ArrowLeft',bubbles:true}));
+    canvas.dispatchEvent(new PointerEvent('pointermove',{clientX:550,clientY:400,pointerType:'mouse',bubbles:true}));
+    g.setSpin(.4,.4);for(let n=0;n<5;n++)g.frame();
+    return {angle:g.angle,target:g.targetAngle,tip:g.tipX,action:g.opponentAction};
+  });
+  expect(waiting).toEqual({angle:.35,target:.35,tip:0,action:null});
+  release();await expect.poll(()=>page.evaluate(()=>(window as any).__pool.mode)).toBe('rolling');
+  expect(await page.evaluate(()=>{const g=(window as any).__pool;return {angle:g.angle,target:g.targetAngle,action:g.opponentAction};})).toEqual({angle:.35,target:.35,action:null});
 });

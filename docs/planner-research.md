@@ -64,3 +64,58 @@ These are targeted regression fixtures, not an estimate of competitive win rate.
 Follow-up evaluation should use paired rack seeds/starting seats and compare
 geometry, planner-only and Jev selecting from the same planner options. Track
 fouls, runs, retained turns, latency, fallback rate and provider cost separately.
+
+## 0.9.2: controlled energy and cluster development
+
+The previous candidate queue only reduced power or changed spin; it never tried
+a firmer version of a normal seed. Contact safeties used power 0.42 regardless of
+congestion, and legal shots passing the turn received no credit for improving
+own-ball congestion. A tight group could also be incorrectly rejected because
+clearance was tested to the object's center, beyond the cue's first-contact point.
+
+The queue now reserves early trials for an original shot, a variant adding
+0.65 m/s of launch speed through the engine's nonlinear power mapping, and two
+controlled development seeds when an accessible legal cluster face exists.
+Development speeds begin at 2.05/2.85 m/s, with a bounded travel-energy estimate;
+configured speed limits and authoritative previews still decide the outcome.
+Cluster clearance ends at the cue's first-contact ghost position.
+
+Completed previews report separated neighboring pairs, newly clear object-ball
+routes, new direct-shot targets, and corresponding opponent development. The
+evaluation limits the reward for raw separation and values a usable cue leave;
+foul/loss exclusion and immediate-win priority remain in force. Jev receives
+these measured outcomes and a plain-language pace/development description.
+Both Python Jev planning and offline TypeScript CPU planning use this approach.
+The 16-trial/two-second backend and 12-trial/120-ms browser budgets are unchanged.
+
+This follows CueCard's explicit cluster-dispersal candidates and search over
+different feasible speeds, rather than assuming one speed per geometric route.
+[CueCard paper](https://www.ijcai.org/Proceedings/09/Papers/231.pdf).
+Dr. Dave's worked breakout examples likewise combine controlled speed and spin
+to enter a cluster and obtain a subsequent shot; they do not prescribe maximum
+power. [February 2010 breakout examples](https://drdavepoolinfo.com/bd_articles/2010/feb10.pdf).
+
+The benchmark additionally compares identical contact aims at powers 0.42,
+0.65, 0.85 and 1.0 against the selected plan on three committed cluster fixtures.
+For `dense-solids` and its reversed layout:
+
+| Power | Separated nearby pairs | Own direct options afterward | Scratch/foul |
+| --- | --- | --- | --- |
+| 0.42 | 5 | 0 | none |
+| 0.65 | 6 | 1 | none |
+| 0.85 | 7 | 1 | none |
+| 1.00 | 9 | 0 | none |
+| Selected 0.8517, within four trials | 7 | 1 | none |
+
+On `tightly-packed-solids`, selected power 0.8517 opens 11 neighboring pairs and
+leaves one own direct option with none for the opponent. Power 0.42 leaves no own
+direct option; maximum power exposes an opponent option. Tests independently
+replay the chosen shots, cover a development shot that loses on an early eight,
+and retain a controlled-power easy pot. All eight earlier fixtures retain their
+previous result totals: eight legal shots, five called pots, zero scratches.
+
+These are deterministic targeted regression results, not win-rate estimates.
+Object routes and next-shot counts remain geometry estimates, not calibrated
+probabilities. A dense arrangement can still require a multi-turn development
+plan beyond this bounded one-shot preview, and model selection can choose among
+the offered legal alternatives. No paid inference is used by the benchmark.

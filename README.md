@@ -296,3 +296,22 @@ WASD moves horizontally, Space rises, Left Shift descends, and Q/E turns.
 Space no longer fires a shot; Enter is a quick shot only with the table focused.
 Pull-and-release shooting and mobile touch controls remain available.
 See [control mappings and research](docs/camera-controls.md).
+
+## Opponent presentation and cluster shots (0.9.2)
+
+CPU/Jev planning hides the human cue. The selected shot then gets a short aim,
+pullback and stroke before playback; reduced motion uses a brief static cue.
+Player shot controls are locked during opponent turns and pending Jev responses,
+while camera controls remain usable. The submitted direction is latched so late
+input cannot turn the displayed cue away from its actual shot.
+
+The planners now reserve early trials for firmer shots and dense-cluster
+development. Previews measure useful next shots and opportunities left to the
+opponent; maximum power is not automatically preferred. Existing simulation
+budgets and provider accounting remain unchanged. See
+[opponent presentation](docs/opponent-cue.md) and
+[planner evaluation](docs/planner-research.md).
+
+Camera input mode and expandable controls share one compact HUD surface; hints
+appear inside its expanded panel. Legal footer links and Privacy choices use
+matching control styles and remain clear of the shot tray.
