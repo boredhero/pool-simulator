@@ -27,6 +27,7 @@ export class TableOptions {
     };
     el('helpbtn').addEventListener('click', () => show(!el('helppanel').classList.contains('open'), true));
     el('closehelp').addEventListener('click', () => show(false, true));
+    el('starttutorial').addEventListener('click',()=>show(false,true));
     for (const id of ['settingsbtn', 'onlinebtn']) el(id).addEventListener('click', () => show(false, true));
     const tab = (touch: boolean) => {
       document.documentElement.classList.toggle('touch-input',touch);

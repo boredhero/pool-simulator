@@ -436,9 +436,9 @@ test('compact mobile scores expand and trackpad shift-scroll orbits',async({page
   await page.evaluate(()=>{const g=(window as any).__pool;g.gs.groups=['solid','stripe'];g.gs.open=false;g.hud();});
   await expect(page.locator('.pcard')).toHaveCount(2);
   await expect(page.locator('.pcard .balls').first()).toBeHidden();
-  await page.locator('#scoretoggle').click();
+  await page.locator('.pcard').first().click();
   await expect(page.locator('.pcard .balls').first()).toBeVisible();
-  await page.locator('#scoretoggle').click();
+  await page.locator('.pcard').first().click();
   await expect(page.locator('#spin')).toBeVisible();
   await expect(page.locator('#resetspin')).toBeVisible();
   await expect(page.locator('#cpubtn')).toBeHidden();
@@ -509,4 +509,47 @@ test('optional analytics waits for consent, withdraws, and leaves play available
   await expect(page.locator('#privacychoices')).not.toBeVisible();
   await page.locator('#settingsbtn').click();
   expect(events).toBe(2);
+});
+
+test('optional interactive tutorial responds to controls and stays dismissed',async({page})=>{
+  await openGame(page);
+  await expect(page.locator('#tutorial')).toBeHidden();
+  if(!await page.locator('#helppanel').isVisible())await page.locator('#helpbtn').click();
+  await page.locator('#starttutorial').click();
+  await expect(page.locator('#tutorialtitle')).toContainText('Line up');
+  for(const width of [390,1280]){
+    await page.setViewportSize({width,height:844});
+    await expect.poll(async()=>page.evaluate(()=>{
+      const panel=document.getElementById('tutorial')!.getBoundingClientRect();
+      const scores=document.getElementById('scorecard')!.getBoundingClientRect();
+      const tray=document.querySelector('.control-tray')!.getBoundingClientRect();
+      return Math.abs((panel.left+panel.right)/2-innerWidth/2)<2 && panel.top>=scores.bottom && panel.bottom<=tray.top;
+    })).toBe(true);
+  }
+
+  const point=await page.evaluate(()=>{
+    const g=(window as any).__pool;
+    for(let y=200;y<innerHeight-120;y+=20)for(let x=20;x<innerWidth-20;x+=20){
+      if(document.elementFromPoint(x,y)?.id==='game-canvas' && g.scene.pickFelt(x,y))return {x,y};
+    }
+    throw new Error('No exposed felt for tutorial aiming');
+  });
+  await page.mouse.move(point.x,point.y);
+  await expect(page.locator('#tutorialnext')).toHaveText('Next');
+  await page.locator('#tutorialnext').click();
+  await page.locator('#spin').focus();await page.keyboard.press('ArrowRight');
+  await expect(page.locator('#tutorialprogress')).toContainText('worked');
+  await page.locator('#resetspin').click();
+  await page.locator('#tutorialnext').click();
+  await page.mouse.move(point.x,point.y);await page.keyboard.down('Shift');await page.mouse.wheel(100,0);await page.keyboard.up('Shift');
+  await expect(page.locator('#tutorialprogress')).toContainText('worked');
+  await page.locator('#tutorialnext').click();
+  await expect(page.locator('#tutorialbody')).toContainText('real shot');
+  await page.locator('#tutorialclose').click();
+  await openGame(page,true);
+  await expect(page.locator('#tutorial')).toBeHidden();
+  await page.setViewportSize({width:390,height:844});
+  await expect(page.locator('#scoretoggle')).toHaveCount(0);
+  await page.locator('.pcard').first().focus();await page.keyboard.press('Enter');
+  await expect(page.locator('.pcard').first()).toHaveAttribute('aria-expanded','true');
 });

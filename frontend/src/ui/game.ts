@@ -1,3 +1,4 @@
+import { Tutorial } from './tutorial';
 import { AccountPanel, type Account } from './account';
 import { cueStyle } from '../render/ballTextures';
 import { advancePlayback } from './playback';
@@ -38,6 +39,7 @@ const freshEv = (): ShotEvents => ({
 });
 
 export class Game {
+  tutorial = new Tutorial();
   gs: GameState;
   options: TableOptions;
   calledBall: number | null = null;
@@ -235,6 +237,7 @@ export class Game {
   }
 
   setSpin(x: number, y: number): void {
+    if(!this.cpuOpponent||this.gs.current===0)this.tutorial.record('spin');
     const scale=Math.min(1,.55/(Math.hypot(x,y)||1));
     this.tipX=x*scale;this.tipY=y*scale;
     const spin=this.el.spin;
@@ -256,7 +259,7 @@ export class Game {
       if (this.mode !== 'aim' || this.cue().potted) return;
       const c = this.cue();
       const dx = cx - c.x, dy = cy - c.y;
-      if (Math.hypot(dx, dy) > 0.02) this.targetAngle = Math.atan2(dy, dx);
+      if (Math.hypot(dx, dy) > 0.02) {this.targetAngle = Math.atan2(dy, dx);this.tutorial.record('aim');}
     };
     const tryPlace = (cx: number, cy: number) => {
       if (this.room) {
@@ -297,7 +300,7 @@ export class Game {
       if (this.mode === 'aim' && !this.cue().potted) {
         const c = this.cue();
         const dx = p[0] - c.x, dy = p[1] - c.y;
-        if (Math.hypot(dx, dy) > 0.02) this.targetAngle = Math.atan2(dy, dx);
+        if (Math.hypot(dx, dy) > 0.02) {this.targetAngle = Math.atan2(dy, dx);this.tutorial.record('aim');}
       }
       if (e.pointerType !== 'mouse') {
         this.touchAim=this.humanTurn();
@@ -333,11 +336,16 @@ export class Game {
     document.getElementById('touchshoot')!.addEventListener('click',()=>{
       if(this.humanTurn()&&!this.pointers.size){this.angle=this.targetAngle;this.fire(touchPower.valueAsNumber/100);}
     });
-    document.getElementById('scoretoggle')!.addEventListener('click',()=>{
+    const toggleScores=()=>{
+      if(!matchMedia('(max-width:900px)').matches)return;
       this.scoresExpanded=!this.scoresExpanded;
       this.el.scorecard.classList.toggle('expanded',this.scoresExpanded);
-      document.getElementById('scoretoggle')!.setAttribute('aria-expanded',String(this.scoresExpanded));
-      document.getElementById('scoretoggle')!.textContent=this.scoresExpanded?'Hide balls':'Show balls';
+      for(const card of this.el.scorecard.querySelectorAll('.pcard'))card.setAttribute('aria-expanded',String(this.scoresExpanded));
+    };
+    matchMedia('(max-width:900px)').addEventListener('change',()=>this.renderScorecard());
+    this.el.scorecard.addEventListener('click',toggleScores);
+    this.el.scorecard.addEventListener('keydown',e=>{
+      if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();toggleScores();}
     });
     document.getElementById('morecontrols')!.addEventListener('click',()=>{
       const open=document.querySelector('.control-tray')!.classList.toggle('expanded');
@@ -506,6 +514,7 @@ export class Game {
     const elevation = cueElevation(c.x, c.y, this.angle, 0, this.gs.balls);
     beginShot(this.gs, this.calledBall, this.calledPocket);
     const params = { aim: this.angle, power, tipX: this.tipX, tipY: this.tipY, vmax, elevation, calledBall: this.calledBall, calledPocket: this.calledPocket };
+    if(!this.cpuOpponent||this.gs.current===0)this.tutorial.record('shot');
     strike(c, Math.cos(this.angle), Math.sin(this.angle), power, this.tipX, this.tipY, vmax, elevation);
     this.ev = freshEv();
     this.contact = { v: false };
@@ -538,7 +547,9 @@ export class Game {
     this.fire(shot.power);
   }
 
+  lastTutorialCameraRevision = 0;
   frame(): void {
+    if(this.scene.cameraRig.revision!==this.lastTutorialCameraRevision){this.lastTutorialCameraRevision=this.scene.cameraRig.revision;this.tutorial.record('camera');}
     const fnow = performance.now();
     const fdt = this.lastFrame ? Math.min((fnow - this.lastFrame) / 1000, 0.1) : 0.016;
     this.lastFrame = fnow;
@@ -687,6 +698,7 @@ export class Game {
       const provisional=this.gs.groups[i]!==g;
       const card = document.createElement('div');
       card.setAttribute('aria-label',`${this.playerName(i)}${this.gs.current===i?' — current player':''}`);
+      if(matchMedia('(max-width:900px)').matches){card.setAttribute('role','button');card.tabIndex=0;card.setAttribute('aria-expanded',String(this.scoresExpanded));card.title='Tap to show or hide balls';}
       card.className = 'pcard' + (provisional ? ' provisional' : '') + (this.gs.current === i && this.gs.winner === null ? ' active' : '');
       const head = document.createElement('div');
       head.className = 'pname';

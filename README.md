@@ -219,3 +219,10 @@ additive. Account access/export/deletion requests go to the public contact addre
 verify ownership without asking for a password or recovery code. Production host
 logs and backup rotation must be managed separately from application retention.
 See [Jev integration notes](docs/jev.md) for research and evaluation limitations.
+
+The Help panel includes an optional interactive tutorial. It observes real aiming,
+spin, camera and shot actions, supports skipping/back/close, and does not reset the
+current rack. Its shot step uses the current game rather than a separate practice
+simulation. The panel stays centered in the space between scores and controls.
+On compact screens, tap either scorecard (or use Enter/Space when focused) to show
+or hide ball details; there is no floating Show balls button.

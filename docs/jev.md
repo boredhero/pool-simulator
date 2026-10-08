@@ -61,3 +61,5 @@ Legal documents are operator-specific drafts implemented for review, not a legal
 opinion. Future advertising, children-directed features, payment, new providers or
 expanded telemetry require renewed privacy/legal review rather than silently
 expanding the existing consent.
+
+An additional live automated match check exercised 30 server-owned turns: 15 geometry-driven human-seat shots, 7 live Jev selections and 8 opponent geometry fallbacks. It recorded 5,793 input tokens and 294 output tokens with no unmetered requests (estimated $0.000243306). The rack remained active at the 30-turn test limit. This checks real inference plus physics and accounting; it does not establish completed-game reliability or playing strength.
