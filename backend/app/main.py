@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.accounts import router as accounts_router
+from app.api.admin import router as admin_router
 from app.api.jev import router as jev_router
 from app.api.privacy import cleanup
 from app.api.privacy import router as privacy_router
@@ -49,6 +50,7 @@ app.include_router(router, prefix="/api")
 app.include_router(jev_router, prefix="/api")
 app.include_router(privacy_router, prefix="/api")
 app.include_router(accounts_router, prefix="/api")
+app.include_router(admin_router, prefix="/api")
 
 
 @app.exception_handler(RequestValidationError)
@@ -75,7 +77,9 @@ async def account_cache_control(request, call_next):
     )
     if request.url.scheme == "https":
         response.headers["Strict-Transport-Security"] = "max-age=31536000"
-    if request.url.path.startswith(("/api/account", "/api/opponents/jev", "/api/privacy")):
+    if request.url.path.startswith(
+        ("/api/account", "/api/opponents/jev", "/api/privacy", "/api/admin")
+    ):
         response.headers["Cache-Control"] = "no-store"
     return response
 

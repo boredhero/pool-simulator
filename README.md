@@ -251,3 +251,26 @@ current rack. Its shot step uses the current game rather than a separate practic
 simulation. The panel stays centered in the space between scores and controls.
 On compact screens, tap either scorecard (or use Enter/Space when focused) to show
 or hide ball details; there is no floating Show balls button.
+
+## Owner dashboard (0.8.0)
+
+Set `ADMIN_ACCOUNT_ID` in the deployment environment to the existing owner's
+immutable account ID. An unset value disables administration. Usernames do not
+grant privileges, and registration cannot assign admin status. The owner sees
+**Admin settings** in Settings. Every `/api/admin/*` endpoint checks the active
+server session and configured ID; other callers receive 404. Premium mutations
+require the same origin/request header protection as account mutations and
+record an audit entry.
+
+The dashboard provides account search, Premium filtering, sorting, pagination,
+Premium toggles, per-account game usage and recent Premium changes. Token and
+cost totals cover retained game records (removed after 90 days of inactivity),
+not a lifetime invoice. Unmetered requests are shown separately because missing
+provider usage does not establish zero cost. Lifetime attempt/completion counts
+are labeled separately. Credentials, recovery hashes and network identifiers
+are never returned by the admin endpoints.
+
+Settings, View and Online panels have draggable headers, click/keyboard Move
+controls and Reset position. WASD moves the camera relative to its view; the
+HUD Fly control opens a four-arrow touch pad. Camera movement pauses while
+editing fields or using dialogs.

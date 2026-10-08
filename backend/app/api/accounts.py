@@ -18,6 +18,7 @@ from app.services.auth import (
     digest,
     mutation_guard,
     normalize_recovery,
+    public_account,
     rate_limit,
     recovery_code,
     set_session,
@@ -79,12 +80,7 @@ def register(payload: Credentials, request: Request, response: Response) -> dict
                 TermsAcceptance(account_id=user.id, version=VERSION, accepted_at=int(time.time()))
             )
             set_session(db, response, request, user.id)
-            result = {
-                "id": user.id,
-                "username": user.username,
-                "createdAt": user.created_at,
-                "premium": user.premium,
-            }
+            result = public_account(user)
     except IntegrityError as exc:
         raise HTTPException(409, "That username is already taken.") from exc
     return {"account": result, "recovery": code}
@@ -116,14 +112,7 @@ def login(payload: Credentials, request: Request, response: Response) -> dict:
         if old:
             db.execute(delete(LoginSession).where(LoginSession.token_hash == digest(old)))
         set_session(db, response, request, user.id)
-        return {
-            "account": {
-                "id": user.id,
-                "username": user.username,
-                "createdAt": user.created_at,
-                "premium": user.premium,
-            }
-        }
+        return {"account": public_account(user)}
 
 
 @router.post("/logout", dependencies=[Depends(mutation_guard)])

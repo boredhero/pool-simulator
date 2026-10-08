@@ -1,4 +1,5 @@
-export interface Account {id:string;username:string;createdAt:number;premium:boolean}
+import { AdminPanel } from './admin';
+export interface Account {id:string;username:string;createdAt:number;premium:boolean;isAdmin:boolean}
 interface Stats {matches:number;wins:number;losses:number;abandoned:number;shots:number;ballsPocketed:number;scratches:number;fouls:number;recent:Array<{id:string;opponent:string;status:string;result:string|null}>}
 const el=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 
@@ -7,6 +8,7 @@ export class AccountPanel {
   private mode:'login'|'register'|'recover'='login';
   private recoveryPending=false;
   private busy=false;
+  private admin=new AdminPanel(()=>void this.refresh());
   constructor(private playing:()=>boolean,private changed:(account:Account|null)=>void) {
     el('accountbtn').addEventListener('click',()=>{el<HTMLDialogElement>('accountdialog').showModal();void this.refresh();});
     el('accountclose').addEventListener('click',()=>el<HTMLDialogElement>('accountdialog').close());
@@ -58,6 +60,7 @@ export class AccountPanel {
     this.status('');
   }
   private render(stats?:Stats) {
+    this.admin.setAccount(this.account);
     for(const id of ['accountpremium','settingspremium'])el(id).hidden=!this.account?.premium;
     el('accountbtn').textContent=this.account?`${this.account.username} · Account`:'Sign in / Create account';
     el('accountauth').hidden=!!this.account||this.recoveryPending;

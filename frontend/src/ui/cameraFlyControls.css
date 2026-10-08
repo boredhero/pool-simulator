@@ -1,0 +1,9 @@
+#camera-fly-hud{position:fixed;right:16px;bottom:calc(var(--above-controls,136px) + 10px);z-index:3;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+#camera-fly-toggle{min-height:44px;font-size:14px;padding:0 12px;background:#211d18;border:1px solid #8d795c;box-shadow:0 3px 12px #0005}
+#camera-fly-pad{display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:auto 44px 44px;gap:4px;padding:8px;border:1px solid #8d795c;border-radius:12px;background:#211d18;box-shadow:0 3px 12px #0005}
+#camera-fly-pad[hidden]{display:none}
+#camera-fly-pad button{width:44px;min-height:44px;padding:0;font-size:24px;touch-action:none;user-select:none;-webkit-user-select:none}
+#camera-fly-pad button.held{background:#496340;border-color:#bad3a1}
+.camera-fly-hint{grid-column:1 / -1;font-size:12px;color:#e2cfaa;text-align:center}
+.camera-fly-forward{grid-column:2;grid-row:2}.camera-fly-left{grid-column:1;grid-row:3}.camera-fly-backward{grid-column:2;grid-row:3}.camera-fly-right{grid-column:3;grid-row:3}
+@media(max-width:900px){#camera-fly-hud{right:10px}#camera-fly-toggle{font-size:13px}}

@@ -2,6 +2,7 @@ import { MathUtils, PerspectiveCamera, Spherical, Vector3 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TOUCH, MOUSE } from 'three';
 import { BALL_R, TABLE_H, TABLE_W } from '../sim/table';
+import { translateCamera } from './cameraFly';
 
 export type Point={x:number;y:number;potted?:boolean};
 export type SafeFrame={left:number;right:number;top:number;bottom:number};
@@ -62,6 +63,9 @@ export function framePose(camera:PerspectiveCamera,target:Vector3,points:Point[]
 
 export class CameraRig {
   revision=0;
+  private flyForward=0;
+  private flyRight=0;
+  private lastUpdate=0;
   private motion?:{time:number;target:Vector3;end:Vector3;orbit:Spherical;endOrbit:Spherical};
   constructor(private camera:PerspectiveCamera,private controls:OrbitControls,private canvas:HTMLCanvasElement) {
     controls.maxDistance=8;controls.enablePan=false;controls.zoomSpeed=.8;controls.rotateSpeed=1;controls.dampingFactor=.12;
@@ -82,6 +86,15 @@ export class CameraRig {
     },{capture:true,passive:false});
   }
   get moving(){return !!this.motion;}
+  setFlyInput(forward:number,right:number){
+    if(forward===this.flyForward&&right===this.flyRight)return;
+    this.flyForward=forward;this.flyRight=right;
+    if(forward||right)this.cancel(true);
+  }
+  nudgeFly(forward:number,right:number){
+    this.cancel(true);
+    translateCamera(this.camera,this.controls.target,forward,right,.12);
+  }
   cancel(manual=false){this.motion=undefined;if(manual)this.revision++;}
   setMode(enabled:boolean){this.cancel(true);this.controls.enablePan=enabled;this.controls.mouseButtons.LEFT=enabled?MOUSE.ROTATE:-1 as MOUSE;this.controls.panSpeed=.6;this.controls.touches.ONE=enabled?TOUCH.ROTATE:-1 as TOUCH;this.controls.touches.TWO=enabled?TOUCH.DOLLY_PAN:TOUCH.DOLLY_ROTATE;}
   zoom(factor:number){this.cancel(true);const offset=this.camera.position.clone().sub(this.controls.target);offset.setLength(MathUtils.clamp(offset.length()*factor,.6,8));this.camera.position.copy(this.controls.target).add(offset);this.controls.update();}
@@ -105,6 +118,13 @@ export class CameraRig {
     return facing?.theta;
   }
   update(now:number){
+    const dt=this.lastUpdate?Math.min(.05,Math.max(0,(now-this.lastUpdate)/1000)):0;
+    this.lastUpdate=now;
+    if(this.flyForward||this.flyRight){
+      this.cancel();
+      translateCamera(this.camera,this.controls.target,this.flyForward,this.flyRight,dt);
+      return;
+    }
     const m=this.motion;if(!m)return;
     const t=Math.min(1,(now-m.time)/750),ease=t*t*(3-2*t);
     this.controls.target.copy(m.target).lerp(m.end,ease);

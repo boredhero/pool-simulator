@@ -23,6 +23,22 @@ SESSION_SECONDS = 30 * 24 * 3600
 throttle_lock = threading.Lock()
 
 
+def is_admin(account_id: str) -> bool:
+    """Pin the operator's immutable ID; usernames never confer privileges."""
+    owner = os.environ.get("ADMIN_ACCOUNT_ID", "")
+    return bool(owner) and secrets.compare_digest(account_id, owner)
+
+
+def public_account(user: Account) -> dict:
+    return {
+        "id": user.id,
+        "username": user.username,
+        "createdAt": user.created_at,
+        "premium": user.premium,
+        "isAdmin": is_admin(user.id),
+    }
+
+
 def digest(value: str) -> str:
     return hashlib.sha256(value.encode()).hexdigest()
 
@@ -91,16 +107,7 @@ def account_for_token(token: str | None) -> dict | None:
         if not session or session.expires_at <= int(time.time()):
             return None
         user = db.get(Account, session.account_id)
-        return (
-            {
-                "id": user.id,
-                "username": user.username,
-                "createdAt": user.created_at,
-                "premium": user.premium,
-            }
-            if user
-            else None
-        )
+        return public_account(user) if user else None
 
 
 def current_account(request: Request) -> dict | None:

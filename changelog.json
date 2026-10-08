@@ -1,5 +1,15 @@
 [
   {
+    "version": "0.8.0",
+    "date": "2026-10-08",
+    "title": "Owner dashboard and movable camera controls",
+    "changes": [
+      "Added a private owner dashboard for searching accounts, managing Premium, and inspecting recorded Jev usage and estimated costs. Owner access is checked on the server and Premium changes are audited.",
+      "Settings, View and Online panels can be dragged, moved with buttons or keyboard controls, and reset to their original positions.",
+      "Added WASD camera movement and a compact HUD camera pad for touch devices."
+    ]
+  },
+  {
     "version": "0.7.1",
     "date": "2026-10-08",
     "title": "Premium accounts and unlimited Jev games",

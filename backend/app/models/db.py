@@ -77,6 +77,16 @@ class LoginSession(Base):
     expires_at: Mapped[int] = mapped_column(Integer, index=True)
 
 
+class AdminAudit(Base):
+    __tablename__ = "admin_audit"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    actor_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"))
+    account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), index=True)
+    old_premium: Mapped[bool] = mapped_column(Boolean)
+    new_premium: Mapped[bool] = mapped_column(Boolean)
+    occurred_at: Mapped[int] = mapped_column(Integer, index=True)
+
+
 class AuthThrottle(Base):
     __tablename__ = "auth_throttles"
     key: Mapped[str] = mapped_column(String(64), primary_key=True)

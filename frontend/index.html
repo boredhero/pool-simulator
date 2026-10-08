@@ -164,6 +164,7 @@ body:has(#tutorial:not([hidden])) .privacy-notice{display:none}
 <div id="settingspanel" role="dialog" aria-labelledby="settings-title">
   <header class="settings-header"><h2 id="settings-title">Settings <span id="settingspremium" class="premium-badge" hidden>Premium</span></h2><button id="closesettings" type="button" aria-label="Close settings" title="Close settings">×</button></header>
   <div class="settings-body">
+  <button id="adminbtn" hidden type="button">Admin settings</button>
   <h2>Table &amp; rules</h2>
   <label for="rulespreset">Game</label><select id="rulespreset"><option value="bar">8-Ball (Bar)</option><option value="tournament">8-Ball (Tourny)</option><option value="custom">8-Ball (Custom)</option></select>
   <p class="guide-note" id="rulesnotice">Preset rules are locked. Choose Custom to make them your own.</p>
@@ -257,6 +258,18 @@ body:has(#tutorial:not([hidden])) .privacy-notice{display:none}
       <p id="accountjev"></p><div id="termsupdate"><label class="terms-check"><input id="termsadult" type="checkbox"> <span>I am 18 or older and agree to the <a href="/terms.html" target="_blank" rel="noopener">Terms</a>. I have read the <a href="/privacy.html" target="_blank" rel="noopener">Privacy Notice</a>.</span></label><button id="acceptterms" type="button">Accept Terms for Jev AI</button></div><dl id="accountstats"></dl><h3>Recent matches</h3><ul id="accountmatches"></ul>
       <div class="row"><button id="accountrefresh">Refresh stats</button><button id="accountlogout">Sign out</button></div>
     </section>
+  </div>
+</dialog>
+<dialog id="admindialog" aria-labelledby="admintitle">
+  <header class="admin-header"><div><span class="eyebrow">OWNER CONSOLE</span><h2 id="admintitle">Admin settings</h2><p id="adminowner"></p></div><div class="row"><button id="adminrefresh" type="button">Refresh</button><button id="adminclose" type="button" aria-label="Close admin settings">Close</button></div></header>
+  <div class="admin-body">
+    <div id="adminsummary" class="admin-summary"></div>
+    <p id="adminusage-note" class="admin-note"></p>
+    <p class="admin-note">Usage and cost totals cover retained games, including all calls within each game. Games expire after 90 days of inactivity. These are not daily spending totals or provider invoices. Lifetime attempt counts remain available separately.</p>
+    <div class="admin-toolbar"><label>Find a player<input id="adminsearch" type="search" maxlength="20" placeholder="Search usernames" autocomplete="off"></label><label>Account type<select id="adminfilter"><option value="all">All accounts</option><option value="premium">Premium</option><option value="free">Free</option></select></label><label>Sort by<select id="adminsort"><option value="joined">Newest accounts</option><option value="username">Username A–Z</option><option value="cost">Highest cost</option><option value="requests">Most requests</option></select></label></div>
+    <p id="adminstatus" role="status" aria-live="polite"></p>
+    <div id="adminresults" aria-busy="false"><div class="admin-table-wrap"><table class="admin-table"><caption class="admin-note">Players · Premium access and recorded Jev usage</caption><thead><tr><th scope="col">Player</th><th scope="col">Premium access</th><th scope="col">Jev requests</th><th scope="col">Est. cost (USD)</th><th scope="col">Activity</th></tr></thead><tbody id="adminrows"></tbody></table><p id="adminempty" hidden>No accounts match these filters.</p></div></div>
+    <div class="admin-pagination"><span id="adminpage"></span><div class="row"><button id="adminprev" type="button">Previous</button><button id="adminnext" type="button">Next</button></div></div>
   </div>
 </dialog>
 <script type="module" src="/src/main.ts"></script>
