@@ -5,13 +5,19 @@ const input = (id: string) => el<HTMLInputElement>(id);
 
 export class TableOptions {
   fastForward = false;
+  autoCamera = false;
   constructor(start: (rules: MatchConfig) => void) {
+    let savedCamera:string|null=null;try{savedCamera=localStorage.getItem('pool:auto-camera');}catch{}
+    this.autoCamera=savedCamera===null?(matchMedia('(pointer: coarse)').matches||matchMedia('(max-width: 700px)').matches):savedCamera==='1';
+    input('autocamera').checked=this.autoCamera;
+    input('autocamera').addEventListener('change',()=>{this.autoCamera=input('autocamera').checked;try{localStorage.setItem('pool:auto-camera',this.autoCamera?'1':'0');}catch{}});
     try { this.fastForward = localStorage.getItem('pool:fast-forward') === '1'; } catch { /* private storage */ }
     input('fastforward').checked = this.fastForward;
     input('fastforward').addEventListener('change', () => { this.fastForward = input('fastforward').checked; try { localStorage.setItem('pool:fast-forward', this.fastForward ? '1' : '0'); } catch { /* private storage */ } });
     let dismissed = false;
     try { dismissed = localStorage.getItem('pool:help-dismissed') === '1'; } catch { /* private storage */ }
     select('rulespreset').addEventListener('change', () => this.write(matchConfig({ preset: select('rulespreset').value as MatchConfig['preset'] })));
+    el('closesettings').addEventListener('click',()=>{el('settingspanel').classList.remove('open');el('settingsbtn').focus();});
     el('applyrules').addEventListener('click', () => { start(this.read()); el('settingspanel').classList.remove('open'); });
     const show = (open: boolean, remember = false) => {
       if (!open && remember) { dismissed = true; try { localStorage.setItem('pool:help-dismissed', '1'); } catch { /* private storage */ } }
@@ -34,7 +40,7 @@ export class TableOptions {
     const desktop = matchMedia('(min-width: 1101px)');
     show(desktop.matches && !dismissed);
     desktop.addEventListener('change', e => show(e.matches && !dismissed));
-    addEventListener('keydown', e => { if (e.key === 'Escape') { show(false, true); el('settingspanel').classList.remove('open'); el('onlinepanel').classList.remove('open'); } });
+    addEventListener('keydown', e => { if (e.key === 'Escape') { if(el('settingspanel').classList.contains('open'))el('settingsbtn').focus(); show(false, true); el('settingspanel').classList.remove('open'); el('onlinepanel').classList.remove('open'); } });
     this.write(matchConfig());
   }
   read(): MatchConfig {
@@ -51,6 +57,6 @@ export class TableOptions {
   }
   summary(c: MatchConfig): void {
     el('kitchenhelp').hidden=c.scratch!=='kitchen';
-    el('rulesummary').textContent = `${rulesName(c)} · Scratch: ${c.scratch === 'kitchen' ? 'behind the head string' : 'ball in hand anywhere'}. Calls: ${c.calls === 'eight' ? '8-Ball only' : c.calls === 'all' ? 'every ball' : 'none'}. ${c.assignOnBreak ? 'Groups may be assigned on the break.' : 'Table stays open after the break.'} 8 on break: ${c.eightOnBreak === 'win' ? 'win' : 'respot'}. ${c.strictBreak ? 'Illegal break: rerack for the opponent.' : ''}`;
+    el('rulesummary').textContent = `${rulesName(c)} · Scratch: ${c.scratch === 'kitchen' ? 'behind the head string' : 'ball in hand anywhere'}. Calls: ${c.calls === 'eight' ? '8-Ball only' : c.calls === 'all' ? 'every ball' : 'none'}. ${c.assignOnBreak ? 'Groups may be assigned on the break.' : 'Table stays open after the break.'} Groups require a legal pot; a scratch leaves an open table unassigned. 8 on break: ${c.eightOnBreak === 'win' ? 'win' : 'respot'}. ${c.strictBreak ? 'Illegal break: rerack for the opponent.' : 'Empty break: keep the layout and pass the turn; no rerack.'}`;
   }
 }

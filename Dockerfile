@@ -4,6 +4,7 @@ WORKDIR /web
 COPY frontend/package.json frontend/package-lock.json* frontend/pnpm-lock.yaml* ./
 RUN if [ -f pnpm-lock.yaml ]; then npm install -g pnpm && pnpm install; elif [ -f package-lock.json ]; then npm ci; else npm install; fi
 COPY frontend/ ./
+COPY changelog.json /changelog.json
 RUN npm run build
 
 FROM python:3.13-slim

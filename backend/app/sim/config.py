@@ -9,7 +9,7 @@ BAR_RULES = dict(
     eightOnBreak="win",
     scratchOnEightLoss=True,
     assignOnBreak=True,
-    strictBreak=True,
+    strictBreak=False,
     normalMax=3.5,
     breakMax=8.5,
 )
@@ -21,6 +21,7 @@ TOURNAMENT_RULES = {
     "eightOnBreak": "spot",
     "scratchOnEightLoss": False,
     "assignOnBreak": False,
+    "strictBreak": True,
 }
 
 

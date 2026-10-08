@@ -257,3 +257,138 @@ test('spin resets both axes and supports keyboard adjustments on desktop and mob
   await page.setViewportSize({width:390,height:844});await expect(reset).toBeVisible();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
+
+test('version opens a readable changelog and restores keyboard focus', async ({page})=>{
+  await openGame(page);
+  await page.locator('#version').click();
+  await expect(page.locator('#changelog')).toBeVisible();
+  await expect(page.locator('#changelog-content')).toContainText('v0.3.0');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#changelog')).not.toBeVisible();
+  await expect(page.locator('#version')).toBeFocused();
+});
+
+test('camera preferences adapt to mobile and persist an explicit override',async({page})=>{
+  await openGame(page);
+  await expect(page.locator('#autocamera')).not.toBeChecked();
+  await page.setViewportSize({width:390,height:844});
+  await openGame(page,true);
+  await expect(page.locator('#autocamera')).toBeChecked();
+  for(const id of ['viewbtn','version','settingsbtn']) {const box=(await page.locator('#'+id).boundingBox())!;expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(390);}
+  await page.screenshot({path:'/tmp/pool-mobile-camera.png'});
+  await page.locator('#viewbtn').click();
+  await page.getByRole('button',{name:'Move camera',exact:true}).click();
+  expect(await page.evaluate(()=>(window as any).__pool.cameraMode)).toBe(true);
+  await page.keyboard.press('Escape');
+  expect(await page.evaluate(()=>(window as any).__pool.cameraMode)).toBe(false);
+  await page.locator('#settingsbtn').click();
+  await page.locator('#autocamera').uncheck();
+  await openGame(page,true);
+  await expect(page.locator('#autocamera')).not.toBeChecked();
+});
+
+test('automatic framing waits for rest and yields to manual camera movement',async({page})=>{
+  await openGame(page);
+  const result=await page.evaluate(()=>{
+    const g=(window as any).__pool;let framed=0;g.frameBalls=()=>framed++;g.options.autoCamera=true;
+    g.cameraShotPending=true;g.cameraShotRevision=g.scene.cameraRig.revision;g.mode='wait';g.frame();const waiting=framed;
+    g.mode='aim';g.frame();const settled=framed;g.frame();const once=framed;
+    g.cameraShotPending=true;g.cameraShotRevision=g.scene.cameraRig.revision;g.scene.cameraRig.cancel(true);g.frame();
+    return{waiting,settled,once,manual:framed};
+  });
+  expect(result).toEqual({waiting:0,settled:1,once:1,manual:1});
+});
+
+test('cards retain the final 8-Ball objective before and after clearing a group',async({page})=>{
+  await openGame(page);
+  await expect(page.locator('.pcard .eight-ball')).toHaveCount(0);
+  await page.evaluate(()=>{const g=(window as any).__pool;g.gs.open=false;g.gs.groups=['solid','stripe'];g.hud();});
+  await expect(page.locator('.pcard .eight-ball')).toHaveCount(2);
+  await expect(page.locator('.pcard').first().locator('.balls .pball').last()).toHaveText('8');
+  await expect(page.locator('.pcard').first().locator('.grp')).toHaveText('Solids · 7 remaining');
+  await expect(page.locator('.pcard').first().locator('.eight-ball')).not.toHaveClass(/ready/);
+  await page.evaluate(()=>{const g=(window as any).__pool;for(const b of g.gs.balls)if(b.n>=1&&b.n<=7)b.potted=true;g.hud();});
+  await expect(page.locator('.pcard').first().locator('.grp')).toHaveText('On the 8-Ball');
+  await expect(page.locator('.pcard').first().locator('.eight-ball')).toHaveClass(/ready/);
+});
+
+test('desktop starts behind the cue facing the rack and renders a captured ball dropping',async({page})=>{
+  await openGame(page);
+  const result=await page.evaluate(()=>{
+    const w=window as any,g=w.__pool,scene=g.scene, camera=scene.controls.object;
+    const direction=camera.position.clone().sub(scene.controls.target);
+    return {x:direction.x,y:direction.y,z:direction.z,angle:g.angle};
+  });
+  expect(result.x).toBeLessThan(0);expect(result.y).toBeGreaterThan(0);expect(result.z).toBeCloseTo(0);expect(result.angle).toBeCloseTo(0);
+  await page.evaluate(()=>{const w=window as any;w.__pool.scene.renderer.render=(s:any,c:any)=>{w.__scene=s;w.__draw(s,c);w.__pool.scene.renderer.render=()=>{};};});
+  await page.waitForFunction(()=>!!(window as any).__scene);
+  await page.screenshot({path:'/tmp/pool-desktop-start.png'});
+  const drop=await page.evaluate(()=>{
+    const w=window as any,g=w.__pool,list=g.gs.balls.map((b:any)=>({...b})),b=list.find((b:any)=>b.n===1);
+    b.x=1.27;b.y=-.026;g.scene.setBalls(list,0,[],.016);
+    b.potted=true;g.scene.setBalls(list,0,[1],.1);
+    const mesh=w.__scene.getObjectByName('ball-b1'),start=mesh.position.y;
+    g.scene.setBalls(list,0,[1],.1);const falling=mesh.position.y;
+    for(let i=0;i<5;i++)g.scene.setBalls(list,0,[1],.1);
+    return{start,falling,stored:mesh.position.y,visible:mesh.visible};
+  });
+  expect(drop.start).toBeGreaterThan(drop.falling);expect(drop.stored).toBeLessThan(-.1);expect(drop.visible).toBe(true);
+});
+
+
+test('AI name appears in turn, foul, rolling, and winner messages',async({page})=>{
+  await openGame(page);
+  for(const [mode,message,expected] of [
+    ['place','Foul: No contact · Player 2, place anywhere','Foul: No contact · AI, place anywhere'],
+    ['rolling','Player 2 to shoot','AI · shot in motion'],
+    ['over','Player 2 wins!','AI wins!'],
+  ]) {
+    const state=await page.evaluate(({mode,message})=>{const g=(window as any).__pool;g.aiOpponent=true;g.gs.current=1;g.gs.message=message;g.mode=mode;g.hud();return{turn:document.getElementById('turn')!.textContent,message:document.getElementById('msg')!.textContent};},{mode,message});
+    expect(state.turn).toBe('AI');expect(state.message).toContain(expected);expect(state.message).not.toContain('Player 2');
+  }
+});
+
+test('camera faces current player targets and aligns the idle cue with the final view',async({page})=>{
+  await openGame(page);
+  const results=await page.evaluate(()=>{
+    const g=(window as any).__pool,rig=g.scene.cameraRig,camera=g.scene.controls.object;
+    g.gs.open=false;g.gs.groups=['solid','stripe'];g.gs.current=0;
+    let args:any;const frame=rig.frame.bind(rig);rig.frame=(...a:any[])=>{args=a;return frame(...a);};
+    g.targetAngle=1.7;
+    g.frameBalls();rig.update(performance.now()+1000);
+    const solids=args[2].map((b:any)=>b.n),cue=args[1].n;
+    g.gs.current=1;g.frameBalls();const stripes=args[2].map((b:any)=>b.n);
+    for(const b of g.gs.balls)if(b.n>=9)b.potted=true;
+    g.frameBalls();const eight=args[2].map((b:any)=>b.n);
+    rig.update(performance.now()+1000);
+    const offset=camera.position.clone().sub(g.scene.controls.target),ball=g.gs.balls.find((b:any)=>b.n===8),c=g.cue();
+    const alignment=(offset.x*(ball.x-c.x)+offset.z*(ball.y-c.y))/Math.hypot(offset.x,offset.z)/Math.hypot(ball.x-c.x,ball.y-c.y);
+    const cueAlignment=(Math.cos(g.targetAngle)*offset.x+Math.sin(g.targetAngle)*offset.z)/Math.hypot(offset.x,offset.z);
+    const angle=g.targetAngle;
+    g.gs.ballInHand=true;g.frameBalls();const placement=args[1]===undefined;
+    return{solids,stripes,eight,cue,alignment,placement,cueAlignment,placementKeepsAim:g.targetAngle===angle};
+  });
+  expect(results.solids.sort((a:number,b:number)=>a-b)).toEqual([1,2,3,4,5,6,7]);
+  expect(results.stripes.sort((a:number,b:number)=>a-b)).toEqual([9,10,11,12,13,14,15]);
+  expect(results.eight).toEqual([8]);expect(results.cue).toBeNull();expect(results.alignment).toBeCloseTo(-1);
+  expect(results.placement).toBe(true);expect(results.cueAlignment).toBeCloseTo(-1);expect(results.placementKeepsAim).toBe(true);
+});
+
+test('settings title and close button stay visible while scrolling on desktop and mobile',async({page})=>{
+  await openGame(page);
+  for(const viewport of [{width:1280,height:720},{width:390,height:844}]) {
+    await page.setViewportSize(viewport);
+    await page.locator('#settingsbtn').click();
+    const header=page.locator('.settings-header'),before=(await header.boundingBox())!;
+    await page.locator('.settings-body').evaluate(el=>el.scrollTop=el.scrollHeight);
+    expect(await page.locator('.settings-body').evaluate(el=>el.scrollTop)).toBeGreaterThan(100);
+    const after=(await header.boundingBox())!;expect(after.y).toBeCloseTo(before.y);
+    await expect(page.getByRole('heading',{name:'Settings',exact:true})).toBeVisible();
+    await page.getByRole('button',{name:'Close settings',exact:true}).click();
+    await expect(page.locator('#settingspanel')).not.toBeVisible();
+    await expect(page.locator('#settingsbtn')).toBeFocused();
+    await page.locator('#settingsbtn').click();await page.keyboard.press('Escape');
+    await expect(page.locator('#settingspanel')).not.toBeVisible();
+    await expect(page.locator('#settingsbtn')).toBeFocused();
+  }
+});

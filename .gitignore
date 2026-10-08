@@ -5,3 +5,35 @@ frontend/dist/
 frontend/test-results/
 frontend/e2e/*.png
 .uv/
+
+# Local configuration and credentials (keep shareable templates).
+.env
+.env.*
+!.env.example
+!.env.sample
+
+# Python tooling and generated metadata.
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+*.egg-info/
+
+# Browser reports and local runtime output.
+playwright-report/
+blob-report/
+coverage/
+*.tsbuildinfo
+*.log
+*.sqlite
+*.sqlite3
+*.db
+
+# Editor / operating-system files.
+.DS_Store
+Thumbs.db
+*.swp
+*.swo

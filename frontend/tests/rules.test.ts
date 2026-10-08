@@ -76,3 +76,16 @@ for (const f of fixtures) it(f.name, () => {
   expect(gs).toMatchObject(f.expected);
   for (const n of f.respot ?? []) expect(gs.balls.find(b => b.n === n)?.potted).toBe(false);
 });
+
+it('keeps a Bar soft dry-break layout and passes turns on the open table until a legal pot',()=>{
+  const gs=newGame();beginShot(gs);
+  gs.balls[1].x=.8;gs.balls[1].y=.3;
+  const layout=gs.balls.map(b=>[b.x,b.y]);
+  applyShot(gs,ev({firstContact:1,railAfterContact:true,objectRails:[1]}));
+  expect(gs.balls.map(b=>[b.x,b.y])).toEqual(layout);
+  expect(gs.current).toBe(1);expect(gs.breakShot).toBe(false);expect(gs.open).toBe(true);expect(gs.ballInHand).toBe(false);
+  beginShot(gs);applyShot(gs,ev({firstContact:2,railAfterContact:true}));
+  expect(gs.current).toBe(0);expect(gs.open).toBe(true);expect(gs.balls.map(b=>[b.x,b.y])).toEqual(layout);
+  beginShot(gs);gs.balls.find(b=>b.n===1)!.potted=true;applyShot(gs,ev({firstContact:1,potted:[1]}));
+  expect(gs.groups).toEqual(['solid','stripe']);expect(gs.current).toBe(0);expect(gs.open).toBe(false);
+});

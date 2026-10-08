@@ -42,6 +42,7 @@ jobs:
               - '.github/workflows/**'
             frontend:
               - 'frontend/**'
+              - 'changelog.json'
               - 'contracts/**'
               - 'info.yml'
               - '.github/workflows/**'

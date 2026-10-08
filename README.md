@@ -16,3 +16,13 @@ Decisions (Socratic dialog 2026-10-06): online private rooms (anonymous), hybrid
 
 ## Physics contract
 - 2D circles + 3-axis spin (ωx,ωy,ωz), SI units, fixed dt=1/240, semi-implicit Euler + swept TOI, sleep thresholds. See `backend/app/sim/` and `frontend/src/sim/` — keep in sync via golden vectors in `contracts/golden/`.
+
+## Changelog maintenance
+
+Always update the root `changelog.json` as you make user-visible changes. The
+version button displays this committed file in the in-game changelog modal. Keep
+releases newest first, with `version`, ISO `date`, `title`, and a `changes` list
+of plain-language entries. Add changes to the current release while iterating;
+create a new entry when bumping the version. Keep its version aligned with
+`info.yml`, `backend/pyproject.toml`, and `backend/uv.lock`. Build the frontend
+after editing the changelog to validate its import.

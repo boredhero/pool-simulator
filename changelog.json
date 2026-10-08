@@ -1,0 +1,62 @@
+[
+  {
+    "version": "0.4.0",
+    "date": "2026-10-08",
+    "title": "A natural stance and clearer Bar play",
+    "changes": [
+      "Settings now has a fixed title bar and close button that stay visible while scrolling, with Escape dismissal and keyboard focus restored to the Table button.",
+      "Automatic framing uses a lower, closer playing view and tighter bounds around the visible balls. Cue alignment remains adjustable and never overrides a shot being pulled.",
+      "Automatic camera framing now swings behind the cue toward the majority of the current player\u2019s legal targets, including the final 8-Ball, with the idle cue facing forward from the new view.",
+      "Bar house rules now keep the layout after an empty break instead of automatically reracking. Players alternate until a legal pot assigns groups; pots made with a scratch stay down without assigning a group.",
+      "Turn, foul, and result messages use the AI opponent\u2019s name consistently. Illegal-break reracks now explain the missing pocket and four-rail requirement.",
+      "Once groups are assigned, player cards show the 8-Ball after their group, highlighted when it becomes the final target.",
+      "Desktop tables open from behind the cue, looking toward the fresh rack.",
+      "Pocketed balls visibly fall into deeper pocket wells before entering the return, while scoring updates immediately.",
+      "Release history now includes earlier versions reconstructed from repository history."
+    ]
+  },
+  {
+    "version": "0.3.0",
+    "date": "2026-10-08",
+    "title": "A better view of the table",
+    "changes": [
+      "New camera controls: enter Move camera mode to orbit with one finger and pinch or pan with two. Focus balls, Whole table, and zoom buttons make adjusting the view easier.",
+      "Optional automatic framing follows the remaining balls after a shot settles. Enabled by default on mobile, disabled on desktop; manual camera movement takes priority.",
+      "Click the version badge to read this release history.",
+      "Warmer lighting, shadows, detailed felt and wood, improved cushions and pockets, table legs, and a visible ball return.",
+      "Improved cue geometry and assisted elevation, collision handling, and rolling behavior. Optional fast-forward for fine movements.",
+      "Clearer player cards and adaptive instructions, immediate pocket indicators, configurable rail sights and cue ball markings, and a spin reset button.",
+      "Bar 8-Ball placement guidance and persistent tutorial dismissal. Browser tests run separately from required deployment checks."
+    ]
+  },
+  {
+    "version": "0.2.0",
+    "date": "2026-10-07",
+    "title": "Playable 8-Ball, online rooms, and an AI opponent",
+    "changes": [
+      "Added a playable 3D pool table with racked balls, aiming, shot power, spin, cue ball placement, and 8-Ball rules for turns, fouls, and winning.",
+      "Added online rooms with join codes and synchronized shots, plus an optional AI opponent. Fixed the AI getting stuck before taking its turn.",
+      "Added player scorecards, a compact lobby, felt and wood color settings, and desktop camera orbit with right-drag.",
+      "Refined pull-back shot controls, softened the power curve for gentler shots, previewed legal cue ball placement, and made aiming independent of frame rate.",
+      "Improved pocket capture and jaw geometry, cushion rebounds, spin and collision behavior, and visible ball rolling. Break shots can use more power than regular shots.",
+      "Added game sound effects and an installable web app with offline asset caching."
+    ]
+  },
+  {
+    "version": "0.1.1",
+    "date": "2026-10-06",
+    "title": "Correct version display in deployed builds",
+    "changes": [
+      "Fixed the version badge by including the version information in deployed builds and correcting where the server reads it."
+    ]
+  },
+  {
+    "version": "0.1.0",
+    "date": "2026-10-06",
+    "title": "Initial application foundation",
+    "changes": [
+      "Established the browser canvas and backend foundation for the pool simulator; playable pool arrived in a later release.",
+      "Added the site version badge and the initial deployment setup."
+    ]
+  }
+]

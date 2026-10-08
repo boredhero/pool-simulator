@@ -42,6 +42,11 @@ export class Game {
   calledPocket: number | null = null;
   accumulator = 0;
   pointers = new Set<number>();
+  cameraMode=false;
+  cameraGesture=false;
+  placementPress:[number,number]|null=null;
+  cameraShotPending=false;
+  cameraShotRevision=0;
   scene: SceneHandle;
   mode: Mode = 'aim';
   angle = 0; // aim direction, sim plane (eased toward targetAngle)
@@ -95,7 +100,9 @@ export class Game {
   reset(rules: MatchConfig = this.gs.rules): void {
     if (this.room) return;
     this.gs = newGame((Math.random() * 1e9) | 0, rules);
+    this.cameraShotPending=false;this.scene.cameraRig.cancel();
     this.mode = 'aim'; this.pulling = false; this.pressPt = null;
+    this.angle=this.targetAngle=0;
     this.lastPotted = 0; this.lastSpeed.clear(); this.calledBall = this.calledPocket = null;
     this.options.write(rules); this.hud();
   }
@@ -156,6 +163,7 @@ export class Game {
 
   /** Human may act only on their own turn (AI turns are driven by aiMove). */
   humanTurn(): boolean {
+    if(this.cameraMode || this.cameraGesture)return false;
     if (!this.canShoot()) return false;
     if (this.aiOpponent && this.gs.current === 1) return false;
     return true;
@@ -165,6 +173,19 @@ export class Game {
     if (!this.pulling || !this.pressPt || !this.hoverPt) return 0;
     const d = Math.hypot(this.hoverPt[0] - this.pressPt[0], this.hoverPt[1] - this.pressPt[1]);
     return Math.min(1, d / PULL_FULL);
+  }
+
+  frameBalls(whole=false): void {
+    const eligible=legalTargets(this.gs);
+    const targets=this.gs.balls.filter(b=>!b.potted&&b.n!==null&&eligible.includes(b.n));
+    const points=this.gs.balls.filter(b=>!b.potted&&(whole||b.n===null||eligible.includes(b.n))).map(b=>({x:b.x,y:b.y}));
+    if(whole || this.gs.ballInHand) {
+      const edge=whole||this.gs.placement!=='kitchen'?TABLE_W:TABLE_W/4;
+      for(const x of [0,edge])for(const y of [0,TABLE_H])points.push({x,y});
+    }
+    const facing=this.scene.cameraRig.frame(points,!whole&&!this.gs.ballInHand&&!this.cue().potted?this.cue():undefined,targets);
+    if(facing!==undefined&&this.humanTurn()&&!this.pulling)
+      this.targetAngle=Math.atan2(-Math.cos(facing),-Math.sin(facing));
   }
 
   setSpin(x: number, y: number): void {
@@ -196,11 +217,12 @@ export class Game {
         if (this.seat === this.gs.current) this.room.place(cx, cy);
       } else if (placeCue(this.gs, cx, cy)) {
         this.mode = 'aim';
+        if(this.options.autoCamera)this.frameBalls();
       }
       this.hud();
     };
     canvas.addEventListener('pointermove', (e) => {
-      if (this.pointers.size > 1) return;
+      if (this.cameraMode || this.cameraGesture || this.pointers.size > 1) return;
       if (e.pointerType === 'mouse' && e.buttons !== 0 && e.buttons !== 1) return;
       const p = this.scene.pickFelt(e.clientX, e.clientY);
       if (!p) return;
@@ -210,13 +232,14 @@ export class Game {
     canvas.addEventListener('pointerdown', (e) => {
       this.sfx.unlock();
       this.pointers.add(e.pointerId);
-      if (this.pointers.size > 1) { this.pulling = false; this.pressPt = null; return; }
+      if(this.cameraMode || this.pointers.size>1){this.cameraGesture=true;this.pulling=false;this.pressPt=null;this.placementPress=null;return;}
+      if(this.cameraGesture)return;
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       const p = this.scene.pickFelt(e.clientX, e.clientY);
       if (!p) return;
       if (this.mode === 'place') {
         this.placeX = p[0]; this.placeY = p[1];
-        tryPlace(p[0], p[1]);
+        this.placementPress=[e.clientX,e.clientY];
         return;
       }
       if (this.humanTurn() && callRequired(this.gs) && this.calledPocket === null) {
@@ -237,8 +260,11 @@ export class Game {
       }
     });
     const cancelPull = () => { this.pulling = false; this.pressPt = null; };
+    this.scene.controls.addEventListener('start',()=>{cancelPull();this.placementPress=null;});
     canvas.addEventListener('pointerup', (e) => {
       this.pointers.delete(e.pointerId);
+      if(this.cameraMode || this.cameraGesture){cancelPull();this.placementPress=null;if(!this.pointers.size)this.cameraGesture=false;return;}
+      if(this.placementPress){const start=this.placementPress;this.placementPress=null;if(Math.hypot(e.clientX-start[0],e.clientY-start[1])<12){const p=this.scene.pickFelt(e.clientX,e.clientY);if(p)tryPlace(...p);}return;}
       if (!this.pulling) return;
       if (e.pointerType === 'mouse' && e.button !== 0) { cancelPull(); return; }
       const power = Math.max(0.04, this.pullPower());
@@ -247,10 +273,12 @@ export class Game {
       this.fire(power);
     });
     canvas.addEventListener('pointercancel', e => { this.pointers.delete(e.pointerId); cancelPull(); });
-    addEventListener('pointerup', e => this.pointers.delete(e.pointerId));
+    const releasePointer=(e:PointerEvent)=>{this.pointers.delete(e.pointerId);if(!this.pointers.size){this.cameraGesture=false;this.placementPress=null;}};
+    addEventListener('pointerup',releasePointer);addEventListener('pointercancel',releasePointer);
     canvas.addEventListener('pointerleave', cancelPull);
     addEventListener('keydown', (e) => {
       if ((e.target as HTMLElement)?.closest('input,select,button,textarea')) return;
+      if(this.cameraMode)return;
       if (e.code === 'ArrowLeft') this.targetAngle += 0.03;
       if (e.code === 'ArrowRight') this.targetAngle -= 0.03;
       if (e.code === 'Space') {
@@ -276,6 +304,27 @@ export class Game {
       else if(e.key==='Home'||e.key==='0'){e.preventDefault();e.stopPropagation();this.setSpin(0,0);}
     });
     document.getElementById('resetspin')!.addEventListener('click',()=>this.setSpin(0,0));
+    const view=document.getElementById('viewpanel')!,viewButton=document.getElementById('viewbtn')!;
+    const closeView=()=>{view.classList.remove('open');viewButton.setAttribute('aria-expanded','false');};
+    const setCameraMode=(enabled:boolean)=>{
+      this.cameraMode=enabled;cancelPull();this.placementPress=null;this.scene.cameraRig.setMode(enabled);
+      const button=document.getElementById('cameramode')!;button.setAttribute('aria-pressed',String(enabled));button.textContent=enabled?'Return to play':'Move camera';
+      viewButton.classList.toggle('on',enabled);viewButton.textContent=enabled?'Camera':'View';
+      if(enabled)closeView();
+    };
+    viewButton.addEventListener('click',()=>{
+      const open=!view.classList.contains('open');view.classList.toggle('open',open);viewButton.setAttribute('aria-expanded',String(open));
+      for(const id of ['helppanel','settingspanel','onlinepanel'])document.getElementById(id)!.classList.remove('open');
+      document.getElementById('helpbtn')!.setAttribute('aria-expanded','false');
+    });
+    document.getElementById('cameramode')!.addEventListener('click',()=>setCameraMode(!this.cameraMode));
+    document.getElementById('focusballs')!.addEventListener('click',()=>{closeView();this.scene.cameraRig.cancel(true);this.frameBalls();});
+    document.getElementById('wholetable')!.addEventListener('click',()=>{closeView();this.scene.cameraRig.cancel(true);this.frameBalls(true);});
+    document.getElementById('zoomin')!.addEventListener('click',()=>this.scene.cameraRig.zoom(.8));
+    document.getElementById('zoomout')!.addEventListener('click',()=>this.scene.cameraRig.zoom(1.25));
+    document.getElementById('autocamera')!.addEventListener('change',()=>{if(!this.options.autoCamera)this.scene.cameraRig.cancel();});
+    for(const id of ['helpbtn','settingsbtn','onlinebtn'])document.getElementById(id)!.addEventListener('click',closeView);
+    addEventListener('keydown',e=>{if(e.key==='Escape'){closeView();if(this.cameraMode)setCameraMode(false);}});
     this.el.onlinebtn.addEventListener('click', () => {
       this.el.onlinepanel.classList.toggle('open');
       this.el.settingspanel.classList.remove('open');
@@ -315,7 +364,8 @@ export class Game {
     this.ev = freshEv();
     this.contact = { v: false };
     this.whoShot = this.seat;
-    this.mode = 'rolling'; this.lastT = 0; this.accumulator = 0;
+    this.mode = 'rolling';
+    this.cameraShotPending=true;this.cameraShotRevision=this.scene.cameraRig.revision; this.lastT = 0; this.accumulator = 0;
     if (this.room) this.room.shot(params);
     this.hud();
   }
@@ -406,6 +456,10 @@ export class Game {
         if ((this.mode as Mode) === 'rolling') break;
       }
     }
+    if(this.cameraShotPending && this.mode!=='rolling' && this.mode!=='wait') {
+      this.cameraShotPending=false;
+      if(this.options.autoCamera && !this.cameraMode && !this.pulling && !this.pointers.size && this.cameraShotRevision===this.scene.cameraRig.revision)this.frameBalls();
+    }
     const potted=this.gs.balls.filter(b=>b.potted).length;
     if(potted>this.lastPotted)this.sfx.pot();
     this.lastPotted=potted;
@@ -415,7 +469,7 @@ export class Game {
       if(this.mode==='rolling' && (this.ev.potted.length || this.ev.cuePotted))this.el.msg.textContent=this.ev.cuePotted?'Scratch · balls still rolling':`Pocketed ${this.ev.potted.join(', ')} · balls still rolling`;
     }
     const returnOrder = [...new Set([...this.gs.returnOrder, ...(this.mode === 'rolling' || this.mode === 'wait' ? this.ev.potted : [])])].filter(n => this.gs.balls.some(b => b.n === n && b.potted));
-    this.scene.setBalls(this.gs.balls, ballDt, returnOrder);
+    this.scene.setBalls(this.gs.balls, ballDt, returnOrder, fdt);
     // Ease aim toward target (kills mouse jitter twitch), frame-rate independent.
     {
       let d = this.targetAngle - this.angle;
@@ -437,14 +491,19 @@ export class Game {
     }
   }
 
+  playerName(seat:number): string {
+    return this.roomNames?.[seat] ?? (seat===1 && this.aiOpponent && !this.room ? 'AI' : `Player ${seat+1}`);
+  }
+
   hud(): void {
     let msg = this.gs.message;
     if (this.mode === 'place') msg += ' — tap a green spot to place the cue ball';
     else if (this.mode === 'rolling') msg = `Player ${this.gs.current + 1} · shot in motion`;
     else if (this.mode === 'wait' && this.room) msg += ' — waiting…';
     else if (this.room && this.seat !== null && this.seat !== this.gs.current && this.mode === 'aim') msg += ' — opponent aiming…';
-    this.el.msg.textContent = msg;
-    this.el.turn.textContent = this.gs.winner !== null ? 'Game over' : `Player ${this.gs.current + 1}`;
+    if(msg.startsWith('Illegal break'))msg += ' · no ball pocketed and fewer than four object balls reached a rail';
+    this.el.msg.textContent = msg.replace(/\bPlayer ([12])\b/g,(_,seat)=>this.playerName(Number(seat)-1));
+    this.el.turn.textContent = this.gs.winner !== null ? 'Game over' : this.playerName(this.gs.current);
     this.el.turn.classList.toggle('me', !this.room || this.seat === this.gs.current);
     this.el.roominfo.textContent = this.room ? `room ${this.room.code} · you P${(this.seat ?? 0) + 1}` : 'solo table';
     this.options.summary(this.gs.rules);
@@ -464,10 +523,6 @@ export class Game {
   renderScorecard(): void {
     const box = this.el.scorecard;
     box.innerHTML = '';
-    const names = this.roomNames ?? [
-      'Player 1',
-      this.aiOpponent ? 'AI' : 'Player 2',
-    ];
     const live=this.mode==='rolling' || this.mode==='wait';
     let displayedGroups=this.gs.groups;
     if(live && this.gs.open && this.gs.shot && this.ev.potted.length) {
@@ -485,17 +540,18 @@ export class Game {
       const label = g === 'solid' ? 'Solids' : 'Stripes';
       head.innerHTML = '';
       const nm = document.createElement('span');
-      nm.textContent = names[i] ?? `Player ${i + 1}`;
+      nm.textContent = this.playerName(i);
       const gr = document.createElement('span');
       gr.className = 'grp';
       const nums = g !== null && GROUP_BALLS[g] ? [...GROUP_BALLS[g]] : [];
       const onEight = !this.gs.open && g !== null && !this.gs.balls.some(
         (b) => !b.potted && b.n !== null && b.n !== 8 && GROUP_BALLS[g]?.includes(b.n),
       );
-      if (onEight) nums.push(8);
+
       const left = nums.filter((n) => !this.gs.balls.find((q) => q.n === n)?.potted).length;
       gr.textContent = g === null ? 'Open table · groups unassigned' : onEight ? 'On the 8-Ball' : `${label} · ${left} remaining`;
       if(provisional)gr.textContent = `${label} · pending shot result`;
+      if(g!==null)nums.push(8);
       head.appendChild(nm);
       head.appendChild(gr);
       card.appendChild(head);
@@ -504,9 +560,10 @@ export class Game {
       for (const n of nums) {
         const b = this.gs.balls.find((q) => q.n === n);
         const d = document.createElement('div');
-        d.className = 'pball' + (b?.potted ? ' potted' : '');
+        d.className = 'pball' + (b?.potted ? ' potted' : '') + (n===8 ? ' eight-ball'+(onEight?' ready':'') : '');
         d.style.background = ballCss(n);
-        d.title = `Ball ${n}${b?.potted ? ' · pocketed' : ' · remaining'}`;
+        d.title = n===8 ? `8-Ball · ${b?.potted?'pocketed':onEight?'your final ball':'clear your group first'}` : `Ball ${n}${b?.potted ? ' · pocketed' : ' · remaining'}`;
+        d.setAttribute('aria-label',d.title);
         const number = document.createElement('span');
         number.textContent = String(n);
         d.appendChild(number);
@@ -523,6 +580,7 @@ export class Game {
   }
 
   applyServerState(s: RoomState): void {
+    const wasPlacing=this.gs.ballInHand;
     for (const sb of s.balls) {
       const b = this.gs.balls.find((q) => q.id === sb.id);
       if (!b) continue;
@@ -543,6 +601,7 @@ export class Game {
     this.gs.message = s.message;
     this.mode = s.winner !== null ? 'over' : s.ball_in_hand && s.current === this.seat ? 'place' : 'aim';
     this.pulling = false; this.pressPt = null;
+    if(wasPlacing&&!s.ball_in_hand&&s.winner===null&&this.options.autoCamera&&!this.cameraMode)this.frameBalls();
     this.lastPotted = this.gs.balls.filter((b) => b.potted).length;
     this.lastSpeed.clear();
     this.hud();
@@ -574,7 +633,8 @@ export class Game {
       this.ev = freshEv();
       this.contact = { v: false };
       this.whoShot = by;
-      this.mode = 'rolling'; this.lastT = 0; this.accumulator = 0;
+      this.mode = 'rolling';
+      this.cameraShotPending=true;this.cameraShotRevision=this.scene.cameraRig.revision; this.lastT = 0; this.accumulator = 0;
       this.hud();
     };
     rc.onShot = (by,shot) => { if(by===this.seat)return; if(this.mode==='rolling' || this.pendingNetwork.length)this.pendingNetwork.push(()=>handleShot(by,shot)); else handleShot(by,shot); };

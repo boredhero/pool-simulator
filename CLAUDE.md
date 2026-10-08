@@ -22,3 +22,13 @@ after editing `pyproject.toml`.)
   on `main` and skips SSH steps gracefully if secrets are absent.
 - Prod: https://pool.martinospizza.dev (nginx on boredhero.dyndns.org →
   127.0.0.1:8000, certbot auto-renew). Container: `~/pool-simulator`.
+
+## Changelog maintenance
+
+Always update the root `changelog.json` as you make user-visible changes. The
+version button displays this committed file in the in-game changelog modal. Keep
+releases newest first, with `version`, ISO `date`, `title`, and a `changes` list
+of plain-language entries. Add changes to the current release while iterating;
+create a new entry when bumping the version. Keep its version aligned with
+`info.yml`, `backend/pyproject.toml`, and `backend/uv.lock`. Build the frontend
+after editing the changelog to validate its import.
