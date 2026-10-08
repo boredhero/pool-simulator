@@ -15,11 +15,16 @@ def clean_accounts_and_matches():
     from app.models.db import (
         Account,
         AuthThrottle,
+        FeatureEvent,
         GameMatch,
+        JevGame,
+        JevUsage,
         LoginSession,
         MatchPlayer,
         MatchShot,
         Session,
+        TermsAcceptance,
+        VisitorSession,
         init_db,
     )
     from app.net.rooms import lobby
@@ -27,6 +32,22 @@ def clean_accounts_and_matches():
     init_db()
     lobby.rooms.clear()
     with Session.begin() as db:
-        for model in (MatchShot, MatchPlayer, GameMatch, LoginSession, AuthThrottle, Account):
+        for model in (
+            MatchShot,
+            MatchPlayer,
+            GameMatch,
+            LoginSession,
+            AuthThrottle,
+            JevUsage,
+            JevGame,
+            TermsAcceptance,
+            VisitorSession,
+            FeatureEvent,
+            JevGame,
+            TermsAcceptance,
+            FeatureEvent,
+            VisitorSession,
+            Account,
+        ):
             db.query(model).delete()
     yield

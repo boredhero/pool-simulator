@@ -8,7 +8,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy import delete, update
 from sqlalchemy.exc import IntegrityError
 
-from app.models.db import Account, LoginSession, Session, init_db
+from app.api.privacy import VERSION
+from app.models.db import Account, LoginSession, Session, TermsAcceptance, init_db
 from app.services.auth import (
     COOKIE,
     DUMMY_HASH,
@@ -31,6 +32,8 @@ router = APIRouter(prefix="/account")
 class Credentials(BaseModel):
     username: str = Field(min_length=3, max_length=20)
     password: str = Field(min_length=15, max_length=128)
+    terms_version: str | None = None
+    adult: bool = False
 
 
 class Recovery(Credentials):
@@ -56,6 +59,8 @@ def me(request: Request, response: Response) -> dict:
 
 @router.post("/register", dependencies=[Depends(mutation_guard)])
 def register(payload: Credentials, request: Request, response: Response) -> dict:
+    if payload.terms_version != VERSION or payload.adult is not True:
+        raise HTTPException(400, "Accounts require age 18+ and acceptance of the current Terms.")
     key = attempts(request, payload.username)
     code = recovery_code()
     user = Account(
@@ -70,6 +75,9 @@ def register(payload: Credentials, request: Request, response: Response) -> dict
         with Session.begin() as db:
             db.add(user)
             db.flush()
+            db.add(
+                TermsAcceptance(account_id=user.id, version=VERSION, accepted_at=int(time.time()))
+            )
             set_session(db, response, request, user.id)
             result = {"id": user.id, "username": user.username, "createdAt": user.created_at}
     except IntegrityError as exc:

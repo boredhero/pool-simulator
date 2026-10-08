@@ -1,6 +1,8 @@
+import { initPrivacy } from './ui/privacy';
 import { setupChangelog } from './ui/changelog';
 import { Game } from './ui/game';
 setupChangelog();
+initPrivacy();
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
 const game = new Game(canvas);
 (window as unknown as { __pool: Game }).__pool = game;

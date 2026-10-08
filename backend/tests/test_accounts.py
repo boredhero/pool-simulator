@@ -14,7 +14,9 @@ PASSWORD = secrets.token_urlsafe(24)
 
 def signup(client, name="Pool_Player"):
     response = client.post(
-        "/api/account/register", headers=HEADERS, json={"username": name, "password": PASSWORD}
+        "/api/account/register",
+        headers=HEADERS,
+        json={"terms_version": "2026-10-08", "adult": True, "username": name, "password": PASSWORD},
     )
     assert response.status_code == 200, response.text
     return response.json()
@@ -40,7 +42,12 @@ def test_register_hashes_credentials_and_uses_cookie_session(monkeypatch):
     response = client.post(
         "/api/account/login",
         headers=HEADERS,
-        json={"username": "pool_player", "password": PASSWORD},
+        json={
+            "terms_version": "2026-10-08",
+            "adult": True,
+            "username": "pool_player",
+            "password": PASSWORD,
+        },
     )
     assert response.status_code == 200
     for attribute in ("HttpOnly", "Secure", "SameSite=lax"):
@@ -53,7 +60,12 @@ def test_unique_casefolded_names_and_validation_do_not_echo_passwords():
     response = client.post(
         "/api/account/register",
         headers=HEADERS,
-        json={"username": "pool_player", "password": PASSWORD},
+        json={
+            "terms_version": "2026-10-08",
+            "adult": True,
+            "username": "pool_player",
+            "password": PASSWORD,
+        },
     )
     assert response.status_code == 409
     for name in ("xy", "space name", "../bad", "üsername", "x" * 21):
@@ -61,7 +73,12 @@ def test_unique_casefolded_names_and_validation_do_not_echo_passwords():
             client.post(
                 "/api/account/register",
                 headers=HEADERS,
-                json={"username": name, "password": PASSWORD},
+                json={
+                    "terms_version": "2026-10-08",
+                    "adult": True,
+                    "username": name,
+                    "password": PASSWORD,
+                },
             ).status_code
             == 422
         )
@@ -69,7 +86,12 @@ def test_unique_casefolded_names_and_validation_do_not_echo_passwords():
     response = client.post(
         "/api/account/register",
         headers=HEADERS,
-        json={"username": "valid", "password": short_password},
+        json={
+            "terms_version": "2026-10-08",
+            "adult": True,
+            "username": "valid",
+            "password": short_password,
+        },
     )
     assert response.status_code == 422
     assert short_password not in response.text
@@ -82,7 +104,12 @@ def test_recovery_rotates_code_revokes_all_sessions_and_requires_new_login():
         second.post(
             "/api/account/login",
             headers=HEADERS,
-            json={"username": "pool_player", "password": PASSWORD},
+            json={
+                "terms_version": "2026-10-08",
+                "adult": True,
+                "username": "pool_player",
+                "password": PASSWORD,
+            },
         ).status_code
         == 200
     )
@@ -102,7 +129,12 @@ def test_recovery_rotates_code_revokes_all_sessions_and_requires_new_login():
         first.post(
             "/api/account/login",
             headers=HEADERS,
-            json={"username": "Pool_Player", "password": PASSWORD},
+            json={
+                "terms_version": "2026-10-08",
+                "adult": True,
+                "username": "Pool_Player",
+                "password": PASSWORD,
+            },
         ).status_code
         == 401
     )
@@ -110,7 +142,12 @@ def test_recovery_rotates_code_revokes_all_sessions_and_requires_new_login():
         first.post(
             "/api/account/login",
             headers=HEADERS,
-            json={"username": "Pool_Player", "password": new_password},
+            json={
+                "terms_version": "2026-10-08",
+                "adult": True,
+                "username": "Pool_Player",
+                "password": new_password,
+            },
         ).status_code
         == 200
     )

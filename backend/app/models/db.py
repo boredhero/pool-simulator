@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 
-from sqlalchemy import ForeignKey, Integer, String, Text, create_engine
+from sqlalchemy import ForeignKey, Integer, String, Text, UniqueConstraint, create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./pool.db")
@@ -104,3 +104,61 @@ class MatchShot(Base):
     seat: Mapped[int] = mapped_column(Integer)
     shot: Mapped[str] = mapped_column(Text)
     facts: Mapped[str] = mapped_column(Text)
+
+
+class JevUsage(Base):
+    """Lifetime provider attempts; daily budgets live in durable AuthThrottle windows."""
+
+    __tablename__ = "jev_usage"
+    account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), primary_key=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    completed: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class JevGame(Base):
+    __tablename__ = "jev_games"
+    __table_args__ = (
+        UniqueConstraint("account_id", "day"),
+        UniqueConstraint("network_hash", "day"),
+    )
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), index=True)
+    day: Mapped[int] = mapped_column(Integer, index=True)
+    network_hash: Mapped[str] = mapped_column(String(64), index=True)
+    started_at: Mapped[int] = mapped_column(Integer)
+    updated_at: Mapped[int] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String(16), default="active")
+    state: Mapped[str] = mapped_column(Text)
+    revision: Mapped[int] = mapped_column(Integer, default=0)
+    requests: Mapped[int] = mapped_column(Integer, default=0)
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    # Provider input price in nano-USD per token at creation: $0.042 / million.
+    token_price_nano: Mapped[int] = mapped_column(Integer, default=42)
+    estimated_cost_nano: Mapped[int] = mapped_column(Integer, default=0)
+    unmetered_requests: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class TermsAcceptance(Base):
+    __tablename__ = "terms_acceptances"
+    account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), primary_key=True)
+    version: Mapped[str] = mapped_column(String(32))
+    accepted_at: Mapped[int] = mapped_column(Integer)
+
+
+class VisitorSession(Base):
+    __tablename__ = "visitor_sessions"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    started_at: Mapped[int] = mapped_column(Integer, index=True)
+    last_seen: Mapped[int] = mapped_column(Integer)
+    consent_version: Mapped[str] = mapped_column(String(32))
+    device: Mapped[str] = mapped_column(String(16))
+    # No account link, IP, user agent, URL, referrer, or fingerprint in analytics.
+
+
+class FeatureEvent(Base):
+    __tablename__ = "feature_events"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    session_id: Mapped[str] = mapped_column(ForeignKey("visitor_sessions.id"), index=True)
+    name: Mapped[str] = mapped_column(String(32))
+    occurred_at: Mapped[int] = mapped_column(Integer, index=True)

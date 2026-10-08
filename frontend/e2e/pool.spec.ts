@@ -452,3 +452,61 @@ test('compact mobile scores expand and trackpad shift-scroll orbits',async({page
   expect(Math.abs(after.theta-before)).toBeGreaterThan(.01);expect(after.mode).toBe('aim');
   await page.screenshot({path:'/tmp/pool-060-mobile.png'});
 });
+
+test('Jev requires sign-in while CPU remains available to guests', async ({page}) => {
+  await openGame(page);
+  await page.locator('#jevbtn').click();
+  await expect(page.locator('#accountdialog')).toBeVisible();
+  expect(await page.evaluate(()=>(window as any).__pool.jevOpponent)).toBe(false);
+  await page.locator('#accountclose').click();
+  await page.locator('#cpubtn').click();
+  expect(await page.evaluate(()=>(window as any).__pool.cpuOpponent)).toBe(true);
+});
+
+test('Jev resumes its server-owned game and reset discards an in-flight turn', async ({page}) => {
+  await page.route('**/api/account',route=>route.fulfill({json:{account:{id:'jev-test',username:'Tester',createdAt:0},stats:null}}));
+  await page.route('**/api/opponents/jev',route=>route.fulfill({json:{available:true,usage:{gamesRemaining:1,resetsAt:2000000000}}}));
+  await openGame(page);
+  const state=await page.evaluate(()=>{
+    const g=(window as any).__pool;
+    return {balls:g.gs.balls,return_order:[],current:0,groups:[null,null],open:true,
+      ball_in_hand:false,break_shot:true,placement:'none',kitchen_shot:false,rules:g.gs.rules,
+      revision:0,winner:null,message:'Player 1 to break'};
+  });
+  await page.route('**/api/opponents/jev/games',route=>route.fulfill({json:{id:'daily-game',state,status:'active'}}));
+  let release:(()=>void)|undefined,requests=0;
+  await page.route('**/api/opponents/jev/games/daily-game/turn',async route=>{
+    requests++;
+    await new Promise<void>(resolve=>{release=resolve;});
+    await route.fulfill({status:409,json:{detail:'Resume game'}}).catch(()=>{});
+  });
+  await page.locator('#jevbtn').click();
+  await expect.poll(()=>page.evaluate(()=>(window as any).__pool.jevGame?.id)).toBe('daily-game');
+  await page.evaluate(()=>{const g=(window as any).__pool;g.fire(.4);});
+  await expect.poll(()=>requests).toBe(1);
+  await page.locator('#rack').click();
+  release!();
+  expect(await page.evaluate(()=>(window as any).__pool.jevGame)).toBeNull();
+  await page.locator('#jevbtn').click();
+  await expect.poll(()=>page.evaluate(()=>(window as any).__pool.jevGame?.id)).toBe('daily-game');
+});
+
+test('optional analytics waits for consent, withdraws, and leaves play available',async({page})=>{
+  let events=0;
+  await page.route('**/api/privacy/consent',route=>route.fulfill({json:{analytics:route.request().postDataJSON().allow}}));
+  await page.route('**/api/privacy/events',route=>{events++;return route.fulfill({status:204});});
+  await openGame(page);
+  await page.locator('#settingsbtn').click();
+  expect(events).toBe(0);
+  await page.locator('#closesettings').click();
+  await page.locator('#privacybtn').click();
+  await page.locator('#privacyaccept').click();
+  await expect.poll(()=>events).toBe(1);
+  await page.locator('#settingsbtn').click();
+  await expect.poll(()=>events).toBe(2);
+  await page.locator('#closesettings').click();
+  await page.locator('#privacybtn').click();await page.locator('#privacyreject').click();
+  await expect(page.locator('#privacychoices')).not.toBeVisible();
+  await page.locator('#settingsbtn').click();
+  expect(events).toBe(2);
+});

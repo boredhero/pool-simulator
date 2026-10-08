@@ -4,7 +4,7 @@ import { BALL_R, POCKETS, TABLE_H, TABLE_W } from './table';
 import type { Ball } from './physics';
 import { groupOf } from './rules';
 
-export interface AiShot { angle: number; power: number; tipX: number; tipY: number; ball?: number; pocket?: number }
+export interface CpuShot { angle: number; power: number; tipX: number; tipY: number; ball?: number; pocket?: number }
 
 function segClear(
   x1: number, y1: number, x2: number, y2: number, balls: Ball[], ignore: number[], margin = 0.004,
@@ -28,13 +28,15 @@ function gauss(rnd: () => number): number {
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
 }
 
-export function chooseShot(
-  balls: Ball[], targets: number[], difficulty: 'easy' | 'medium' | 'hard' = 'medium', rnd: () => number = Math.random,
-): AiShot | null {
+export interface ShotCandidate extends CpuShot {
+  score: number; ball: number; pocket: number;
+  cutDegrees: number; cueDistance: number; pocketDistance: number;
+}
+
+/** Deterministic geometric options; no model is asked to calculate aiming angles. */
+export function shotCandidates(balls: Ball[], targets: number[]): ShotCandidate[] {
   const cue = balls[0];
-  const sigma = difficulty === 'easy' ? (2.5 * Math.PI) / 180 : difficulty === 'hard' ? (0.3 * Math.PI) / 180 : (1.0 * Math.PI) / 180;
-  interface Cand { angle: number; power: number; score: number; ball: number; pocket: number }
-  const cands: Cand[] = [];
+  const cands: ShotCandidate[] = [];
   for (const b of balls) {
     if (b.id === 0 || b.potted || b.n === null || !targets.includes(b.n)) continue;
     for (const p of POCKETS) {
@@ -53,17 +55,23 @@ export function chooseShot(
       if (!segClear(b.x, b.y, p.x, p.y, balls, [0, b.id])) continue;
       const dist = aimLen + pd;
       const score = (1 - cut / Math.PI) * 2 - dist / (TABLE_W + TABLE_H) + (p.corner ? 0.1 : 0);
-      cands.push({ angle: Math.atan2(aimY, aimX), power: Math.min(0.9, Math.max(0.15, 0.15 + dist * 0.22)), score, ball: b.n, pocket: POCKETS.indexOf(p) });
+      cands.push({ angle: Math.atan2(aimY, aimX), power: Math.min(0.9, Math.max(0.15, 0.15 + dist * 0.22)), score, ball: b.n, pocket: POCKETS.indexOf(p), tipX: 0, tipY: 0, cutDegrees: cut * 180 / Math.PI, cueDistance: aimLen, pocketDistance: pd });
     }
   }
-  if (cands.length === 0) return null;
-  cands.sort((a, b) => b.score - a.score);
-  const best = cands[0];
+  return cands.sort((a, b) => b.score - a.score);
+}
+
+export function chooseShot(
+  balls: Ball[], targets: number[], difficulty: 'easy' | 'medium' | 'hard' = 'medium', rnd: () => number = Math.random,
+): CpuShot | null {
+  const best = shotCandidates(balls, targets)[0];
+  if (!best) return null;
+  const sigma = (difficulty === 'easy' ? 2.5 : difficulty === 'hard' ? 0.3 : 1) * Math.PI / 180;
   return { angle: best.angle + gauss(rnd) * sigma, power: best.power, tipX: 0, tipY: 0, ball: best.ball, pocket: best.pocket };
 }
 
 /** Break fallback: full power at the apex ball. */
-export function breakShot(balls: Ball[]): AiShot {
+export function breakShot(balls: Ball[]): CpuShot {
   const cue = balls[0];
   const apex = balls.find((b) => b.n === 1) ?? balls[1];
   return { angle: Math.atan2(apex.y - cue.y, apex.x - cue.x), power: 1.0, tipX: 0, tipY: 0.1 };

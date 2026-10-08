@@ -111,6 +111,9 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
  #morecontrols{order:2;display:block;padding:0 12px;min-height:44px;font-size:14px}.touch-shot{flex:1}#hint{display:none}#callpanel{bottom:var(--above-controls,166px);max-width:calc(100vw - 24px)}
  #settingspanel,#onlinepanel,#helppanel,#viewpanel{top:var(--below-header,120px);max-height:calc(100dvh - var(--below-header,120px) - 16px);overflow-y:auto;z-index:10}
 }
+#opponentstatus{margin:6px 0 0;font-size:14px;line-height:1.4;color:#ddcba7}#opponentstatus:empty{display:none}.actions{flex-wrap:wrap}
+@media(max-width:900px){.control-tray{bottom:max(36px,env(safe-area-inset-bottom))}}
+#opponentstatus{order:3;flex-basis:100%}.legal-links{position:fixed;bottom:4px;right:10px;display:flex;gap:10px;font-size:12px;z-index:5}.legal-links a,.legal-links button{color:#dfd5c4;background:#211d18;border:0;font:inherit;padding:3px 6px;min-height:24px;text-decoration:underline}.privacy-notice{position:fixed;left:12px;bottom:120px;width:min(360px,calc(100vw - 24px));z-index:30;background:#211d18;color:#eee5d6;padding:16px;border:1px solid #75634a;border-radius:14px;box-sizing:border-box;font-size:15px;line-height:1.4}.privacy-notice[hidden]{display:none}.privacy-notice button{font-size:14px;min-height:44px;padding:0 10px}.privacy-dialog{max-width:600px;width:90vw;background:#211d18;color:#eee5d6;border:1px solid #75634a;border-radius:16px;padding:20px;font-size:17px;line-height:1.5}.privacy-dialog::backdrop{background:#0009}.privacy-dialog a,.account-body a{color:#c9dfa8}.terms-check[hidden]{display:none}.terms-check{display:flex;align-items:flex-start;gap:10px;font-size:15px}.terms-check input{width:22px!important;min-height:22px!important;flex-shrink:0}.privacy-dialog .row{flex-wrap:wrap}
 </style>
 </head>
 <body>
@@ -120,6 +123,7 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
     <div class="status">
       <div class="status-meta"><span id="turn">Player 1</span><button id="version" aria-label="Open changelog" aria-haspopup="dialog"></button></div>
       <div id="msg" role="status" aria-live="polite">Player 1 to break</div>
+      <p id="opponentstatus" role="status" aria-live="polite"></p>
     </div>
     <div class="toolbar">
       <button id="helpbtn" aria-label="How to play" aria-expanded="false" aria-controls="helppanel"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.5" r=".9" fill="currentColor" stroke="none"/></svg></button>
@@ -134,7 +138,7 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
     <button id="morecontrols" aria-expanded="false" aria-controls="shotextras">More</button>
     <div class="power-control"><span class="control-label">Shot power <span id="playbackstate" role="status"></span></span><div id="chargebar"><div id="chargefill"></div></div><div class="control-help">Pull farther for a stronger shot</div></div>
     <div id="spincontrols" class="spin-control"><span class="control-label">Spin</span><div id="spin" tabindex="0" role="group" title="Drag to set spin. Arrow keys adjust; Shift makes smaller adjustments. Home resets." aria-label="Cue ball spin control: centered"></div><button id="resetspin" type="button" aria-label="Reset spin to center" disabled>Reset</button></div>
-    <div id="shotextras" class="row actions"><button id="cpubtn">Play vs CPU</button><button id="rack">New rack</button></div>
+    <div id="shotextras" class="row actions"><button id="cpubtn" aria-pressed="false">Play vs CPU</button><button id="jevbtn" aria-pressed="false">Play vs Jev AI</button><button id="rack">New rack</button></div>
   </div>
 </div>
 <div id="scorecard"></div><button id="scoretoggle" aria-expanded="false" aria-controls="scorecard">Show balls</button>
@@ -231,7 +235,7 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
         <label id="accountpasswordlabel" for="accountpassword">Password</label><input id="accountpassword" type="password" required minlength="15" maxlength="128" autocomplete="current-password" aria-describedby="passwordhelp" />
         <p id="passwordhelp" class="guide-note">15–128 characters. A long passphrase works well.</p>
         <label id="accountrecoverylabel" hidden>Recovery code<input id="accountrecovery" autocomplete="off" maxlength="128" spellcheck="false" disabled /></label>
-        <button id="accountsubmit" type="submit">Sign in</button>
+        <label id="registerterms" class="terms-check" hidden><input id="registeradult" type="checkbox"><span>I am 18 or older and agree to the <a href="/terms.html" target="_blank" rel="noopener">Terms</a>. I have read the <a href="/privacy.html" target="_blank" rel="noopener">Privacy Notice</a>.</span></label><button id="accountsubmit" type="submit">Sign in</button>
       </form>
       <p class="guide-note">Accounts are optional. No email required. Keep your recovery code: without it or your password, the account cannot be recovered.</p>
     </section>
@@ -244,11 +248,14 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
     <section id="accountprofile" hidden>
       <h3 id="accountname"></h3><p id="accountsince" class="guide-note"></p>
       <h3>Lifetime casual stats</h3><p class="guide-note">Recorded by the server. Local practice and CPU games do not count. Private and custom matches are unranked. Leaving after the first shot counts as a forfeit, even if your connection drops.</p>
-      <dl id="accountstats"></dl><h3>Recent matches</h3><ul id="accountmatches"></ul>
+      <p id="accountjev"></p><div id="termsupdate"><label class="terms-check"><input id="termsadult" type="checkbox"> <span>I am 18 or older and agree to the <a href="/terms.html" target="_blank" rel="noopener">Terms</a>. I have read the <a href="/privacy.html" target="_blank" rel="noopener">Privacy Notice</a>.</span></label><button id="acceptterms" type="button">Accept Terms for Jev AI</button></div><dl id="accountstats"></dl><h3>Recent matches</h3><ul id="accountmatches"></ul>
       <div class="row"><button id="accountrefresh">Refresh stats</button><button id="accountlogout">Sign out</button></div>
     </section>
   </div>
 </dialog>
 <script type="module" src="/src/main.ts"></script>
+<nav class="legal-links" aria-label="Legal"><a href="/terms.html" target="_blank" rel="noopener">Terms</a><a href="/privacy.html" target="_blank" rel="noopener">Privacy</a><button id="privacybtn">Privacy choices</button></nav>
+<aside id="privacynotice" class="privacy-notice" hidden><strong>Your privacy</strong><p>Essential storage supports sign-in and your chosen game settings. Optional analytics is off. Adults can opt in to optional feature-use sessions.</p><div class="row"><button id="privacyessential">Essential only</button><button id="privacyreview">Review choices</button></div></aside>
+<dialog id="privacychoices" class="privacy-dialog" aria-labelledby="privacytitle"><h2 id="privacytitle">Privacy choices</h2><p>Sign-in, security, your chosen settings, and daily Jev game accounting are needed to provide those features. They do not depend on analytics consent.</p><p>Optional analytics records a random session and which features you open—not your name, IP, screen, typing, or account. Records expire after 30 days. No advertising trackers. <a href="/privacy.html" target="_blank" rel="noopener">Read the Privacy Notice</a>.</p><p id="privacystatus" role="status"></p><div class="row"><button id="privacyreject">Essential only / withdraw</button><button id="privacyaccept">I’m 18+ · allow analytics</button><button id="privacyclose">Close</button></div></dialog>
 </body>
 </html>

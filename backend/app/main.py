@@ -1,6 +1,7 @@
 """FastAPI entry: serves API + frontend/dist in prod, /healthz."""
 
-from contextlib import asynccontextmanager
+import asyncio
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, WebSocket
@@ -10,7 +11,11 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.accounts import router as accounts_router
+from app.api.jev import router as jev_router
+from app.api.privacy import cleanup
+from app.api.privacy import router as privacy_router
 from app.api.routes import router
+from app.models.db import Session, init_db
 from app.net.rooms import handle as handle_room_ws
 from app.security import BodyLimit
 from app.services.matches import interrupt_matches
@@ -19,12 +24,30 @@ from app.services.matches import interrupt_matches
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     interrupt_matches()
-    yield
+    init_db()
+    with Session.begin() as db:
+        cleanup(db)
+
+    async def retention():
+        while True:
+            await asyncio.sleep(3600)
+            with Session.begin() as db:
+                cleanup(db)
+
+    maintenance = asyncio.create_task(retention())
+    try:
+        yield
+    finally:
+        maintenance.cancel()
+        with suppress(asyncio.CancelledError):
+            await maintenance
 
 
 app = FastAPI(title="pool-simulator", lifespan=lifespan)
 app.add_middleware(BodyLimit)
 app.include_router(router, prefix="/api")
+app.include_router(jev_router, prefix="/api")
+app.include_router(privacy_router, prefix="/api")
 app.include_router(accounts_router, prefix="/api")
 
 
@@ -52,7 +75,7 @@ async def account_cache_control(request, call_next):
     )
     if request.url.scheme == "https":
         response.headers["Strict-Transport-Security"] = "max-age=31536000"
-    if request.url.path.startswith("/api/account"):
+    if request.url.path.startswith(("/api/account", "/api/opponents/jev", "/api/privacy")):
         response.headers["Cache-Control"] = "no-store"
     return response
 
