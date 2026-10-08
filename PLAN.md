@@ -9,8 +9,8 @@ Flow: work on `develop`, PR to `main` (protected: PR + `ci` check), merge to shi
 - [x] 0.8.0: Owner-ID authorization, account search/filter/pagination, Premium
   management and audits, Jev usage/cost dashboard, authorization regressions.
 - [x] 0.8.0: Accessible draggable Settings, View and Online panels.
-- [ ] 0.8.0: WASD camera movement and mobile HUD arrow controls.
-- [ ] 0.8.0: Browser/integration checks, version bump and develop → main PR.
+- [x] 0.8.0: WASD camera movement and mobile HUD arrow controls.
+- [x] 0.8.0: Browser/integration checks, version bump and develop → main PR #26.
 - [ ] 0.9.0: Research Jev decision representation and CPU planning.
 - [ ] 0.9.0: Bounded physics previews and diverse tactical shot candidates.
 - [ ] 0.9.0: Semantic Jev decisions and complete usage accounting.
