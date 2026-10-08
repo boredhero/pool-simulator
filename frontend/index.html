@@ -119,9 +119,11 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
 #tutorial{position:fixed;right:20px;top:var(--below-header,140px);width:min(340px,calc(100vw - 24px));box-sizing:border-box;padding:16px;border:1px solid #c7b47f;border-radius:16px;background:#211d18f5;color:#eee5d6;z-index:15;font-size:16px;line-height:1.4}#tutorial[hidden]{display:none}#tutorial header{display:flex;align-items:center;gap:10px;justify-content:space-between}#tutorialclose{min-height:40px;width:40px;padding:0;font-size:26px}#tutorialprogress{font-size:14px;color:#bdd8a7}#tutorial button{font-size:15px}#starttutorial{margin-bottom:14px;width:100%}.tutorial-focus{outline:3px solid #e1cf8d!important;outline-offset:3px}.pcard[role=button]{cursor:pointer;pointer-events:auto}.pcard[role=button]:focus-visible{outline:3px solid #e1cf8d}@media(max-width:900px){#tutorial{top:auto;bottom:var(--above-controls,200px);left:12px;right:12px;width:auto;padding:12px}#tutorial p{margin:8px 0}}
 body:has(#tutorial:not([hidden])) .privacy-notice{display:none}
 #tutorial{--tutorial-top:max(var(--below-header,140px),var(--below-scores,140px));left:50%;right:auto;bottom:auto;top:calc((var(--tutorial-top) + 100dvh - var(--above-controls,180px)) / 2);transform:translate(-50%,-50%);width:min(420px,calc(100vw - 24px));max-height:max(80px,calc(100dvh - var(--tutorial-top) - var(--above-controls,180px) - 16px));overflow-y:auto;overscroll-behavior:contain}
+#viewsource{display:flex;align-items:center;justify-content:center;gap:10px;min-height:44px;box-sizing:border-box;padding:10px 16px;border:1px solid #75634a;border-radius:10px;background:#302a21;color:#eee5d6;text-decoration:none;font-size:16px}#viewsource:hover{background:#443b2d;border-color:#b19a70}#viewsource:focus-visible{outline:2px solid #e7c384;outline-offset:2px}#viewsource img{display:block;object-fit:contain;flex:none}
 </style>
 <style>
 .premium-badge{display:inline-block;vertical-align:middle;width:fit-content;padding:3px 9px;border:1px solid #baa065;border-radius:999px;background:#3c321f;color:#f4d88f;font-size:13px;font-weight:700;letter-spacing:.03em}.premium-badge[hidden]{display:none}
+#viewsource{display:flex;align-items:center;justify-content:center;gap:10px;min-height:44px;box-sizing:border-box;padding:10px 16px;border:1px solid #75634a;border-radius:10px;background:#302a21;color:#eee5d6;text-decoration:none;font-size:16px}#viewsource:hover{background:#443b2d;border-color:#b19a70}#viewsource:focus-visible{outline:2px solid #e7c384;outline-offset:2px}#viewsource img{display:block;object-fit:contain;flex:none}
 </style>
 </head>
 <body>
@@ -169,6 +171,7 @@ body:has(#tutorial:not([hidden])) .privacy-notice{display:none}
   <div class="settings-body">
   <button id="adminbtn" hidden type="button">Admin settings</button>
   <button id="installapp" data-install-app type="button">Install app</button><p id="installappstatus" role="status"></p>
+  <a id="viewsource" href="https://github.com/boredhero/pool-simulator" target="_blank" rel="noopener noreferrer" aria-label="View source on GitHub (opens in a new tab)"><img src="/github-mark-white.svg" alt="" width="24" height="24">View source</a>
   <h2>Table &amp; rules</h2>
   <label for="rulespreset">Game</label><select id="rulespreset"><option value="bar">8-Ball (Bar)</option><option value="tournament">8-Ball (Tourny)</option><option value="custom">8-Ball (Custom)</option></select>
   <p class="guide-note" id="rulesnotice">Preset rules are locked. Choose Custom to make them your own.</p>

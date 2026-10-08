@@ -423,3 +423,5 @@ browser control. Installed standalone windows mark the app installed.
 
 The manifest uses the Pool Simulator name, a stable root ID, PNG icons at 192px
 and 512px, and a 180px Apple touch icon. The service worker registers over HTTPS.
+
+The Settings “View source” link uses the unmodified white Invertocat SVG from the [official GitHub logo pack](https://brand.github.com/GitHub_Logos.zip). GitHub marks belong to GitHub, Inc.; see their [brand guidelines](https://brand.github.com/foundations/logo).
