@@ -17,4 +17,4 @@ COPY backend/ ./backend/
 RUN uv sync --frozen --no-dev --directory backend || uv sync --no-dev --directory backend
 COPY --from=web /web/dist ./frontend/dist
 EXPOSE 8000
-CMD ["uv", "run", "--directory", "backend", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uv", "run", "--directory", "backend", "python", "-m", "app.server"]

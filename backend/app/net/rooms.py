@@ -56,6 +56,42 @@ def ev_dump(ev: ShotEvents) -> dict:
     }
 
 
+def valid_message(msg: dict) -> bool:
+    """Only accept finite, bounded protocol inputs; never trust browser state."""
+    kind = msg.get("t")
+    if not isinstance(kind, str):
+        return False
+    if kind in ("leave", "done"):
+        return True  # Legacy playback facts are deliberately ignored.
+    if kind in ("create", "join"):
+        if not isinstance(msg.get("name", ""), str) or len(msg.get("name", "")) > 24:
+            return False
+        if kind == "create":
+            return isinstance(msg.get("rules", {}), dict)
+        code = msg.get("code")
+        return isinstance(code, str) and len(code) == 8 and code.isascii() and code.isalnum()
+    if kind not in ("shot", "place") or type(msg.get("revision")) is not int:
+        return False
+    if not 0 <= msg["revision"] <= 2**31 - 1:
+        return False
+
+    def finite(value, bound=1e6):
+        return type(value) in (int, float) and -bound <= value <= bound and math.isfinite(value)
+
+    if kind == "place":
+        return finite(msg.get("x")) and finite(msg.get("y"))
+    shot = msg.get("shot")
+    if not isinstance(shot, dict):
+        return False
+    if not all(finite(shot.get(key, 0)) for key in ("aim", "power", "tipX", "tipY")):
+        return False
+    for key, low, high in (("calledBall", 1, 15), ("calledPocket", 0, 5)):
+        value = shot.get(key)
+        if value is not None and (type(value) is not int or not low <= value <= high):
+            return False
+    return "aim" in shot and "power" in shot
+
+
 @dataclass
 class Room:
     code: str
@@ -67,6 +103,7 @@ class Room:
     busy: bool = False
     closed: bool = False
     match_id: str | None = None
+    started: bool = False
     touched: float = field(default_factory=time.monotonic)
 
     def state_msg(self) -> dict:
@@ -96,7 +133,7 @@ class Room:
         for i, ws in enumerate(self.players):
             if ws is not None and i != exclude:
                 try:
-                    await ws.send_json(msg)
+                    await asyncio.wait_for(ws.send_json(msg), timeout=5)
                 except Exception:
                     pass  # Disconnect cleanup runs in the socket handler.
 
@@ -104,6 +141,9 @@ class Room:
 class Lobby:
     def __init__(self) -> None:
         self.rooms: dict[str, Room] = {}
+        self.connections: dict[str, int] = {}
+        self.simulations = 0
+        self.draining = False
 
     def create(self) -> Room:
         if len(self.rooms) >= 200:
@@ -133,12 +173,22 @@ async def handle(ws: WebSocket) -> None:
         await ws.close(code=1008)
         return
     ip = ws.client.host if ws.client else "unknown"
-    await ws.accept()
+    if (
+        lobby.draining
+        or lobby.connections.get(ip, 0) >= 8
+        or sum(lobby.connections.values()) >= 400
+    ):
+        await ws.close(code=1013)
+        return
+    lobby.connections[ip] = lobby.connections.get(ip, 0) + 1
+    tokens, last_message = 30.0, time.monotonic()
+    server_failure = False
     room: Room | None = None
     seat = -1
     identity: dict | None = None
     token = ws.cookies.get(COOKIE)
     try:
+        await ws.accept()
         await asyncio.to_thread(rate_limit, "ws-connect", ip, 60)
         identity = await asyncio.to_thread(account_for_token, token)
         if token and identity is None:
@@ -150,18 +200,28 @@ async def handle(ws: WebSocket) -> None:
             )
             return
         while True:
-            raw = await asyncio.wait_for(ws.receive_text(), timeout=900)
-            if len(raw) > 16384:
+            raw = await asyncio.wait_for(ws.receive_text(), timeout=900 if room else 30)
+            now = time.monotonic()
+            tokens = min(30.0, tokens + (now - last_message))
+            last_message = now
+            if tokens < 1:
+                await ws.close(code=1008, reason="Message rate exceeded")
+                return
+            tokens -= 1
+            if len(raw.encode("utf-8")) > 16384:
                 await ws.close(code=1009)
                 return
             try:
                 msg = json.loads(raw)
-            except ValueError:
+            except (ValueError, RecursionError):
                 await ws.send_json({"t": "error", "error": "Invalid message"})
                 continue
             if not isinstance(msg, dict):
                 continue
             typ = msg.get("t")
+            if not valid_message(msg):
+                await ws.send_json({"t": "error", "error": "Invalid message fields"})
+                continue
             if identity and await asyncio.to_thread(account_for_token, token) is None:
                 await ws.send_json({"t": "error", "error": "Session ended. Sign in again."})
                 return
@@ -257,7 +317,11 @@ async def handle(ws: WebSocket) -> None:
                 ):
                     await ws.send_json({"t": "error", "error": "call a legal ball and pocket"})
                     continue
+                if lobby.simulations >= 4:
+                    await ws.send_json({"t": "error", "error": "Server busy. Try again shortly."})
+                    continue
                 begin_shot(room.gs, called_ball, called_pocket)
+                room.started = True
                 room.busy = True
                 vmax = room.gs.rules["breakMax" if room.gs.break_shot else "normalMax"]
                 elevation = cue_elevation(cue.x, cue.y, aim, 0, room.gs.balls)
@@ -273,7 +337,11 @@ async def handle(ws: WebSocket) -> None:
                 }
                 strike(cue, math.cos(aim), math.sin(aim), power, tip_x, tip_y, vmax, elevation)
                 await room.broadcast({"t": "shot", "by": seat, "shot": shot})
-                server_ev = await asyncio.to_thread(simulate_shot, room.gs.balls, 0)
+                lobby.simulations += 1
+                try:
+                    server_ev = await asyncio.to_thread(simulate_shot, room.gs.balls, 0)
+                finally:
+                    lobby.simulations -= 1
                 if room.closed:
                     return
                 apply_shot(room.gs, server_ev)
@@ -314,24 +382,42 @@ async def handle(ws: WebSocket) -> None:
                     await room.broadcast(room.state_msg())
             else:
                 await ws.send_json({"t": "error", "error": "unknown message"})
-    except (WebSocketDisconnect, TimeoutError):
+    except WebSocketDisconnect:
+        pass  # Peer-supplied close codes cannot waive a forfeit.
+    except TimeoutError:
         pass
+    except asyncio.CancelledError:
+        server_failure = True
+        raise
     except HTTPException as exc:
         await ws.send_json({"t": "error", "error": exc.detail})
     except Exception:
+        server_failure = True
         logger.exception("Room handler failed")
     finally:
+        lobby.connections[ip] -= 1
+        if not lobby.connections[ip]:
+            del lobby.connections[ip]
         if room is not None and 0 <= seat <= 1 and room.players[seat] is ws:
             room.players[seat] = None
             room.closed = True
             lobby.rooms.pop(room.code, None)
             if room.match_id:
-                await asyncio.to_thread(abandon_match, room.match_id, seat)
+                await asyncio.to_thread(
+                    abandon_match,
+                    room.match_id,
+                    seat,
+                    room.started,
+                    server_failure or lobby.draining,
+                )
             await room.broadcast(
                 {
                     "t": "left",
                     "names": room.names,
-                    "message": "Opponent left. This room has closed; create another to play again.",
+                    "message": (
+                        "Room closed. Leaving a started game counts as a casual forfeit; "
+                        "server interruptions do not."
+                    ),
                 }
             )
             for peer in room.players:

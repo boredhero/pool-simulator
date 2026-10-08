@@ -72,9 +72,10 @@ off by default. No Fernet key or application encryption key is required. Protect
 the database and its backups as account data.
 
 Run **one Uvicorn worker / one API instance** while live rooms are held in memory.
-SQLite uses WAL, foreign keys, and a busy timeout. Restarting the server closes
-live rooms and marks their persisted active matches interrupted, without inventing
-wins/losses. PostgreSQL can replace the SQLAlchemy database URL later, but horizontal
+SQLite uses WAL, foreign keys, and a busy timeout. The production entrypoint (`python -m app.server`) marks shutdown before closing
+live sockets; restarting marks persisted active matches interrupted without inventing
+wins/losses. Leaving or losing connection after the first accepted shot is a casual
+forfeit; leaving before play starts is an abandonment without a winner. PostgreSQL can replace the SQLAlchemy database URL later, but horizontal
 scaling also needs shared room coordination and distributed rate limiting.
 
 For a consistent live backup (including the WAL), use the backup API rather than
@@ -132,3 +133,34 @@ and development dependencies are grouped separately for npm and uv; container
 images and Actions each have their own group. Version-update PRs target `develop`
 so they go through tests before the release PR to `main`. Configuration follows
 [GitHub's grouping reference](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference).
+
+
+### Online security (0.6.1)
+
+The server simulates shots, checks turns and placements, and records results.
+Browser state and playback acknowledgements are not trusted. Legacy POST
+`/api/scores` and `/api/replays` now return 410; existing records remain readable.
+Account totals are unranked casual statistics, including private/custom games and
+forfeits. They are not a matchmaking rating: cooperating players and aiming bots
+can still produce valid shots. Future ranked games need a separate eligibility and
+abuse policy; never reuse these casual totals as ranked results.
+
+Connections are capped at eight per IP and 400 total, with 200 rooms and four
+concurrent simulations. Each socket has a 30-message burst, replenishing at one
+message per second. Before joining a room, sockets time out after 30 seconds;
+room sockets time out after 15 minutes without a message. HTTP bodies and production
+WebSocket messages are limited to 16 KiB. The single-worker production entrypoint
+also limits WebSocket queues and marks planned shutdowns before disconnecting
+players. Use `python -m app.server` for production, as the Dockerfile does.
+
+HTTPS pages use same-origin HTTPS and WSS with normal browser certificate validation.
+Browsers no longer support site-controlled HPKP certificate pinning; we do not
+attempt JavaScript pinning. HTTPS responses send HSTS (one year, this host only),
+plus CSP, anti-framing, no-referrer, and MIME-sniffing protection. TLS terminates at
+the host proxy, with the backend port published only on loopback. Keep the proxy's
+HTTP-to-HTTPS redirect and certificate renewal working. Do not expose the backend
+port publicly or widen forwarded-header trust.
+
+References: [OWASP WebSocket security](https://cheatsheetseries.owasp.org/cheatsheets/WebSocket_Security_Cheat_Sheet.html),
+[Chrome HPKP removal](https://developer.chrome.com/blog/chrome-72-deps-rems/),
+and [HSTS](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Strict-Transport-Security).
