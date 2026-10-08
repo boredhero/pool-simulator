@@ -262,6 +262,7 @@ export class Game {
       if (Math.hypot(dx, dy) > 0.02) {this.targetAngle = Math.atan2(dy, dx);this.tutorial.record('aim');}
     };
     const tryPlace = (cx: number, cy: number) => {
+      if (this.jevRequest || (this.cpuOpponent && this.gs.current === 1 && !this.room)) return;
       if (this.room) {
         if (this.seat === this.gs.current) this.room.place(cx, cy);
       } else if (placeCue(this.gs, cx, cy)) {
@@ -664,7 +665,8 @@ export class Game {
 
   hud(): void {
     let msg = this.gs.message;
-    if (this.mode === 'place') msg += ' — tap inside the outlined area to place the cue ball';
+    if (this.mode === 'place') msg += this.cpuOpponent && this.gs.current === 1 && !this.room
+      ? ' — planning cue placement…' : ' — tap inside the outlined area to place the cue ball';
     else if (this.mode === 'rolling') msg = `Player ${this.gs.current + 1} · shot in motion`;
     else if (this.mode === 'wait' && this.room) msg += ' — waiting…';
     else if (this.room && this.seat !== null && this.seat !== this.gs.current && this.mode === 'aim') msg += ' — opponent aiming…';

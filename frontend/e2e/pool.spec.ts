@@ -603,15 +603,23 @@ test('offline CPU places behind the head string and actually fires its turn', as
     Object.assign(g.gs,{current:1,groups:['stripe','solid'],open:false,breakShot:false,
       ballInHand:true,placement:'kitchen',kitchenShot:true,winner:null});
     g.mode='place';
+    const canvas=document.getElementById('game-canvas')!;
+    const originalPick=g.scene.pickFelt;
+    g.scene.pickFelt=()=>[.2,.4];
+    canvas.dispatchEvent(new PointerEvent('pointerdown',{pointerId:42,pointerType:'mouse',button:0,clientX:100,clientY:100,bubbles:true}));
+    canvas.dispatchEvent(new PointerEvent('pointerup',{pointerId:42,pointerType:'mouse',button:0,clientX:100,clientY:100,bubbles:true}));
+    g.scene.pickFelt=originalPick;
+    const humanCouldPlace=!g.gs.ballInHand;
     await g.cpuMove();
     const fired={mode:g.mode,x:g.gs.balls[0].x,hand:g.gs.ballInHand,potted:g.gs.balls[0].potted};
     // Stop future CPU turns while resolving this exact shot through real frame playback.
     g.cpuOpponent=false;
     for(let n=0;n<200 && g.mode==='rolling';n++){g.accumulator+=.25;g.frame();}
-    return {fired,mode:g.mode,firstContact:g.ev.firstContact,message:g.gs.message,
+    return {fired,humanCouldPlace,mode:g.mode,firstContact:g.ev.firstContact,message:g.gs.message,
       asleep:g.gs.balls.every((b:any)=>b.asleep||b.potted)};
   });
   expect(result.fired.mode).toBe('rolling');expect(result.fired.x).toBeLessThan(2.54/4);
+  expect(result.humanCouldPlace).toBe(false);
   expect(result.fired.hand).toBe(false);expect(result.fired.potted).toBe(false);
   expect(result.mode).not.toBe('rolling');expect(result.firstContact).toBe(1);
   expect(result.asleep).toBe(true);expect(result.message).not.toContain('Foul');
