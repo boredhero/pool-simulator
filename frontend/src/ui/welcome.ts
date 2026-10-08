@@ -70,7 +70,13 @@ export async function setupWelcome(startTutorial:()=>void):Promise<void> {
     if(busy||!agreement.checked)return;
     busy=true;refresh();get('welcomestatus').textContent='';
     try {
-      if(current?.authenticated&&!current.accepted){await acceptTerms(version);current.accepted=true;}
+      if(current?.authenticated){
+        const latest=await termsStatus();
+        if(latest.accountId!==current.accountId||latest.version!==version)throw Error('Your account or the Terms changed. Reload to review the current agreement.');
+        if(current.accepted&&!latest.accepted){current=latest;agreement.checked=false;agreement.closest('.welcome-choice')!.removeAttribute('hidden');throw Error('Please confirm the current Terms for your account.');}
+        if(!latest.accepted)await acceptTerms(version,current.accountId!);
+        current.accepted=true;
+      }
       if(!respectSaved){
         if(analytics.checked&&!privacyOptedOut()){await consent(true);recordPrivacySession();}
         else chooseEssentialPrivacy();

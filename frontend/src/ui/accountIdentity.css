@@ -10,3 +10,5 @@
 #termsupdate{display:grid;gap:12px;margin:18px 0 24px;padding:16px;border:1px solid #75634a;border-radius:12px;background:#282219}
 #termsupdate[hidden]{display:none}#acceptterms{justify-self:start;max-width:100%;white-space:normal}
 #accounttermsstatus{font-size:14px;color:#c9d9b4;margin:12px 0 20px}#accounttermsstatus:empty{display:none}
+
+#accountstatsnote{font-size:14px;line-height:1.5;color:#c8baa3;margin:12px 0 24px}#accountstats dt{overflow-wrap:anywhere}

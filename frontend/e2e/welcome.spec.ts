@@ -2,7 +2,7 @@ import {TERMS_VERSION} from '../src/ui/terms';
 import { expect, test } from '@playwright/test';
 
 test.beforeEach(async({page})=>{
-  await page.route('**/api/privacy/terms',route=>route.fulfill({json:{version:TERMS_VERSION,accepted:false,authenticated:false}}));
+  await page.route('**/api/privacy/terms',route=>route.fulfill({json:{version:TERMS_VERSION,accepted:false,authenticated:false,accountId:null}}));
   await page.route('**/api/account',route=>route.fulfill({json:{account:null,stats:null}}));
   await page.route('**/api/version',route=>route.fulfill({json:{version:'e2e'}}));
   await page.route('**/api/privacy/consent',route=>route.fulfill({json:{analytics:route.request().postDataJSON().allow}}));
@@ -93,17 +93,23 @@ test.describe('small touch welcome',()=>{
 test('changed terms hash prompts independently of saved analytics',async({page})=>{
  const changed='b'.repeat(64);
  await page.addInitScript(version=>{if(!localStorage.getItem('pool:welcome'))localStorage.setItem('pool:welcome',JSON.stringify({version,accepted:true}));localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-08',allow:false}));},TERMS_VERSION);
- await page.route('**/api/privacy/terms',r=>r.fulfill({json:{version:changed,accepted:false,authenticated:false}}));
+ await page.route('**/api/privacy/terms',r=>r.fulfill({json:{version:changed,accepted:false,authenticated:false,accountId:null}}));
  await page.goto('/');await expect(page.locator('#welcomedialog')).toBeVisible();await expect(page.locator('#welcometerms')).not.toBeChecked();await page.locator('#welcometerms').check();await page.locator('#welcomeplay').click();
  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('pool:welcome')!).version)).toBe(changed);expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('pool:privacy')!).version)).toBe('2026-10-08');
  await page.reload();await expect(page.locator('#welcomedialog')).toHaveCount(0);
 });
 test('signed-in acceptance is reused and a new agreement is saved to the backend',async({page})=>{
  let accepted=true;const posted:string[]=[];
- await page.route('**/api/privacy/terms',r=>{if(r.request().method()==='POST'){posted.push(r.request().postDataJSON().version);accepted=true;return r.fulfill({json:{accepted:TERMS_VERSION}});}return r.fulfill({json:{version:TERMS_VERSION,accepted,authenticated:true}});});
- await page.goto('/');await expect(page.locator('#welcomedialog')).toBeVisible();await expect(page.locator('#welcometerms')).not.toBeVisible();await expect(page.locator('#welcomeplay')).toBeEnabled();await page.locator('#welcomeplay').click();expect(posted).toEqual([]);
+ await page.route('**/api/privacy/terms',r=>{if(r.request().method()==='POST'){posted.push(r.request().postDataJSON().version);accepted=true;return r.fulfill({json:{accepted:TERMS_VERSION}});}return r.fulfill({json:{version:TERMS_VERSION,accepted,authenticated:true,accountId:'player'}});});
+ await page.goto('/');await expect(page.locator('#welcomedialog')).toBeVisible();await expect(page.locator('#welcometerms')).not.toBeVisible();await expect(page.locator('#welcomeplay')).toBeEnabled();await page.locator('#welcomeplay').click();await expect(page.locator('#welcomedialog')).not.toBeVisible();expect(posted).toEqual([]);
  accepted=false;await page.evaluate(()=>localStorage.removeItem('pool:welcome'));await page.reload();await page.locator('#welcometerms').check();await page.locator('#welcomeplay').click();await expect(page.locator('#welcomedialog')).not.toBeVisible();expect(posted).toEqual([TERMS_VERSION]);
 });
 test('offline guest can acknowledge bundled terms without inventing account acceptance',async({page})=>{
  await page.route('**/api/privacy/terms',r=>r.abort());await page.goto('/');await page.locator('#welcometerms').check();await page.locator('#welcomeplay').click();await expect(page.locator('#welcomedialog')).not.toBeVisible();expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('pool:welcome')!).version)).toBe(TERMS_VERSION);
+});
+
+test('welcome never accepts terms for an account switched in another tab',async({page})=>{
+ let accountId='player';let writes=0;
+ await page.route('**/api/privacy/terms',r=>{if(r.request().method()==='POST'){writes++;return r.fulfill({status:409,json:{detail:'Account changed'}});}return r.fulfill({json:{version:TERMS_VERSION,accepted:false,authenticated:true,accountId}});});
+ await page.goto('/');await expect(page.locator('#welcomedialog')).toBeVisible();await page.locator('#welcometerms').check();accountId='other';await page.locator('#welcomeplay').click();await expect(page.locator('#welcomestatus')).toContainText('account or the Terms changed');await expect(page.locator('#welcomedialog')).toBeVisible();expect(writes).toBe(0);expect(await page.evaluate(()=>localStorage.getItem('pool:welcome'))).toBeNull();await expect(page.locator('#welcomeplay')).toBeEnabled();
 });
