@@ -56,3 +56,24 @@ async def test_streaming_body_limit_works_without_content_length():
 
     await BodyLimit(app)({"type": "http", "method": "POST"}, receive, send)
     assert not called and sent[0]["status"] == 413
+
+
+def test_api_documentation_and_schema_are_not_public():
+    assert app.docs_url is None
+    assert app.redoc_url is None
+    assert app.openapi_url is None
+    for path in (
+        "/docs",
+        "/docs/",
+        "/docs/oauth2-redirect",
+        "/redoc",
+        "/redoc/",
+        "/openapi.json",
+        "/api/docs",
+        "/api/openapi.json",
+    ):
+        response = c.get(path)
+        assert response.status_code == 404, path
+        assert "swagger-ui" not in response.text.lower()
+    assert c.get("/healthz").status_code == 200
+    assert c.get("/api/version").status_code == 200

@@ -1,5 +1,17 @@
 [
   {
+    "version": "1.2.0",
+    "date": "2026-10-08",
+    "title": "Optional passkey sign-in",
+    "changes": [
+      "New accounts can optionally add a passkey after saving their recovery code. Password sign-in remains available.",
+      "Sign in with a passkey, including username autofill in supported browsers.",
+      "Manage multiple named passkeys in account settings, with creation and last-used dates. Sensitive changes require recent identity verification.",
+      "Removing a passkey signs out other sessions. Account recovery removes saved passkeys so you can secure the account again.",
+      "Public API documentation and OpenAPI schema endpoints are disabled."
+    ]
+  },
+  {
     "version": "1.1.2",
     "date": "2026-10-08",
     "title": "Install Pool Simulator",

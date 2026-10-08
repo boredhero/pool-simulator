@@ -14,6 +14,8 @@ services:
       COOKIE_SECURE: "true"
       # Only the host reverse proxy can reach this loopback-published service.
       FORWARDED_ALLOW_IPS: "*"
+      WEBAUTHN_RP_ID: pool.martinospizza.dev
+      WEBAUTHN_ORIGIN: https://pool.martinospizza.dev
       ALLOWED_ORIGINS: https://pool.martinospizza.dev
     volumes:
       - pool_data:/srv/data

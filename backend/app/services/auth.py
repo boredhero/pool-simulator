@@ -14,7 +14,7 @@ from argon2.exceptions import VerificationError
 from fastapi import HTTPException, Request, Response
 from sqlalchemy import delete, or_, update
 
-from app.models.db import Account, AuthThrottle, LoginSession, Session, init_db
+from app.models.db import Account, AuthFresh, AuthThrottle, LoginSession, Session, init_db
 
 HASHER = PasswordHasher(time_cost=2, memory_cost=19456, parallelism=1)
 DUMMY_HASH = HASHER.hash(secrets.token_urlsafe(32))
@@ -137,6 +137,8 @@ def set_session(db, response: Response, request: Request, account_id: str) -> No
     token = secrets.token_urlsafe(32)
     now = int(time.time())
     db.execute(delete(LoginSession).where(LoginSession.expires_at <= now))
+    db.execute(delete(AuthFresh).where(AuthFresh.expires_at <= now))
+    db.add(AuthFresh(session_hash=digest(token), account_id=account_id, expires_at=now + 300))
     db.add(
         LoginSession(
             token_hash=digest(token), account_id=account_id, expires_at=now + SESSION_SECONDS

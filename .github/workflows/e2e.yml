@@ -65,6 +65,10 @@ jobs:
         working-directory: frontend
         run: npx playwright test
 
+      - name: Run passkey integration tests
+        working-directory: frontend
+        run: npm run test:passkeys
+
       - name: Run online account and guest integration tests
         working-directory: frontend
         run: npm run test:online

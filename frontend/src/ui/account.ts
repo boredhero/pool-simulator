@@ -1,3 +1,4 @@
+import {PasskeyPanel} from './passkeys';
 import {PasswordControls} from './passwordControls';
 import './accountIdentity.css';
 import './mobileHud.css';
@@ -10,6 +11,8 @@ const el=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById
 export class AccountPanel {
   account:Account|null=null;
   private passwords=new PasswordControls();
+  private passkeys:PasskeyPanel;
+  private offerPasskey=false;
   private mode:'login'|'register'|'recover'='login';
   private recoveryPending=false;
   private busy=false;
@@ -20,11 +23,13 @@ export class AccountPanel {
   private agreementRevision=0;
   private admin=new AdminPanel(()=>void this.refresh());
   constructor(private playing:()=>boolean,private changed:(account:Account|null)=>void) {
+    this.passkeys=new PasskeyPanel(account=>{this.account=account;this.changed(account);this.passwords.reset();this.render();void this.refreshAgreement();},()=>this.playing()||this.busy||this.agreementBusy||this.recoveryPending,busy=>{this.busy=busy;++this.accountRevision;el<HTMLButtonElement>('accountsubmit').disabled=busy;el<HTMLButtonElement>('accountclose').disabled=busy;el<HTMLButtonElement>('accountlogout').disabled=busy||this.playing();if(!busy)void this.refresh();});
+    el('settingspasskeys').addEventListener('click',()=>{this.opener=el('settingspasskeys');el<HTMLDialogElement>('accountdialog').showModal();void this.refresh();el('passkeys').scrollIntoView({block:'start'});el('passkeystitle').setAttribute('tabindex','-1');el('passkeystitle').focus();});
     for(const id of ['accountbtn','accountidentity'])el(id).addEventListener('click',()=>{this.opener=el(id);el<HTMLDialogElement>('accountdialog').showModal();void this.refresh();});
     el('accountdialog').addEventListener('keydown',e=>e.stopPropagation());
     el('accountclose').addEventListener('click',()=>el<HTMLDialogElement>('accountdialog').close());
     el('accountdialog').addEventListener('cancel',e=>{if(this.recoveryPending||this.busy||this.agreementBusy)e.preventDefault();});
-    el('accountdialog').addEventListener('close',()=>{this.passwords.reset();this.opener?.focus();});
+    el('accountdialog').addEventListener('close',()=>{this.passwords.reset();this.passkeys.close();this.opener?.focus();});
     for(const mode of ['login','register','recover'] as const)el('account-'+mode).addEventListener('click',()=>this.setMode(mode));
     el('accountform').addEventListener('submit',e=>{e.preventDefault();void this.submit();});
     el('accountlogout').addEventListener('click',()=>void this.logout());
@@ -36,6 +41,7 @@ export class AccountPanel {
       el<HTMLButtonElement>('accountclose').disabled=false;this.render();
       this.status(this.account?'Your account is ready.':'Password reset. Sign in with your new password.');
       if(!this.account)this.setMode('login');
+      if(this.offerPasskey&&this.account){this.offerPasskey=false;this.passkeys.offer();}
       void this.refresh();
     });
     window.setInterval(()=>{if(this.account&&!document.hidden)void this.request('/activity',{}).catch(()=>{});},60_000);
@@ -85,7 +91,7 @@ export class AccountPanel {
   }
   private setMode(mode:typeof this.mode) {
     if(this.busy||this.agreementBusy)return;
-    this.mode=mode;
+    this.passkeys.cancelAutofill();this.mode=mode;
     this.passwords.setRequired(mode!=='login');
     for(const name of ['login','register','recover'])el('account-'+name).setAttribute('aria-pressed',String(name===mode));
     el('accountrecoverylabel').hidden=mode!=='recover';
@@ -97,9 +103,11 @@ export class AccountPanel {
     el('accountpasswordlabel').textContent=mode==='recover'?'New password':'Password';
     this.status('');
     if(mode==='register')void this.refreshAgreement();
+    this.passkeys.update(this.account,mode==='login'&&el<HTMLDialogElement>('accountdialog').open);
   }
   private render(stats?:Stats) {
     this.admin.setAccount(this.account);
+    this.passkeys.update(this.account,this.mode==='login'&&el<HTMLDialogElement>('accountdialog').open&&!this.recoveryPending);
     for(const id of ['accountpremium','settingspremium'])el(id).hidden=!this.account?.premium;
     el('accountbtn').textContent=this.account?`${this.account.username} · Account`:'Sign in / Create account';
     const identity=el('accountidentity');
@@ -149,12 +157,13 @@ export class AccountPanel {
     if(this.busy||this.agreementBusy)return;
     if(!this.passwords.validate())return;
     if(this.mode==='register'&&!el<HTMLInputElement>('registeradult').checked){this.status('Accounts require age 18+ and acceptance of the Terms.');return;}
-    this.busy=true;++this.accountRevision;++this.agreementRevision;el<HTMLButtonElement>('accountsubmit').disabled=true;el<HTMLButtonElement>('accountclose').disabled=true;
+    this.passkeys.cancelAutofill();this.busy=true;++this.accountRevision;++this.agreementRevision;el<HTMLButtonElement>('accountsubmit').disabled=true;el<HTMLButtonElement>('accountclose').disabled=true;
     const password=el<HTMLInputElement>('accountpassword'),recovery=el<HTMLInputElement>('accountrecovery');
     try {
       const currentTerms=this.mode==='register'?await termsStatus():null;
       if(currentTerms&&this.agreement?.version!==currentTerms.version){this.agreement=currentTerms;el<HTMLInputElement>('registeradult').checked=false;throw Error('The Terms have changed. Please review them and confirm acceptance again.');}
       const data=await this.request('/'+this.mode,{username:el<HTMLInputElement>('accountusername').value.trim(),password:password.value,...(this.mode==='register'?{terms_version:currentTerms!.version,adult:el<HTMLInputElement>('registeradult').checked}:{}),...(this.mode==='recover'?{recovery:recovery.value}:{})});
+      this.offerPasskey=this.mode==='register'&&!!data.account;
       this.account=data.account??null;this.changed(this.account);this.status('');
       if(data.recovery){this.recoveryPending=true;el<HTMLInputElement>('recoveryvalue').value=data.recovery;el('recoverypanel').hidden=false;}
       this.render();
@@ -165,10 +174,10 @@ export class AccountPanel {
   private async logout(){
     if(this.busy||this.agreementBusy)return;
     if(this.playing()){this.status('Leave your current room before signing out.');return;}
-    this.busy=true;++this.accountRevision;++this.agreementRevision;
+    this.passkeys.close();this.busy=true;++this.accountRevision;++this.agreementRevision;
     el<HTMLButtonElement>('accountlogout').disabled=true;el<HTMLButtonElement>('accountclose').disabled=true;
     try {await this.request('/logout',{});this.account=null;this.changed(null);this.render();void this.refreshAgreement();this.status('Signed out. You can still play as a guest.');}
     catch(error){this.status(error instanceof Error?error.message:'Unable to sign out.');}
-    finally{this.busy=false;el<HTMLButtonElement>('accountlogout').disabled=this.playing();el<HTMLButtonElement>('accountclose').disabled=this.recoveryPending;}
+    finally{this.busy=false;el<HTMLButtonElement>('accountlogout').disabled=this.playing();el<HTMLButtonElement>('accountclose').disabled=this.recoveryPending;if(!this.account){this.setMode('login');this.status('Signed out. You can still play as a guest.');}}
   }
 }

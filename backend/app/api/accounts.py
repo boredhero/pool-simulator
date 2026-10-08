@@ -8,7 +8,16 @@ from pydantic import BaseModel, Field
 from sqlalchemy import delete, update
 from sqlalchemy.exc import IntegrityError
 
-from app.models.db import Account, LoginSession, Session, TermsAcceptance, init_db
+from app.models.db import (
+    Account,
+    AuthFresh,
+    LoginSession,
+    Passkey,
+    PasskeyChallenge,
+    Session,
+    TermsAcceptance,
+    init_db,
+)
 from app.services.auth import (
     COOKIE,
     DUMMY_HASH,
@@ -160,7 +169,8 @@ def recover(payload: Recovery, request: Request, response: Response) -> dict:
         )
         if changed.rowcount != 1:
             raise HTTPException(401, "Username or recovery code is incorrect.")
-        db.execute(delete(LoginSession).where(LoginSession.account_id == user.id))
+        for model in (LoginSession, AuthFresh, Passkey, PasskeyChallenge):
+            db.execute(delete(model).where(model.account_id == user.id))
     response.delete_cookie(COOKIE, path="/")
     response.headers["Cache-Control"] = "no-store"
     return {"ok": True, "recovery": code}

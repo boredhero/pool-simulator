@@ -10,9 +10,11 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:online": "playwright test --config playwright.online.config.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:passkeys": "playwright test --config playwright.passkeys.config.ts"
   },
   "dependencies": {
+    "@simplewebauthn/browser": "^14.0.0",
     "three": "^0.186.0"
   },
   "devDependencies": {
