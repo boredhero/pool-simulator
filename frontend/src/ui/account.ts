@@ -2,7 +2,7 @@ import './accountIdentity.css';
 import './mobileHud.css';
 import {acceptTerms,termsStatus,type TermsStatus} from './terms';
 import { AdminPanel } from './admin';
-export interface Account {id:string;username:string;createdAt:number;premium:boolean;isAdmin:boolean}
+export interface Account {id:string;username:string;createdAt:number;premium:boolean;simEnabled?:boolean;isAdmin:boolean}
 interface Stats {matches:number;wins:number;losses:number;abandoned:number;shots:number;ballsPocketed:number;scratches:number;fouls:number;shotStatsComplete?:boolean;byMode?:Record<string,{matches:number;wins:number;losses:number}>;recent:Array<{id:string;opponent:string;status:string;result:string|null;mode?:string;shotStatsComplete?:boolean}>}
 const el=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 

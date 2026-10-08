@@ -455,7 +455,7 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
       if (!visible) return;
       const [rx, rz] = toRender(cx, cy);
       const dx = Math.cos(angle), dy = Math.sin(angle);
-      const elevation = authoritativeElevation??cueElevation(cx, cy, angle, 0, cueObstacles);
+      const elevation = authoritativeElevation??cueElevation(cx, cy, angle, 0, cueObstacles, tipX, tipY);
       // Local +z is the butt. Tilt up around the ball, then yaw along -aim.
       cueGroup.rotation.set(-elevation, Math.atan2(-dx, -dy), 0, 'YXZ');
       const scale = Math.min(1, .55 / (Math.hypot(tipX, tipY) || 1));

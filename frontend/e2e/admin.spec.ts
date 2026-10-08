@@ -48,3 +48,31 @@ test('owner can inspect usage, recover a failed toggle, search and close the das
   await page.locator('#adminsearch').fill('missing');await expect(page.locator('#adminempty')).toBeVisible();
   await page.locator('#adminclose').focus();await page.keyboard.press('Escape');await expect(dialog).not.toBeVisible();await expect(page.locator('#adminbtn')).toBeFocused();
 });
+
+test('owner can disable, re-enable and confirm deletion without owner self-actions',async({page})=>{
+  let disabled=false,deleted=false,deleteCalls=0;
+  await page.route('**/api/account',r=>r.fulfill({json:{account:owner,stats:null}}));
+  await page.route('**/api/admin/**',r=>{
+    const path=new URL(r.request().url()).pathname,method=r.request().method();
+    if(path.endsWith('/overview'))return r.fulfill({json:{accounts:deleted?1:2,premium:1,usage,lifetimeAttempts:15}});
+    if(method==='PATCH'){disabled=r.request().postDataJSON().disabled;return r.fulfill({json:{disabled}});}
+    if(method==='DELETE'){expect(r.request().postDataJSON()).toEqual({username:'ManagedPlayer'});deleted=true;deleteCalls++;return r.fulfill({json:{deleted:true}});}
+    return r.fulfill({json:{total:deleted?1:2,accounts:[{...owner,usage},...deleted?[]:[{id:'managed',username:'ManagedPlayer',createdAt:1780000000,premium:false,isAdmin:false,disabled,usage}]]}});
+  });
+  await page.goto('/');await page.locator('#settingsbtn').click();await page.locator('#adminbtn').click();
+  const panel=page.locator('#admindialog');
+  await expect(panel.getByRole('button',{name:'Delete account god',exact:true})).toHaveCount(0);
+  await panel.getByRole('button',{name:'Disable account ManagedPlayer',exact:true}).click();
+  await expect(panel.locator('.admin-disabled-tag')).toHaveText('Disabled');
+  await panel.getByRole('button',{name:'Re-enable account ManagedPlayer',exact:true}).click();
+  await expect(panel.locator('.admin-disabled-tag')).toHaveCount(0);
+  await page.setViewportSize({width:390,height:844});
+  await panel.getByRole('button',{name:'Delete account ManagedPlayer',exact:true}).click();
+  const submit=panel.getByRole('button',{name:'Permanently delete',exact:true});
+  await expect(submit).toBeDisabled();await panel.getByLabel('Type ManagedPlayer to confirm').fill('wrong');await expect(submit).toBeDisabled();
+  await panel.getByRole('button',{name:'Cancel',exact:true}).click();expect(deleteCalls).toBe(0);
+  await panel.getByRole('button',{name:'Delete account ManagedPlayer',exact:true}).click();
+  await panel.getByLabel('Type ManagedPlayer to confirm').fill('ManagedPlayer');await submit.click();
+  await expect(panel.getByRole('button',{name:'Delete account ManagedPlayer',exact:true})).toHaveCount(0);
+  await expect(page.locator('#adminstatus')).toContainText('account deleted');expect(deleteCalls).toBe(1);
+});

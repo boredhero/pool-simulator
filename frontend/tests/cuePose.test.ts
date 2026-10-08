@@ -26,3 +26,22 @@ it('does not raise the butt for a ball in front of the shot', () => {
   const empty = cueElevation(1, TABLE_H / 2, 0, 0.02, []);
   expect(cueElevation(1, TABLE_H / 2, 0, 0.02, [{ n: 2, x: 1.1, y: TABLE_H / 2, potted: false }])).toBe(empty);
 });
+
+it('clears a rail with backspin, including a shallow corner approach', () => {
+  for (const angle of [0, Math.PI / 4]) {
+    const x = .08, y = .08;
+    const neutral = cueElevation(x, y, angle, 0, []);
+    const backspin = cueElevation(x, y, angle, 0, [], 0, -.55);
+    expect(backspin).toBeGreaterThan(neutral);
+    const distance = (.08 - .0165) / Math.cos(angle);
+    const shaftHeight = BALL_R - BALL_R * .55 / Math.cos(backspin) + distance * Math.tan(backspin);
+    expect(shaftHeight).toBeGreaterThanOrEqual(.054 + .0165 - 1e-12);
+  }
+});
+
+it('accounts for sideways spin when the shaft approaches a corner facing', () => {
+  const a = cueElevation(.08, .08, Math.PI / 4, 0, [], .4, -.3);
+  const b = cueElevation(.08, .08, Math.PI / 4, 0, [], -.4, -.3);
+  expect(a).toBeCloseTo(b, 12);
+  expect(a).toBeGreaterThan(cueElevation(.08, .08, Math.PI / 4, 0, [], 0, -.3));
+});

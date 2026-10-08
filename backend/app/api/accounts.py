@@ -93,7 +93,7 @@ def login(payload: Credentials, request: Request, response: Response) -> dict:
     with Session.begin() as db:
         user = db.query(Account).filter_by(username_key=key).first()
         valid = verify(user.password_hash if user else DUMMY_HASH, payload.password)
-        if not valid or user is None:
+        if not valid or user is None or user.disabled:
             raise HTTPException(401, "Username or password is incorrect.")
         # Serialize session issuance against password recovery. A stale verified password
         # must not create a new session after a concurrent reset revoked older sessions.
@@ -103,7 +103,11 @@ def login(payload: Credentials, request: Request, response: Response) -> dict:
         )
         changed = db.execute(
             update(Account)
-            .where(Account.id == user.id, Account.password_hash == old_hash)
+            .where(
+                Account.id == user.id,
+                Account.password_hash == old_hash,
+                Account.disabled.is_(False),
+            )
             .values(password_hash=new_hash)
         )
         if changed.rowcount != 1:
@@ -135,12 +139,20 @@ def recover(payload: Recovery, request: Request, response: Response) -> dict:
     with Session.begin() as db:
         user = db.query(Account).filter_by(username_key=key).first()
         old_hash = user.recovery_hash if user else DUMMY_HASH
-        if not verify(old_hash, normalize_recovery(payload.recovery)) or user is None:
+        if (
+            not verify(old_hash, normalize_recovery(payload.recovery))
+            or user is None
+            or user.disabled
+        ):
             raise HTTPException(401, "Username or recovery code is incorrect.")
         # Compare-and-swap makes concurrent reuse of the one-time code fail.
         changed = db.execute(
             update(Account)
-            .where(Account.id == user.id, Account.recovery_hash == old_hash)
+            .where(
+                Account.id == user.id,
+                Account.recovery_hash == old_hash,
+                Account.disabled.is_(False),
+            )
             .values(
                 password_hash=HASHER.hash(payload.password),
                 recovery_hash=HASHER.hash(normalize_recovery(code)),

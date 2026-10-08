@@ -383,3 +383,131 @@ def test_coin_toss_is_persisted_only_for_new_jev_games(monkeypatch, starter):
     assert fresh["created"] is True and fresh["id"] != first["id"]
     assert fresh["state"]["current"] == 1 - starter
     assert start()["state"]["current"] == 1 - starter
+
+
+def enable_sim():
+    from app.models.db import Account
+
+    account = client.get("/api/account").json()["account"]
+    with Session.begin() as db:
+        db.get(Account, account["id"]).sim_enabled = True
+    return account
+
+
+def sim_start(mode):
+    return client.post(
+        "/api/opponents/jev/games", headers=HEADERS, json={"new_game": True, "simulation": mode}
+    )
+
+
+def test_sim_permission_shared_weighted_allowance_and_spectator_ledger():
+    from sqlalchemy import select
+
+    from app.models.db import GameMatch, MatchPlayer
+
+    assert sim_start("jev-jev").status_code == 403
+    account = enable_sim()
+    first = sim_start("jev-jev")
+    assert first.status_code == 200, first.text
+    game = first.json()
+    assert game["dailyCost"] == 2 and game["simulation"] == "jev-jev"
+    assert game["state"]["names"] == ["Jev AI 1", "Jev AI 2"]
+    assert client.get("/api/opponents/jev").json()["usage"]["gamesRemaining"] == 3
+    with Session() as db:
+        assert db.get(GameMatch, game["id"]).mode == "simulation"
+        players = db.scalars(select(MatchPlayer).where(MatchPlayer.match_id == game["id"])).all()
+        assert len(players) == 2 and all(p.account_id is None for p in players)
+    assert sim_start("jev-cpu").status_code == 200
+    normal = client.post(
+        "/api/opponents/jev/games", headers=HEADERS, json={"new_game": True}
+    ).json()
+    assert client.get("/api/opponents/jev").json()["usage"]["gamesRemaining"] == 1
+    assert sim_start("jev-jev").status_code == 429
+    assert start()["id"] == normal["id"]
+    assert sim_start("jev-cpu").status_code == 200
+    assert client.get("/api/opponents/jev").json()["usage"]["gamesRemaining"] == 0
+    assert sim_start("jev-cpu").status_code == 429
+    assert account["premium"] is False
+
+
+def test_sim_revocation_blocks_turn_and_resume_and_premium_does_not_grant_permission():
+    from app.models.db import Account
+
+    account = enable_sim()
+    game = sim_start("jev-jev").json()
+    with Session.begin() as db:
+        row = db.get(Account, account["id"])
+        row.sim_enabled = False
+        row.premium = True
+    assert (
+        client.post(
+            f"/api/opponents/jev/games/{game['id']}/turn", headers=HEADERS, json={"revision": 0}
+        ).status_code
+        == 403
+    )
+    assert client.post("/api/opponents/jev/games", headers=HEADERS, json={}).status_code == 403
+    assert sim_start("jev-jev").status_code == 403
+    enable_sim()
+    for _ in range(4):
+        assert sim_start("jev-jev").status_code == 200
+    assert client.get("/api/opponents/jev").json()["usage"]["gamesRemaining"] is None
+
+
+@pytest.mark.parametrize(
+    "mode,seat,provider_calls", [("jev-cpu", 0, 1), ("jev-cpu", 1, 0), ("jev-jev", 1, 1)]
+)
+def test_sim_automates_both_seats_and_cpu_never_calls_provider(
+    monkeypatch, mode, seat, provider_calls
+):
+    enable_sim()
+    game = sim_start(mode).json()
+    set_cpu_turn(game)
+    with Session.begin() as db:
+        row = db.get(JevGame, game["id"])
+        state = json.loads(row.state)
+        state["current"] = seat
+        row.state = json.dumps(state)
+    calls = []
+    monkeypatch.setattr(jev, "plan_shots", lambda gs: plans())
+
+    async def evaluate(payload, key):
+        calls.append(payload)
+        return jev.Evaluation(payload.candidates[0]["id"], 10, 2)
+
+    monkeypatch.setattr(jev, "evaluate", evaluate)
+    url = f"/api/opponents/jev/games/{game['id']}/turn"
+    assert (
+        client.post(
+            url, headers=HEADERS, json={"revision": 0, "shot": {"aim": 0.0, "power": 0.1}}
+        ).status_code
+        == 409
+    )
+    response = client.post(url, headers=HEADERS, json={"revision": 0})
+    assert response.status_code == 200, response.text
+    assert response.json()["by"] == seat
+    assert len(calls) == provider_calls
+
+
+def test_spin_boundary_roundoff_accepted_but_real_overspin_rejected():
+    game = start()
+    url = f"/api/opponents/jev/games/{game['id']}/turn"
+    bad = client.post(
+        url,
+        headers=HEADERS,
+        json={"revision": 0, "shot": {"aim": 0.0, "power": 0.1, "tipX": 0.4, "tipY": 0.4}},
+    )
+    assert bad.status_code == 422
+    response = client.post(
+        url,
+        headers=HEADERS,
+        json={
+            "revision": 0,
+            "shot": {
+                "aim": 0.0,
+                "power": 0.1,
+                "tipX": 0.029955471237928386,
+                "tipY": 0.5491836393620205,
+            },
+        },
+    )
+    assert response.status_code == 200, response.text

@@ -1,5 +1,19 @@
 [
   {
+    "version": "1.0.3",
+    "date": "2026-10-08",
+    "title": "Simulation games and account controls",
+    "changes": [
+      "The owner dashboard can disable and re-enable accounts. Disabling revokes existing sessions and blocks sign-in and recovery.",
+      "Accounts can be permanently deleted after confirming the username. Private account and Jev records are removed; shared match history is anonymized.",
+      "Server-side owner protection prevents disabling or deleting the admin account. Account actions are recorded in the admin audit log.",
+      "Accounts granted Sim access can watch CPU vs CPU, Jev vs CPU, or Jev vs Jev on desktop and mobile. Sim access is separate from Premium and starts disabled.",
+      "Simulation games share the daily Jev allowance: CPU vs CPU costs zero, Jev vs CPU costs one, and Jev vs Jev costs two. Premium remains unlimited; watching does not change player win/loss stats.",
+      "Spin validation tolerates floating-point rounding at the legal boundary. Cue clearance includes spin offsets near rails and pocket facings, consistently in rendering and physics.",
+      "A Resume game button recovers interrupted Jev games without starting another rack or consuming another game."
+    ]
+  },
+  {
     "version": "1.0.2",
     "date": "2026-10-08",
     "title": "Fresh opponent games and five free Jev starts",

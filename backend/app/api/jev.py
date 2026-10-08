@@ -17,7 +17,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from app.api.privacy import require_terms
-from app.models.db import JevGame, JevUsage, Session
+from app.models.db import Account, JevGame, JevUsage, Session
 from app.net.rooms import Room
 from app.services.auth import current_account, mutation_guard
 from app.services.matches import ensure_jev_match, record_shot_in_session
@@ -60,8 +60,8 @@ class HumanShot(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     aim: float = Field(ge=-100, le=100, allow_inf_nan=False)
     power: float = Field(gt=0, le=1, allow_inf_nan=False)
-    tipX: float = Field(default=0, ge=-0.55, le=0.55, allow_inf_nan=False)
-    tipY: float = Field(default=0, ge=-0.55, le=0.55, allow_inf_nan=False)
+    tipX: float = Field(default=0, ge=-0.550000000001, le=0.550000000001, allow_inf_nan=False)
+    tipY: float = Field(default=0, ge=-0.550000000001, le=0.550000000001, allow_inf_nan=False)
     calledBall: int | None = Field(default=None, ge=1, le=15)
     calledPocket: int | None = Field(default=None, ge=0, le=5)
     x: float | None = Field(default=None, ge=0, le=2.54, allow_inf_nan=False)
@@ -90,6 +90,7 @@ class RuleSettings(BaseModel):
 class StartGame(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     new_game: bool = False
+    simulation: Literal["", "jev-cpu", "jev-jev"] = ""
     rules: RuleSettings | None = None
 
 
@@ -111,11 +112,19 @@ def decode(raw):
 
 def public_game(game, premium=False, *, created=False):
     state = Room(code="", gs=decode(game.state)).state_msg()
-    state["names"] = ["Player 1", "Jev AI"]
+    state["names"] = (
+        ["Jev AI", "CPU"]
+        if game.simulation == "jev-cpu"
+        else ["Jev AI 1", "Jev AI 2"]
+        if game.simulation == "jev-jev"
+        else ["Player 1", "Jev AI"]
+    )
     state["revision"] = game.revision
     return {
         "id": game.id,
         "created": created,
+        "simulation": game.simulation,
+        "dailyCost": game.daily_cost,
         "state": state,
         "status": game.status,
         "expiresAt": None,
@@ -134,7 +143,7 @@ def availability(request: Request, response: Response, account: dict = Depends(r
     with Session() as db:
         game = resumable_game(db, account, day)
         used = db.scalar(
-            select(func.count())
+            select(func.coalesce(func.sum(JevGame.daily_cost), 0))
             .select_from(JevGame)
             .where(
                 JevGame.account_id == account["id"],
@@ -168,13 +177,22 @@ async def start_game(
     premium = account["premium"]
     fresh = payload is not None and payload.new_game
     with Session.begin() as db:
+        current = db.get(Account, account["id"])
+        if current is None or current.disabled:
+            raise HTTPException(401, "Account access is unavailable.")
+        simulation = payload.simulation if payload else ""
+        if simulation and not current.sim_enabled:
+            raise HTTPException(403, "Sim mode is not enabled for this account.")
+        daily_cost = 2 if simulation == "jev-jev" else 1
         existing = resumable_game(db, account, day)
         if existing and existing.status == "active" and not fresh:
+            if existing.simulation and not current.sim_enabled:
+                raise HTTPException(403, "Sim mode is not enabled for this account.")
             return public_game(existing, premium)
         slot = None
         if not premium:
             used = db.scalar(
-                select(func.count())
+                select(func.coalesce(func.sum(JevGame.daily_cost), 0))
                 .select_from(JevGame)
                 .where(
                     JevGame.account_id == account["id"],
@@ -182,10 +200,10 @@ async def start_game(
                     JevGame.daily_slot.is_not(None),
                 )
             )
-            if used >= FREE_DAILY_GAMES:
+            if used + daily_cost > FREE_DAILY_GAMES:
                 raise HTTPException(
                     429,
-                    "You've used your five free Jev games today. "
+                    "Not enough of your five daily Jev games remain for this game. "
                     "Try CPU or return after midnight UTC.",
                 )
             slot = used + 1
@@ -207,6 +225,8 @@ async def start_game(
             account_id=account["id"],
             day=None if premium else day,
             daily_slot=slot,
+            daily_cost=daily_cost,
+            simulation=simulation,
             network_hash="",
             started_at=now,
             updated_at=now,
@@ -406,6 +426,9 @@ async def play_turn(
     if game_id in active_games or len(active_games) >= 4:
         raise HTTPException(409, "Game is busy. Resume after this shot.")
     with Session() as db:
+        current = db.get(Account, account["id"])
+        if current is None or current.disabled:
+            raise HTTPException(401, "Account access is unavailable.")
         record = db.get(JevGame, game_id)
         if record is None or record.account_id != account["id"]:
             raise HTTPException(404, "Game not found.")
@@ -413,16 +436,21 @@ async def play_turn(
             raise HTTPException(409, "This game has ended.")
         if payload.revision != record.revision:
             raise HTTPException(409, "Table changed. Resume your game.")
+        simulation = record.simulation
+        if simulation and not current.sim_enabled:
+            raise HTTPException(403, "Sim mode is not enabled for this account.")
         gs = decode(record.state)
     by = gs.current
-    if (by == 0) != (payload.shot is not None):
+    human = not simulation and by == 0
+    use_jev = not simulation or simulation == "jev-jev" or by == 0
+    if human != (payload.shot is not None):
         raise HTTPException(409, "Not that player's turn.")
     active_games.add(game_id)
     source = "human"
     try:
-        if by == 0:
+        if human:
             s = payload.shot.model_dump()
-            if math.hypot(s["tipX"], s["tipY"]) > 0.55:
+            if math.hypot(s["tipX"], s["tipY"]) > 0.55 + 1e-12:
                 raise HTTPException(422, "Spin is out of range.")
             if gs.ball_in_hand and (
                 s["x"] is None or s["y"] is None or not place_cue(gs, s["x"], s["y"])
@@ -440,7 +468,7 @@ async def play_turn(
                 raise HTTPException(409, "No legal shot plan. Resume your game.")
             s = options[0]
             source = "planner"
-            if len(options) > 1 and not gs.break_shot:
+            if use_jev and len(options) > 1 and not gs.break_shot:
                 source = "cpu-fallback"
                 try:
                     with Session.begin() as db:
@@ -485,7 +513,9 @@ async def play_turn(
         placement = {"x": cue.x, "y": cue.y}
         shot = {k: s[k] for k in ("aim", "power", "tipX", "tipY", "calledBall", "calledPocket")}
         vmax = gs.rules["breakMax" if gs.break_shot else "normalMax"]
-        elevation = cue_elevation(cue.x, cue.y, shot["aim"], 0, gs.balls)
+        elevation = cue_elevation(
+            cue.x, cue.y, shot["aim"], 0, gs.balls, shot["tipX"], shot["tipY"]
+        )
         begin_shot(gs, shot["calledBall"], shot["calledPocket"])
         strike(
             cue,
@@ -535,11 +565,11 @@ async def play_turn(
             "shot": {**shot, "vmax": vmax, "elevation": elevation},
             "placement": placement,
             "source": source,
-            "family": s.get("family") if by == 1 else None,
+            "family": s.get("family") if not human else None,
             "intent": ("Jev chose a " if source == "jev" else "CPU chose a ")
             + s.get("family", "direct")
             + " shot"
-            if by == 1
+            if not human
             else None,
         }
     finally:

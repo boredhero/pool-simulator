@@ -26,12 +26,15 @@ def start_match(names: list[str], accounts: list[str | None], rules: dict) -> st
         )
         db.flush()
         for seat in (0, 1):
+            account = db.get(Account, accounts[seat]) if accounts[seat] else None
             db.add(
                 MatchPlayer(
                     match_id=match_id,
                     seat=seat,
-                    account_id=accounts[seat],
-                    display_name=names[seat],
+                    account_id=account.id if account else None,
+                    display_name="Deleted player"
+                    if accounts[seat] and account is None
+                    else names[seat],
                 )
             )
     return match_id
@@ -182,9 +185,10 @@ def account_stats(account_id: str) -> dict:
 
 def ensure_jev_match(db, game, *, historical=True):
     """Jev's globally random game ID also identifies its durable match ledger."""
+    mode = "simulation" if game.simulation else "jev"
     match = db.get(GameMatch, game.id)
     if match is not None:
-        if match.mode != "jev":
+        if match.mode != mode:
             raise ValueError("Match identifier collision")
         return match
     state = json.loads(game.state)
@@ -193,7 +197,7 @@ def ensure_jev_match(db, game, *, historical=True):
     account = db.get(Account, game.account_id)
     match = GameMatch(
         id=game.id,
-        mode="jev",
+        mode=mode,
         shot_stats_complete=not historical,
         rules=json.dumps(state["rules"]),
         ruleset="eight-ball:unknown" if historical else "eight-ball:2",
@@ -208,9 +212,23 @@ def ensure_jev_match(db, game, *, historical=True):
     db.add_all(
         [
             MatchPlayer(
-                match_id=game.id, seat=0, account_id=game.account_id, display_name=account.username
+                match_id=game.id,
+                seat=0,
+                account_id=None if game.simulation else game.account_id,
+                display_name=("Jev AI 1" if game.simulation == "jev-jev" else "Jev AI")
+                if game.simulation
+                else account.username,
             ),
-            MatchPlayer(match_id=game.id, seat=1, account_id=None, display_name="Jev AI"),
+            MatchPlayer(
+                match_id=game.id,
+                seat=1,
+                account_id=None,
+                display_name="CPU"
+                if game.simulation == "jev-cpu"
+                else "Jev AI 2"
+                if game.simulation == "jev-jev"
+                else "Jev AI",
+            ),
         ]
     )
     db.flush()

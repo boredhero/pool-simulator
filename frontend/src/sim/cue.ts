@@ -11,13 +11,22 @@ const CLEARANCE = 0.0165; // thick end of the shaft plus a small clearance
 export function cueElevation(
   x: number, y: number, angle: number, pull: number,
   balls: ReadonlyArray<{ x: number; y: number; n: number | null; potted: boolean }>,
+  tipX = 0, tipY = 0,
 ): number {
   const dx = -Math.cos(angle), dy = -Math.sin(angle);
   const reach = CUE_LENGTH + BALL_R + pull;
-  let slope = Math.tan(3 * Math.PI / 180);
+  const scale = Math.min(1, .55 / (Math.hypot(tipX, tipY) || 1));
+  x -= Math.sin(angle) * BALL_R * tipX * scale;
+  y += Math.cos(angle) * BALL_R * tipX * scale;
+  let elevation = 3 * Math.PI / 180;
   const clear = (distance: number, height: number) => {
     if (distance > reach) return;
-    slope = Math.max(slope, (height + CLEARANCE - BALL_R) / Math.max(0.001, distance));
+    const d = Math.max(0.001, distance), h = height + CLEARANCE - BALL_R;
+    // Backspin lowers the shaft; solve its tilted height at the obstacle.
+    // Topspin keeps the conservative neutral clearance.
+    const drop = BALL_R * Math.max(0, -tipY * scale);
+    const required = Math.atan2(h, d) + Math.asin(Math.min(1, drop / Math.hypot(d, h)));
+    elevation = Math.max(elevation, Math.min(Math.PI / 2 - .001, required));
   };
   // Slab ray intersections, expanded by the cue radius. Treat pocket gaps as
   // solid here too: raising over a pocket is safer than catching its facing.
@@ -49,5 +58,5 @@ export function cueElevation(
     if (along <= 0 || sideways >= radius) continue;
     clear(along - Math.sqrt(radius * radius - sideways * sideways), BALL_R * 2);
   }
-  return Math.atan(slope);
+  return elevation;
 }

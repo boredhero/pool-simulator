@@ -2,7 +2,7 @@ import type { Account } from './account';
 import './admin.css';
 
 type Usage = {games:number;requests:number;input_tokens:number;output_tokens:number;estimated_cost_nano:number;unmetered_requests:number;last_activity:number|null};
-type User = {id:string;username:string;createdAt:number;premium:boolean;isAdmin:boolean;usage:Usage};
+type User = {id:string;username:string;createdAt:number;premium:boolean;simEnabled?:boolean;disabled?:boolean;isAdmin:boolean;usage:Usage};
 type Game = {id:string;status:string;startedAt:number;updatedAt:number;premiumGame:boolean} & Usage;
 const el=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 const number=(n:number)=>n.toLocaleString();
@@ -57,7 +57,7 @@ export class AdminPanel {
       if(path==='/overview'||response.status!==404)this.setAccount(null);
       throw new Error('Admin access is unavailable. Refresh your account to continue.');
     }
-    if(!response.ok)throw new Error('Could not complete the admin request. Please try again.');
+    if(!response.ok){const data=await response.json().catch(()=>null);throw new Error(typeof data?.detail==='string'?data.detail:'Could not complete the admin request. Please try again.');}
     return response.json();
   }
   private async load() {
@@ -95,6 +95,7 @@ export class AdminPanel {
     const row=node('tr');row.dataset.accountId=user.id;
     const identity=node('th');identity.scope='row';identity.append(node('strong',user.username));
     if(user.isAdmin)identity.append(node('span','Owner','admin-owner-tag'));
+    if(user.disabled)identity.append(node('span','Disabled','admin-disabled-tag'));
     identity.append(node('small',`Joined ${new Date(user.createdAt*1000).toLocaleDateString()}`));
     const status=node('td');
     const toggle=node('button',user.premium?'Premium':'Free','admin-switch');toggle.type='button';
@@ -110,6 +111,13 @@ export class AdminPanel {
       } catch(error){el('adminstatus').textContent=error instanceof Error?error.message:'Update failed.';toggle.disabled=false;}
     });
     status.append(toggle);
+    const simulation=node('button',user.simEnabled?'Sim on':'Sim off','admin-switch');simulation.type='button';
+    simulation.setAttribute('role','switch');simulation.setAttribute('aria-checked',String(!!user.simEnabled));simulation.setAttribute('aria-label',`Simulation for ${user.username}`);
+    simulation.addEventListener('click',async()=>{
+      simulation.disabled=true;
+      try {await this.request(`/accounts/${encodeURIComponent(user.id)}/simulation`,{method:'PATCH',body:JSON.stringify({simEnabled:!user.simEnabled})});await this.load();this.accountChanged();}
+      catch(error){el('adminstatus').textContent=error instanceof Error?error.message:'Update failed.';simulation.disabled=false;}
+    });status.append(simulation);
     const requests=node('td',number(user.usage.requests),'admin-numeric');
     requests.append(node('small',`${number(user.usage.games)} games`));
     const cost=node('td',money(user.usage.estimated_cost_nano),'admin-numeric');
@@ -132,9 +140,42 @@ export class AdminPanel {
           const item=node('li');item.append(node('strong',`${game.status} · ${date(game.startedAt)}`),node('span',`${game.premiumGame?'Premium':'Free'} · ${number(game.requests)} requests · ${number(game.input_tokens)} input / ${number(game.output_tokens)} output tokens · ${money(game.estimated_cost_nano)} estimated${game.unmetered_requests?` · ${game.unmetered_requests} unmetered`:''}`));games.append(item);
         }
         cell.append(games.children.length?games:node('p','No recorded Jev games yet.'));
+        if(data.accountActions?.length){cell.append(node('h4','Recent account changes'));const log=node('ul');for(const entry of data.accountActions)log.append(node('li',`${date(entry.at)} · ${entry.action}`));cell.append(log);}
         if(data.audit.length){cell.append(node('h4','Recent Premium changes'));const log=node('ul');for(const entry of data.audit)log.append(node('li',`${date(entry.at)} · ${entry.from?'Premium':'Free'} → ${entry.to?'Premium':'Free'}`));cell.append(log);}
       } catch(error){if(detailRow?.isConnected)cell.textContent=error instanceof Error?error.message:'Unable to load usage.';}
     });
-    action.append(details);row.append(identity,status,requests,cost,action);return row;
+    action.append(details);
+    if(!user.isAdmin){
+      const access=node('button',user.disabled?'Re-enable':'Disable','admin-details-button');access.type='button';
+      access.setAttribute('aria-label',`${user.disabled?'Re-enable':'Disable'} account ${user.username}`);
+      access.addEventListener('click',async()=>{
+        access.disabled=true;
+        try{
+          await this.request(`/accounts/${encodeURIComponent(user.id)}/status`,{method:'PATCH',body:JSON.stringify({disabled:!user.disabled})});
+          await this.load();el('adminstatus').textContent=`${user.username}: account ${user.disabled?'enabled':'disabled and signed out'}.`;
+          el<HTMLInputElement>('adminsearch').focus();
+        }catch(error){el('adminstatus').textContent=error instanceof Error?error.message:'Update failed.';access.disabled=false;}
+      });
+      const remove=node('button','Delete','admin-delete-button');remove.type='button';remove.setAttribute('aria-label',`Delete account ${user.username}`);
+      remove.addEventListener('click',()=>{
+        remove.disabled=true;
+        const confirmation=node('tr'),cell=node('td','','admin-detail admin-delete-confirm');cell.colSpan=5;
+        cell.append(node('h3',`Delete ${user.username}?`),node('p','This permanently removes the account, sign-in credentials, sessions and Jev usage records. Match history is anonymized. This cannot be undone.'));
+        const label=node('label',`Type ${user.username} to confirm`),input=node('input');input.type='text';input.autocomplete='off';label.append(input);
+        const submit=node('button','Permanently delete','admin-delete-button'),cancel=node('button','Cancel');submit.type=cancel.type='button';submit.disabled=true;
+        input.addEventListener('input',()=>{submit.disabled=input.value!==user.username;});
+        cancel.addEventListener('click',()=>{confirmation.remove();remove.disabled=false;remove.focus();});
+        submit.addEventListener('click',async()=>{
+          submit.disabled=cancel.disabled=input.disabled=true;
+          try{
+            await this.request(`/accounts/${encodeURIComponent(user.id)}`,{method:'DELETE',body:JSON.stringify({username:input.value})});
+            await this.load();el('adminstatus').textContent=`${user.username}: account deleted.`;el<HTMLInputElement>('adminsearch').focus();
+          }catch(error){el('adminstatus').textContent=error instanceof Error?error.message:'Delete failed.';submit.disabled=cancel.disabled=input.disabled=false;}
+        });
+        cell.append(label,submit,cancel);confirmation.append(cell);row.after(confirmation);input.focus();
+      });
+      action.append(access,remove);
+    }
+    action.className='admin-account-actions';row.append(identity,status,requests,cost,action);return row;
   }
 }
