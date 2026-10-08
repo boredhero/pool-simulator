@@ -1,26 +1,23 @@
-"""Private 1v1 rooms over WebSocket. Turn-based shot-event sync.
-Server is authoritative on rules + turn order + ball state; clients predict
-locally for instant feel and reconcile to authoritative resting state.
-"""
+"""Ephemeral private rooms with authenticated identities and a durable server match ledger."""
 
 from __future__ import annotations
 
+import asyncio
+import json
+import logging
 import math
 import random
-import string
+import secrets
+import time
 from dataclasses import dataclass, field
 
-from fastapi import WebSocket
+from fastapi import HTTPException, WebSocket, WebSocketDisconnect
 
+from app.services.auth import COOKIE, account_for_token, allowed_origin, rate_limit
+from app.services.matches import abandon_match, record_shot, start_match
 from app.sim.config import match_config
 from app.sim.cue import cue_elevation
-from app.sim.physics import (
-    Ball,
-    ShotEvents,
-    hash_state,
-    simulate_shot,
-    strike,
-)
+from app.sim.physics import Ball, ShotEvents, simulate_shot, strike
 from app.sim.rules import (
     GameState,
     apply_shot,
@@ -31,11 +28,11 @@ from app.sim.rules import (
     place_cue,
 )
 
+logger = logging.getLogger(__name__)
+
 
 def _code() -> str:
-    return "".join(
-        random.choice(string.ascii_uppercase.replace("O", "").replace("I", "")) for _ in range(4)
-    )
+    return "".join(secrets.choice("ABCDEFGHJKLMNPQRSTUVWXYZ23456789") for _ in range(8))
 
 
 def ball_dump(balls: list[Ball]) -> list[dict]:
@@ -65,13 +62,20 @@ class Room:
     gs: GameState = field(default_factory=lambda: new_game(random.randint(1, 1 << 30)))
     players: list[WebSocket | None] = field(default_factory=lambda: [None, None])
     names: list[str] = field(default_factory=lambda: ["Player 1", "Player 2"])
+    accounts: list[str | None] = field(default_factory=lambda: [None, None])
     revision: int = 0
-    busy: bool = False  # shot in flight
+    busy: bool = False
+    closed: bool = False
+    match_id: str | None = None
+    touched: float = field(default_factory=time.monotonic)
 
     def state_msg(self) -> dict:
         return {
             "t": "state",
             "code": self.code,
+            "names": self.names,
+            "ready": all(self.players) and not self.closed,
+            "registered": [account is not None for account in self.accounts],
             "balls": ball_dump(self.gs.balls),
             "return_order": self.gs.return_order,
             "current": self.gs.current,
@@ -94,7 +98,7 @@ class Room:
                 try:
                     await ws.send_json(msg)
                 except Exception:
-                    pass
+                    pass  # Disconnect cleanup runs in the socket handler.
 
 
 class Lobby:
@@ -102,6 +106,8 @@ class Lobby:
         self.rooms: dict[str, Room] = {}
 
     def create(self) -> Room:
+        if len(self.rooms) >= 200:
+            raise HTTPException(429, "Rooms are full. Try again shortly.")
         code = _code()
         while code in self.rooms:
             code = _code()
@@ -116,51 +122,112 @@ class Lobby:
 lobby = Lobby()
 
 
+def guest_name(value, seat: int) -> str:
+    text = str(value or "").strip()
+    text = "".join(c for c in text if c.isprintable())[:24]
+    return text or f"Guest {seat + 1}"
+
+
 async def handle(ws: WebSocket) -> None:
+    if not allowed_origin(ws.headers.get("origin"), ws.headers.get("host", "")):
+        await ws.close(code=1008)
+        return
+    ip = ws.client.host if ws.client else "unknown"
     await ws.accept()
     room: Room | None = None
     seat = -1
+    identity: dict | None = None
+    token = ws.cookies.get(COOKIE)
     try:
+        await asyncio.to_thread(rate_limit, "ws-connect", ip, 60)
+        identity = await asyncio.to_thread(account_for_token, token)
+        if token and identity is None:
+            await ws.send_json(
+                {
+                    "t": "error",
+                    "error": "Session expired. Sign in again or sign out to play as a guest.",
+                }
+            )
+            return
         while True:
-            msg = await ws.receive_json()
+            raw = await asyncio.wait_for(ws.receive_text(), timeout=900)
+            if len(raw) > 16384:
+                await ws.close(code=1009)
+                return
+            try:
+                msg = json.loads(raw)
+            except ValueError:
+                await ws.send_json({"t": "error", "error": "Invalid message"})
+                continue
+            if not isinstance(msg, dict):
+                continue
             typ = msg.get("t")
+            if identity and await asyncio.to_thread(account_for_token, token) is None:
+                await ws.send_json({"t": "error", "error": "Session ended. Sign in again."})
+                return
+            if room and room.closed:
+                return
+            if room:
+                room.touched = time.monotonic()
 
-            if typ == "create":
-                room = lobby.create()
-                room.gs.rules = match_config(msg.get("rules"))
-                seat = 0
-                room.players[0] = ws
-                room.names[0] = str(msg.get("name", "Player 1"))[:24]
-                await ws.send_json(
-                    {"t": "room", "code": room.code, "you": 0, "state": room.state_msg()}
-                )
-
-            elif typ == "join":
-                room = lobby.get(str(msg.get("code", "")))
-                if room is None:
-                    await ws.send_json({"t": "error", "error": "no such room"})
+            if typ in ("create", "join"):
+                if room is not None:
+                    await ws.send_json({"t": "error", "error": "Leave your current room first."})
                     continue
-                seat = 1 if room.players[0] is not None else 0
-                if seat == 1 and room.players[1] is not None:
-                    await ws.send_json({"t": "error", "error": "room full"})
-                    room, seat = None, -1
-                    continue
+                await asyncio.to_thread(rate_limit, "room-entry", ip, 30)
+                if typ == "create":
+                    room = lobby.create()
+                    room.gs.rules = match_config(msg.get("rules"))
+                    seat = 0
+                else:
+                    candidate = lobby.get(str(msg.get("code", "")))
+                    if candidate is None or candidate.closed:
+                        await ws.send_json({"t": "error", "error": "Room not found or expired."})
+                        continue
+                    if candidate.players[1] is not None or candidate.match_id:
+                        await ws.send_json({"t": "error", "error": "Room is full."})
+                        continue
+                    if identity and identity["id"] == candidate.accounts[0]:
+                        await ws.send_json(
+                            {
+                                "t": "error",
+                                "error": "Use another account or a guest for the other seat.",
+                            }
+                        )
+                        continue
+                    room, seat = candidate, 1
                 room.players[seat] = ws
-                room.names[seat] = str(msg.get("name", f"Player {seat + 1}"))[:24]
+                room.names[seat] = (
+                    identity["username"] if identity else guest_name(msg.get("name"), seat)
+                )
+                room.accounts[seat] = identity["id"] if identity else None
+                if seat == 1:
+                    room.match_id = await asyncio.to_thread(
+                        start_match, room.names, room.accounts, room.gs.rules
+                    )
                 await ws.send_json(
                     {"t": "room", "code": room.code, "you": seat, "state": room.state_msg()}
                 )
-                await room.broadcast({"t": "joined", "names": room.names}, exclude=seat)
-                await room.broadcast(room.state_msg())
+                if seat == 1:
+                    await room.broadcast({"t": "joined", "names": room.names}, exclude=seat)
+                    await room.broadcast(room.state_msg())
 
             elif room is None or seat < 0:
-                await ws.send_json({"t": "error", "error": "join a room first"})
+                await ws.send_json({"t": "error", "error": "Join a room first."})
 
-            elif typ in ("shot", "place") and msg.get("revision", room.revision) != room.revision:
+            elif typ == "leave":
+                return
+
+            elif typ in ("shot", "place") and msg.get("revision") != room.revision:
                 await ws.send_json({"t": "error", "error": "stale table state"})
                 await ws.send_json(room.state_msg())
 
             elif typ == "shot":
+                if not all(room.players) or not room.match_id:
+                    await ws.send_json(
+                        {"t": "error", "error": "Waiting for your opponent to join."}
+                    )
+                    continue
                 if seat != room.gs.current or room.gs.winner is not None or room.busy:
                     await ws.send_json({"t": "error", "error": "not your turn"})
                     continue
@@ -171,13 +238,15 @@ async def handle(ws: WebSocket) -> None:
                 except (KeyError, TypeError, ValueError):
                     await ws.send_json({"t": "error", "error": "bad shot"})
                     continue
-                import math as _m
-
                 cue = room.gs.balls[0]
                 if cue.potted or room.gs.ball_in_hand:
                     await ws.send_json({"t": "error", "error": "cue ball in hand — place it first"})
                     continue
-                if not all(math.isfinite(v) for v in (aim, power, tip_x, tip_y)):
+                if (
+                    not all(math.isfinite(v) for v in (aim, power, tip_x, tip_y))
+                    or not 0 < power <= 1
+                    or math.hypot(tip_x, tip_y) > 0.55
+                ):
                     await ws.send_json({"t": "error", "error": "bad shot"})
                     continue
                 called_ball, called_pocket = s.get("calledBall"), s.get("calledPocket")
@@ -192,45 +261,46 @@ async def handle(ws: WebSocket) -> None:
                 room.busy = True
                 vmax = room.gs.rules["breakMax" if room.gs.break_shot else "normalMax"]
                 elevation = cue_elevation(cue.x, cue.y, aim, 0, room.gs.balls)
-                strike(cue, _m.cos(aim), _m.sin(aim), power, tip_x, tip_y, vmax, elevation)
-                server_ev = simulate_shot(room.gs.balls, 0)
-                room.__dict__["pending_ev"] = server_ev
-                room.__dict__["pending_hash"] = hash_state(room.gs.balls)
+                shot = {
+                    "aim": aim,
+                    "power": power,
+                    "tipX": tip_x,
+                    "tipY": tip_y,
+                    "elevation": elevation,
+                    "vmax": vmax,
+                    "calledBall": called_ball,
+                    "calledPocket": called_pocket,
+                }
+                strike(cue, math.cos(aim), math.sin(aim), power, tip_x, tip_y, vmax, elevation)
+                await room.broadcast({"t": "shot", "by": seat, "shot": shot})
+                server_ev = await asyncio.to_thread(simulate_shot, room.gs.balls, 0)
+                if room.closed:
+                    return
+                apply_shot(room.gs, server_ev)
+                room.revision += 1
+                facts = ev_dump(server_ev)
+                foul = (
+                    room.gs.ball_in_hand
+                    or room.gs.message.startswith("Illegal break")
+                    or (room.gs.winner is not None and room.gs.winner != seat)
+                )
+                await asyncio.to_thread(
+                    record_shot,
+                    room.match_id,
+                    room.revision,
+                    seat,
+                    shot,
+                    facts,
+                    room.gs.winner,
+                    foul,
+                )
+                room.busy = False
                 await room.broadcast(
-                    {
-                        "t": "shot",
-                        "by": seat,
-                        "shot": {
-                            "aim": aim,
-                            "power": power,
-                            "tipX": tip_x,
-                            "tipY": tip_y,
-                            "elevation": elevation,
-                            "vmax": vmax,
-                            "calledBall": called_ball,
-                            "calledPocket": called_pocket,
-                        },
-                    }
+                    {**room.state_msg(), "t": "result", "ev": facts, "corrected": True}
                 )
 
             elif typ == "done":
-                if seat != room.gs.current or not room.busy:
-                    continue
-                server_ev: ShotEvents = room.__dict__.get("pending_ev", ShotEvents())
-                # Always adjudicate authoritative physical facts and resting positions.
-                final_ev = server_ev
-                use_server = True
-                room.busy = False
-                apply_shot(room.gs, final_ev)
-                room.revision += 1
-                await room.broadcast(
-                    {
-                        **room.state_msg(),
-                        "t": "result",
-                        "ev": ev_dump(final_ev),
-                        "corrected": use_server,
-                    }
-                )
+                pass  # Playback acknowledgement is not evidence and cannot create statistics.
 
             elif typ == "place":
                 if seat != room.gs.current or not room.gs.ball_in_hand or room.busy:
@@ -242,15 +312,35 @@ async def handle(ws: WebSocket) -> None:
                 if place_cue(room.gs, x, y):
                     room.revision += 1
                     await room.broadcast(room.state_msg())
-
             else:
                 await ws.send_json({"t": "error", "error": "unknown message"})
-    except Exception:
+    except (WebSocketDisconnect, TimeoutError):
         pass
+    except HTTPException as exc:
+        await ws.send_json({"t": "error", "error": exc.detail})
+    except Exception:
+        logger.exception("Room handler failed")
     finally:
         if room is not None and 0 <= seat <= 1 and room.players[seat] is ws:
             room.players[seat] = None
-            try:
-                await room.broadcast({"t": "left", "names": room.names})
-            except Exception:
-                pass
+            room.closed = True
+            lobby.rooms.pop(room.code, None)
+            if room.match_id:
+                await asyncio.to_thread(abandon_match, room.match_id, seat)
+            await room.broadcast(
+                {
+                    "t": "left",
+                    "names": room.names,
+                    "message": "Opponent left. This room has closed; create another to play again.",
+                }
+            )
+            for peer in room.players:
+                if peer is not None:
+                    try:
+                        await peer.close()
+                    except Exception:
+                        pass
+        try:
+            await ws.close()
+        except Exception:
+            pass

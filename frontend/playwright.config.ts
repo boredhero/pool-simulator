@@ -2,6 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './e2e',
+  testMatch: 'pool.spec.ts',
   fullyParallel: true,
   workers: process.env.CI ? 1 : 2,
   timeout: 60_000,

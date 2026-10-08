@@ -1,13 +1,6 @@
-import os
+from fastapi.testclient import TestClient
 
-_db = "/tmp/opencode/pool-test.db"
-if os.path.exists(_db):
-    os.unlink(_db)
-os.environ["DATABASE_URL"] = f"sqlite:///{_db}"
-
-from fastapi.testclient import TestClient  # noqa: E402
-
-from app.main import app  # noqa: E402
+from app.main import app
 
 c = TestClient(app)
 

@@ -9,7 +9,8 @@
     "lint": "eslint src --ext .ts",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "test:online": "playwright test --config playwright.online.config.ts"
   },
   "dependencies": {
     "three": "^0.186.0"

@@ -1,86 +1,80 @@
+import pytest
 from fastapi.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
 
 from app.main import app
+from app.models.db import GameMatch, MatchPlayer, MatchShot, Session
+from app.net.rooms import Room, lobby
+from app.services.matches import record_shot, start_match
+from app.sim.physics import ShotEvents
+from app.sim.rules import apply_shot, begin_shot, new_game
 
-c1 = TestClient(app)
-c2 = TestClient(app)
+
+def pair(w1, w2, rules=None):
+    w1.send_json({"t": "create", "name": "A", "rules": rules or {"preset": "bar"}})
+    r1 = w1.receive_json()
+    assert len(r1["code"]) == 8 and not r1["state"]["ready"]
+    w2.send_json({"t": "join", "code": r1["code"], "name": "B"})
+    r2 = w2.receive_json()
+    assert r2["you"] == 1 and r2["state"]["names"] == ["A", "B"]
+    assert w1.receive_json()["t"] == "joined"
+    assert w1.receive_json()["ready"]
+    assert w2.receive_json()["ready"]
+    return r1["code"]
 
 
-def test_create_join_shot_flow():
-    with c1.websocket_connect("/ws") as w1, c2.websocket_connect("/ws") as w2:
-        w1.send_json({"t": "create", "name": "A"})
-        r1 = w1.receive_json()
-        assert r1["t"] == "room" and r1["you"] == 0
-        code = r1["code"]
-        assert len(code) == 4
-        assert len(r1["state"]["balls"]) == 16
-        assert r1["state"]["return_order"] == []
-
-        w2.send_json({"t": "join", "code": code, "name": "B"})
-        r2 = w2.receive_json()
-        assert r2["you"] == 1
-        assert w1.receive_json()["t"] == "joined"  # join notice
-        s1 = w1.receive_json()  # state broadcast
-        assert s1["t"] == "state" and len(s1["balls"]) == 16
-        assert w2.receive_json()["t"] == "state"  # state broadcast
-
-        # Player 0 shoots soft straight up-table (likely misses everything -> turn passes).
-        w1.send_json({"t": "shot", "shot": {"aim": 0.0, "power": 0.2, "tipX": 0, "tipY": 0}})
-        assert w1.receive_json()["t"] == "shot"  # echo first (sequential reads)
-        m = w2.receive_json()
-        assert m["t"] == "shot" and m["by"] == 0
-
-        # Shooter reports rest state (reuse server-sent state balls).
+def test_guest_create_join_and_server_result_without_done():
+    with (
+        TestClient(app).websocket_connect("/ws") as w1,
+        TestClient(app).websocket_connect("/ws") as w2,
+    ):
+        code = pair(w1, w2)
         w1.send_json(
-            {
-                "t": "done",
-                "balls": s1["balls"],
-                "ev": {
-                    "first_contact": None,
-                    "potted": [],
-                    "off_table": [],
-                    "rail_after_contact": False,
-                    "cue_potted": False,
-                },
-            }
+            {"t": "shot", "revision": 0, "shot": {"aim": 0, "power": 0.2, "tipX": 0, "tipY": 0}}
         )
-        res = w1.receive_json()
-        assert res["t"] == "result"
-        assert w2.receive_json()["t"] == "result"
-        # Client ev (a whiff) mismatches the server sim (straight into the rack),
-        # so the server corrects: turn/rules outcomes are unit-tested in test_rules.
-        assert res["corrected"] is True
-        assert res["current"] in (0, 1) and isinstance(res["message"], str)
-
-
-def test_bad_code_and_turn_order():
-    with c1.websocket_connect("/ws") as w1:
-        w1.send_json({"t": "join", "code": "ZZZZ"})
-        assert w1.receive_json()["t"] == "error"
-        w1.send_json({"t": "create"})
-        r = w1.receive_json()
-        assert r["you"] == 0
-        # Solo player shoots (allowed, no opponent yet).
-        w1.send_json({"t": "shot", "shot": {"aim": 0.0, "power": 0.1, "tipX": 0, "tipY": 0}})
         assert w1.receive_json()["t"] == "shot"
+        assert w2.receive_json()["t"] == "shot"
+        # No client acknowledgement is necessary to commit results and statistics.
+        result = w1.receive_json()
+        assert result["t"] == "result" and result["revision"] == 1
+        assert w2.receive_json()["t"] == "result"
+        w1.send_json({"t": "done", "ev": {"potted": [8]}})
+        with Session() as db:
+            assert db.query(MatchShot).count() == 1
+            assert db.query(MatchPlayer).filter_by(seat=0).one().shots == 1
+            assert db.query(GameMatch).one().winner_seat is None
+        w1.send_json({"t": "create"})
+        assert "Leave" in w1.receive_json()["error"]
+        assert len(lobby.rooms) == 1
+    assert code not in lobby.rooms
+    with Session() as db:
+        assert db.query(GameMatch).one().status == "abandoned"
+
+
+def test_bad_code_waiting_room_and_cross_origin():
+    with TestClient(app).websocket_connect("/ws") as ws:
+        ws.send_json({"t": "join", "code": "ZZZZZZZZ"})
+        assert ws.receive_json()["t"] == "error"
+        ws.send_json({"t": "create"})
+        assert ws.receive_json()["you"] == 0
+        ws.send_json({"t": "shot", "revision": 0, "shot": {"aim": 0, "power": 0.1}})
+        assert "Waiting" in ws.receive_json()["error"]
+    with pytest.raises(WebSocketDisconnect):
+        with TestClient(app).websocket_connect("/ws", headers={"Origin": "https://evil.example"}):
+            pass
 
 
 def test_room_rules_revision_and_authoritative_calls():
-    with c1.websocket_connect("/ws") as ws:
-        ws.send_json(
-            {"t": "create", "rules": {"preset": "custom", "calls": "all", "normalMax": 4.2}}
-        )
-        msg = ws.receive_json()
-        state = msg["state"]
-        assert state["rules"]["normalMax"] == 4.2
-        assert state["ruleset"] == {"id": "eight-ball", "version": 1}
-        assert state["break_shot"] and state["placement"] == "none"
+    with (
+        TestClient(app).websocket_connect("/ws") as ws,
+        TestClient(app).websocket_connect("/ws") as other,
+    ):
+        code = pair(ws, other, {"preset": "custom", "calls": "all", "normalMax": 4.2})
+        room = lobby.get(code)
+        assert room.gs.rules["normalMax"] == 4.2
         ws.send_json({"t": "shot", "revision": -1, "shot": {"aim": 0, "power": 0.5}})
         assert ws.receive_json()["error"] == "stale table state"
         assert ws.receive_json()["revision"] == 0
-        from app.net.rooms import lobby
-
-        room = lobby.get(msg["code"])
         room.gs.break_shot = False
         ws.send_json({"t": "shot", "revision": 0, "shot": {"aim": 0, "power": 0.5}})
         assert ws.receive_json()["error"] == "call a legal ball and pocket"
@@ -98,19 +92,11 @@ def test_room_rules_revision_and_authoritative_calls():
             }
         )
         shot = ws.receive_json()["shot"]
-        assert shot["elevation"] < 0.2  # Server derives clearance, ignoring invented angle.
-        assert shot["vmax"] == 4.2
-        ws.send_json({"t": "done", "ev": {"potted": [8]}})
-        result = ws.receive_json()
-        assert result["revision"] == 1
-        assert result["winner"] is None  # Fake client 8-Ball event cannot decide the match.
+        assert shot["elevation"] < 0.2 and shot["vmax"] == 4.2
+        assert ws.receive_json()["t"] == "result"
 
 
-def test_room_state_carries_capture_order_for_joining_players():
-    from app.net.rooms import Room
-    from app.sim.physics import ShotEvents
-    from app.sim.rules import apply_shot, begin_shot, new_game
-
+def test_room_state_carries_capture_order():
     gs = new_game()
     gs.break_shot = False
     begin_shot(gs)
@@ -118,3 +104,38 @@ def test_room_state_carries_capture_order_for_joining_players():
         next(b for b in gs.balls if b.n == n).potted = True
     apply_shot(gs, ShotEvents(first_contact=3, potted=[12, 3, 10], rail_after_contact=True))
     assert Room(code="TEST", gs=gs).state_msg()["return_order"] == [12, 3, 10]
+
+
+def test_registered_identity_and_authoritative_lifetime_stats():
+    client = TestClient(app)
+    response = client.post(
+        "/api/account/register",
+        headers={"X-Pool-Request": "1"},
+        json={"username": "ActualPlayer", "password": "long secure pool password"},
+    )
+    account = response.json()["account"]
+    with client.websocket_connect("/ws") as ws:
+        ws.send_json({"t": "create", "name": "Spoofed", "account_id": "invented"})
+        state = ws.receive_json()["state"]
+        assert state["names"][0] == "ActualPlayer"
+        assert state["registered"] == [True, False]
+        assert lobby.get(state["code"]).accounts[0] == account["id"]
+    match = start_match(["ActualPlayer", "Guest"], [account["id"], None], {"preset": "bar"})
+    facts = {"potted": [3, 8], "cue_potted": False, "off_table": []}
+    record_shot(match, 1, 0, {"aim": 0}, facts, 0, False)
+    record_shot(match, 1, 0, {"aim": 0}, facts, 0, False)
+    stats = client.get("/api/account").json()["stats"]
+    assert stats["matches"] == stats["wins"] == stats["shots"] == 1
+    assert stats["ballsPocketed"] == 2 and stats["losses"] == 0
+    client.post("/api/scores", json={"winner": "ActualPlayer"})
+    assert client.get("/api/account").json()["stats"] == stats
+
+
+def test_restart_marks_active_matches_interrupted_without_awarding_wins():
+    from app.services.matches import interrupt_matches
+
+    match_id = start_match(["A", "B"], [None, None], {"preset": "bar"})
+    interrupt_matches()
+    with Session() as db:
+        match = db.get(GameMatch, match_id)
+        assert match.status == "interrupted" and match.winner_seat is None

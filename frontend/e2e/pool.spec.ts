@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 test.beforeEach(async ({page}) => {
   // This suite covers the standalone frontend. Backend API tests cover /api/version.
+  await page.route('**/api/account',route=>route.fulfill({json:{account:null,stats:null}}));
   await page.route('**/api/version', route => route.fulfill({json:{version:'e2e'}}));
   await page.addInitScript(() => {
     const w=window as any, requestFrame=window.requestAnimationFrame.bind(window);
@@ -379,9 +380,9 @@ test('settings title and close button stay visible while scrolling on desktop an
   for(const viewport of [{width:1280,height:720},{width:390,height:844}]) {
     await page.setViewportSize(viewport);
     await page.locator('#settingsbtn').click();
-    const header=page.locator('.settings-header'),before=(await header.boundingBox())!;
-    await page.locator('.settings-body').evaluate(el=>el.scrollTop=el.scrollHeight);
-    expect(await page.locator('.settings-body').evaluate(el=>el.scrollTop)).toBeGreaterThan(100);
+    const header=page.locator('#settingspanel .settings-header'),before=(await header.boundingBox())!;
+    await page.locator('#settingspanel .settings-body').evaluate(el=>el.scrollTop=el.scrollHeight);
+    expect(await page.locator('#settingspanel .settings-body').evaluate(el=>el.scrollTop)).toBeGreaterThan(100);
     const after=(await header.boundingBox())!;expect(after.y).toBeCloseTo(before.y);
     await expect(page.getByRole('heading',{name:'Settings',exact:true})).toBeVisible();
     await page.getByRole('button',{name:'Close settings',exact:true}).click();

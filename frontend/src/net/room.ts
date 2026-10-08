@@ -6,6 +6,7 @@ export interface ShotParams { aim: number; power: number; tipX: number; tipY: nu
 export interface ServerBall { id: number; n: number | null; x: number; y: number; potted: boolean }
 export interface RoomState {
   return_order: number[];
+  names?:string[]; ready?:boolean; registered?:boolean[];
   code: string; balls: ServerBall[]; current: number;
   groups: Array<string | null>; open: boolean; ball_in_hand: boolean;
   winner: number | null; message: string;
@@ -21,38 +22,48 @@ export class RoomClient {
   seat: number | null = null;
   code = '';
   revision = 0;
+  ready = false;
+  private closed = false;
+  private connectingTimer = 0;
   onState: (s: RoomState) => void = () => {};
   onShot: (by: number, shot: ShotParams) => void = () => {};
   onJoined: (names: string[]) => void = () => {};
   onError: (e: string) => void = () => {};
   onOpen: () => void = () => {};
+  onClose: (message:string) => void = () => {};
 
   connect(): void {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     this.ws = new WebSocket(`${proto}//${location.host}/ws`);
-    this.ws.onopen = () => this.onOpen();
+    this.connectingTimer=window.setTimeout(()=>{this.close();this.onClose('Connection timed out. Try again.');},12000);
+    this.ws.onopen = () => {clearTimeout(this.connectingTimer);this.onOpen();};
     this.ws.onmessage = (m) => {
       const d = JSON.parse(m.data);
       if (d.t === 'room') {
         this.seat = d.you;
         this.code = d.code;
         this.revision = d.state.revision;
+        this.ready = d.state.ready ?? true;
         this.onState(d.state);
       } else if (d.t === 'state' || d.t === 'result') {
         this.revision = d.revision;
+        this.ready = d.ready ?? true;
         this.onState(d);
       } else if (d.t === 'shot') {
         this.onShot(d.by, d.shot);
-      } else if (d.t === 'joined' || d.t === 'left') {
+      } else if (d.t === 'joined') {
         this.onJoined(d.names);
+      } else if(d.t==='left'){
+        this.close();this.onClose(d.message??'Opponent left. Room closed.');
       } else if (d.t === 'error') {
         this.onError(d.error);
       }
     };
-    this.ws.onclose = () => this.onError('disconnected');
+    this.ws.onclose = () => {clearTimeout(this.connectingTimer);if(!this.closed){this.closed=true;this.onClose('Disconnected. Create or join a new room to continue.');}};
   }
 
-  send(o: object): void { this.ws?.send(JSON.stringify(o)); }
+  close():void {this.closed=true;clearTimeout(this.connectingTimer);this.ws?.close();this.ws=null;}
+  send(o: object): void { if(this.ws?.readyState===WebSocket.OPEN)this.ws.send(JSON.stringify(o)); }
   create(name: string, rules: MatchConfig): void { this.send({ t: 'create', name, rules }); }
   join(code: string, name: string): void { this.send({ t: 'join', code, name }); }
   shot(s: ShotParams): void { this.send({ t: 'shot', shot: s, revision: this.revision }); }

@@ -6,9 +6,13 @@ services:
     container_name: pool-simulator-api
     restart: unless-stopped
     ports:
-      - "0.0.0.0:8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
       DATABASE_URL: sqlite:////srv/data/pool.db
+      COOKIE_SECURE: "true"
+      # Only the host reverse proxy can reach this loopback-published service.
+      FORWARDED_ALLOW_IPS: "*"
+      ALLOWED_ORIGINS: https://pool.martinospizza.dev
     volumes:
       - pool_data:/srv/data
     healthcheck:

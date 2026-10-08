@@ -32,3 +32,14 @@ of plain-language entries. Add changes to the current release while iterating;
 create a new entry when bumping the version. Keep its version aligned with
 `info.yml`, `backend/pyproject.toml`, and `backend/uv.lock`. Build the frontend
 after editing the changelog to validate its import.
+
+## Accounts and online state
+- Never encrypt passwords reversibly or log passwords/recovery codes/session cookies.
+  Keep Argon2id hashes, one-use recovery rotation, and HttpOnly cookie sessions.
+- Account stats come only from authoritative server matches. Do not connect the
+  legacy client-submitted scores endpoint to account stats or future rankings.
+- Preserve the `pool_data:/srv/data` volume and DATABASE_URL across releases.
+  See README for consistent backups; never delete a production volume as cleanup.
+- New schema tables are additive in 0.5.0. Existing-column changes require migrations.
+- Rooms are single-process and ephemeral. Run the real online integration tests
+  (`npm run test:online` in frontend after a build) for account or room changes.

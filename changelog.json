@@ -1,5 +1,17 @@
 [
   {
+    "version": "0.5.0",
+    "date": "2026-10-08",
+    "title": "Play together, with or without an account",
+    "changes": [
+      "Create a private room and share its invite link. Friends can join as guests with no account required.",
+      "Optional accounts have case-insensitive usernames, secure password hashing, cookie sessions, and a one-use recovery code shown when created. Password recovery issues a new code and revokes existing sessions.",
+      "Your account shows lifetime online stats and recent matches recorded by the server, with durable match history for future lobby and matchmaking features. Local practice and AI games remain untracked.",
+      "Online results no longer wait for client acknowledgement. Account identities are verified by the server, and disconnected rooms close cleanly without awarding fabricated wins.",
+      "Accounts, sessions, and match history persist in the existing SQLite Docker volume. Added authentication limits, request-origin checks, and protection against serving files outside the frontend directory."
+    ]
+  },
+  {
     "version": "0.4.0",
     "date": "2026-10-08",
     "title": "A natural stance and clearer Bar play",
