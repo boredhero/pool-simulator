@@ -8,7 +8,7 @@ import { type MatchConfig } from '../sim/config';
 import { TableOptions } from './tableOptions';
 import { allAsleep, strike, type Ball, type ShotEvents } from '../sim/physics';
 import { applyShot, beginShot, callRequired, canPlace, legalTargets, newGame, placeCue, type GameState } from '../sim/rules';
-import { breakShot, chooseShot } from '../sim/cpu';
+import { planCpuTurn } from '../sim/cpu';
 import { jevRequest } from '../sim/jev';
 import { Sfx } from './sfx';
 import { POCKETS, TABLE_H, TABLE_W } from '../sim/table';
@@ -493,8 +493,9 @@ export class Game {
       this.jevPlayback=true;
       try {this.fire(result.shot.power,result.shot.vmax);} finally {this.jevPlayback=false;}
       this.pendingNetwork.push(()=>{if(this.jevGame===game)this.applyJevState(result.state);});
-      this.el.opponentstatus.textContent=result.source==='jev'?'Jev AI selected this shot':
+      this.el.opponentstatus.textContent=result.source==='jev'?`Jev AI selected a ${result.family??'planned'} shot`:
         result.source==='cpu-fallback'?'Jev AI unavailable or capacity reached · CPU took this shot':
+        result.source==='planner'?`Jev AI · local ${result.family??'planned'} shot (no model choice needed)`:
         result.source==='geometry'?'Jev AI · geometry shot (no model choice needed)':
         result.expiresAt===null?'Premium · Unlimited Jev AI':'Daily Jev game';
     } catch(error) {
@@ -537,20 +538,19 @@ export class Game {
     const cpuSeat = this.cpuOpponent ? 1 : -1;
     if (cpuSeat < 0 || this.gs.current !== cpuSeat) return;
     if(this.jevGame){await this.playJevTurn();return;}
+    if (this.room || this.gs.winner !== null || !['aim','place'].includes(this.mode)) return;
+    const shot = planCpuTurn(this.gs);
+    if (!shot) return;
     if (this.gs.ballInHand) {
-      let placed = false;
-      for (let x = .15; x < TABLE_W && !placed; x += .1) for (let y = .15; y < TABLE_H && !placed; y += .1) placed = placeCue(this.gs, x, y);
-      if (!placed) return;
-      this.mode = 'aim';
+      if (!shot.placement || !placeCue(this.gs,shot.placement.x,shot.placement.y)) return;
     }
-    const targets = legalTargets(this.gs).filter(n => !this.gs.kitchenShot || this.gs.balls.find(b => b.n === n)!.x >= TABLE_W / 4);
-    const shot = (this.gs.breakShot ? breakShot(this.gs.balls) : chooseShot(this.gs.balls, targets, 'medium'))
-      ?? breakShot(this.gs.balls);
+    // Placement and firing are one CPU action, including recovery from place mode.
+    this.mode = 'aim';
     this.angle = shot.angle;
     this.targetAngle = shot.angle;
     this.power = shot.power;
     this.setSpin(shot.tipX, shot.tipY);
-    this.calledBall = shot.ball ?? targets[0] ?? null; this.calledPocket = shot.pocket ?? 0;
+    this.calledBall = shot.ball; this.calledPocket = shot.pocket;
     this.fire(shot.power);
   }
 

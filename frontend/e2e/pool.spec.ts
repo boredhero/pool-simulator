@@ -590,3 +590,29 @@ test('optional interactive tutorial responds to controls and stays dismissed',as
   await page.locator('.pcard').first().focus();await page.keyboard.press('Enter');
   await expect(page.locator('.pcard').first()).toHaveAttribute('aria-expanded','true');
 });
+
+test('offline CPU places behind the head string and actually fires its turn', async ({page})=>{
+  await openGame(page);
+  const result=await page.evaluate(async()=>{
+    const g=(window as any).__pool;
+    g.cpuOpponent=true;g.jevGame=null;g.room=null;
+    for(const b of g.gs.balls) b.potted=true;
+    Object.assign(g.gs.balls[0],{potted:true,asleep:true,x:.25,y:.7});
+    Object.assign(g.gs.balls[1],{potted:false,asleep:true,n:1,x:1.5,y:.55});
+    Object.assign(g.gs.balls[2],{potted:false,asleep:true,n:8,x:2.1,y:1.1});
+    Object.assign(g.gs,{current:1,groups:['stripe','solid'],open:false,breakShot:false,
+      ballInHand:true,placement:'kitchen',kitchenShot:true,winner:null});
+    g.mode='place';
+    await g.cpuMove();
+    const fired={mode:g.mode,x:g.gs.balls[0].x,hand:g.gs.ballInHand,potted:g.gs.balls[0].potted};
+    // Stop future CPU turns while resolving this exact shot through real frame playback.
+    g.cpuOpponent=false;
+    for(let n=0;n<200 && g.mode==='rolling';n++){g.accumulator+=.25;g.frame();}
+    return {fired,mode:g.mode,firstContact:g.ev.firstContact,message:g.gs.message,
+      asleep:g.gs.balls.every((b:any)=>b.asleep||b.potted)};
+  });
+  expect(result.fired.mode).toBe('rolling');expect(result.fired.x).toBeLessThan(2.54/4);
+  expect(result.fired.hand).toBe(false);expect(result.fired.potted).toBe(false);
+  expect(result.mode).not.toBe('rolling');expect(result.firstContact).toBe(1);
+  expect(result.asleep).toBe(true);expect(result.message).not.toContain('Foul');
+});
