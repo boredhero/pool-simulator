@@ -265,3 +265,19 @@ Flow: work on `develop`, PR to `main` (protected: PR + `ci` check), merge to shi
 Camera direction uses sorted cue-relative bearings and a wrapped sliding window of floor(n/2)+1 targets. Near-ties prefer the smallest rotation; azimuth interpolates over the shortest arc. Group eligibility comes from legalTargets rather than shot-selection AI. Whole-table and placement views retain the existing azimuth. Reference: https://threejs.org/docs/pages/Spherical.html and https://threejs.org/docs/pages/MathUtils.html.
 
 Auto-framing refinement: use a 26-degree elevation above the cloth, fit padded bounds around individual balls, and align the idle human cue with the final view. Do not align during a pull, placement, AI turn, or opponent turn.
+
+### 0.5.0 optional identity and online foundation
+- Guest room links carry 8-character random invitation codes; no account wall.
+- Optional case-insensitive usernames, Argon2id password/recovery hashes, rotating
+  one-use recovery codes, and opaque server-revocable cookie sessions.
+- Durable SQLite account/match/participant/shot ledger in the existing Compose
+  volume, with server-only stats and stable opponent identifiers for future queues.
+- Server finalizes shots independently of client playback acknowledgement. Waiting
+  rooms cannot shoot; disconnects close rooms and record unfinished matches.
+- Auth origin/header checks, persistent rate limits, no-store account responses,
+  session revocation and recovery/login race protection. Static serving is confined
+  to frontend/dist. WebSocket transport is an explicit runtime dependency.
+- Real online browser suite uses an isolated temporary database. Accounts and
+  sessions persist through reconnecting the SQLAlchemy engine; live rooms do not.
+- Deliberately deferred: ranked matchmaking, public lobbies, reconnection/resume of
+  live rooms, email recovery, and tracking local practice/AI as verified matches.

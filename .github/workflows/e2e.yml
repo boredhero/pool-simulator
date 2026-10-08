@@ -54,9 +54,20 @@ jobs:
         working-directory: frontend
         run: npx playwright install-deps chromium && npx playwright install chromium
 
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install backend for online integration tests
+        run: uv sync --project backend --frozen
+
       - name: Run e2e
         working-directory: frontend
         run: npx playwright test
+
+      - name: Run online account and guest integration tests
+        working-directory: frontend
+        run: npm run test:online
 
       - name: Upload browser failure diagnostics
         if: failure()

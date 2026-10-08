@@ -2,3 +2,17 @@ node_modules/
 frontend/dist/
 backend/.venv/
 __pycache__/
+
+.git/
+.env
+.env.*
+**/.env
+**/.env.*
+**/*.db
+**/*.sqlite*
+**/.pytest_cache/
+**/.ruff_cache/
+frontend/test-results/
+frontend/playwright-report/
+
+**/*.db-*

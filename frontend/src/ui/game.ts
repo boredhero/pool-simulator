@@ -1,3 +1,4 @@
+import { AccountPanel, type Account } from './account';
 import { cueStyle } from '../render/ballTextures';
 import { advancePlayback } from './playback';
 import { sightStyle } from '../render/railSights';
@@ -61,6 +62,8 @@ export class Game {
   seat: number | null = null;
   whoShot: number | null = null;
   aiOpponent = false;
+  account:Account|null=null;
+  accountPanel:AccountPanel;
   aiTimer = 0;
   sfx = new Sfx();
   lastSpeed = new Map<number, number>();
@@ -86,6 +89,18 @@ export class Game {
     this.options = new TableOptions(rules => this.reset(rules));
     this.buildThemePanel();
     this.wire(canvas);
+    this.accountPanel=new AccountPanel(()=>!!this.room,account=>{
+      this.account=account;
+      const input=this.el.pname as HTMLInputElement;input.disabled=!!account;
+      if(account)input.value=account.username;
+      document.getElementById('onlineidentity')!.textContent=account?`Signed in as ${account.username}. Online matches count toward your stats.`:'Playing as a guest. Create an account to keep lifetime online stats.';
+    });
+    const invitation=new URLSearchParams(location.hash.slice(1)).get('join')??new URLSearchParams(location.search).get('join');
+    if(invitation&&/^[A-Z2-9]{8}$/i.test(invitation)){
+      (this.el.rcode as HTMLInputElement).value=invitation.toUpperCase();
+      this.el.onlinepanel.classList.add('open');document.getElementById('helppanel')!.classList.remove('open');
+      this.el.roominfo.textContent='You are invited. Choose a name and join—no account needed.';
+    }
     new ResizeObserver(entries => {
       const bar = entries[0].target.getBoundingClientRect();
       document.documentElement.style.setProperty('--below-header', `${bar.bottom + 12}px`);
@@ -157,7 +172,7 @@ export class Game {
 
   canShoot(): boolean {
     if (this.mode !== 'aim' || this.gs.winner !== null) return false;
-    if (this.room && this.seat !== this.gs.current) return false;
+    if (this.room && (!this.room.ready || this.seat !== this.gs.current)) return false;
     return true;
   }
 
@@ -333,6 +348,12 @@ export class Game {
       this.el.settingspanel.classList.toggle('open');
       this.el.onlinepanel.classList.remove('open');
     });
+    document.getElementById('closeonline')!.addEventListener('click',()=>{this.el.onlinepanel.classList.remove('open');this.el.onlinebtn.focus();});
+    document.getElementById('leaveroom')!.addEventListener('click',()=>this.leaveRoom('Left room. You are back at a local table.'));
+    document.getElementById('copyroom')!.addEventListener('click',()=>{
+      const input=document.getElementById('roomlink') as HTMLInputElement;
+      void navigator.clipboard.writeText(input.value).then(()=>{this.el.roominfo.textContent='Invite link copied.';}).catch(()=>{input.select();this.el.roominfo.textContent='Select and copy the invite link.';});
+    });
     this.el.createbtn.addEventListener('click', () => this.connectRoom(true));
     this.el.joinbtn.addEventListener('click', () => this.connectRoom(false));
     document.getElementById('callball')!.addEventListener('change', e => { this.calledBall = Number((e.target as HTMLSelectElement).value); this.calledPocket = null; this.hud(); });
@@ -505,7 +526,10 @@ export class Game {
     this.el.msg.textContent = msg.replace(/\bPlayer ([12])\b/g,(_,seat)=>this.playerName(Number(seat)-1));
     this.el.turn.textContent = this.gs.winner !== null ? 'Game over' : this.playerName(this.gs.current);
     this.el.turn.classList.toggle('me', !this.room || this.seat === this.gs.current);
-    this.el.roominfo.textContent = this.room ? `room ${this.room.code} · you P${(this.seat ?? 0) + 1}` : 'solo table';
+    this.el.roominfo.textContent = this.room ? (this.room.code ? `Room ${this.room.code} · ${this.room.ready?'Connected · your seat '+((this.seat??0)+1):'Waiting for your friend'}`:'Connecting…') : 'No room connected';
+    if(this.room&&!this.room.ready)this.el.msg.textContent='Waiting for your friend · open Online to share the invite link';
+    document.getElementById('roomentry')!.hidden=!!this.room;
+    document.getElementById('roomsharing')!.hidden=!this.room?.code;
     this.options.summary(this.gs.rules);
     const needCall = this.mode === 'aim' && this.humanTurn() && callRequired(this.gs);
     document.getElementById('callpanel')!.hidden = !needCall;
@@ -589,6 +613,7 @@ export class Game {
       b.vx = b.vy = b.wx = b.wy = b.wz = 0;
       b.asleep = true;
     }
+    if(s.names)this.roomNames=s.names;
     this.gs.current = s.current === 1 ? 1 : 0;
     this.gs.groups = [(s.groups[0] ?? null) as never, (s.groups[1] ?? null) as never];
     this.gs.returnOrder = s.return_order ?? [];
@@ -607,11 +632,19 @@ export class Game {
     this.hud();
   }
 
+  leaveRoom(message:string):void {
+    this.room?.close();this.room=null;this.seat=null;this.roomNames=null;this.pendingNetwork=[];
+    this.aiOpponent=false;this.el.aibtn.textContent='Play vs AI';this.el.aibtn.classList.remove('on');
+    this.reset();this.el.roominfo.textContent=message;this.el.msg.textContent=message;
+    void this.accountPanel.refresh();
+  }
+
   connectRoom(create: boolean): void {
+    if(this.room)return;
     const name = ((this.el.pname as HTMLInputElement).value || 'Player').slice(0, 24);
     const code = (this.el.rcode as HTMLInputElement).value.trim().toUpperCase();
-    if (!create && code.length !== 4) {
-      this.el.msg.textContent = 'enter a 4-letter room code to join';
+    if (!create && !/^[A-Z2-9]{8}$/.test(code)) {
+      this.el.roominfo.textContent = 'Enter an 8-character room code to join.';
       return;
     }
     const rc = new RoomClient();
@@ -620,6 +653,8 @@ export class Game {
     const handleState = (s: RoomState) => {
       if (this.seat === null && rc.seat !== null) this.seat = rc.seat;
       this.applyServerState(s);
+      const link=new URL('/',location.href);link.hash='join='+rc.code;
+      (document.getElementById('roomlink') as HTMLInputElement).value=link.href;
     };
     rc.onState = s => { if(this.mode==='rolling' || this.pendingNetwork.length)this.pendingNetwork.push(()=>handleState(s)); else handleState(s); };
     const handleShot: typeof rc.onShot = (by, shot) => {
@@ -638,10 +673,11 @@ export class Game {
       this.hud();
     };
     rc.onShot = (by,shot) => { if(by===this.seat)return; if(this.mode==='rolling' || this.pendingNetwork.length)this.pendingNetwork.push(()=>handleShot(by,shot)); else handleShot(by,shot); };
-    rc.onError = (e) => { this.el.msg.textContent = `net: ${e}`; };
+    rc.onError = (e) => {if(!rc.code)this.leaveRoom(e);else this.el.msg.textContent=e;this.el.roominfo.textContent=e;};
+    rc.onClose = message=>{if(this.room===rc)this.leaveRoom(message);};
     rc.onJoined = (names) => { this.roomNames = names; this.hud(); };
     rc.onOpen = () => (create ? rc.create(name, this.gs.rules) : rc.join(code, name));
     rc.connect();
-    this.el.onlinepanel.classList.remove('open');
+    this.hud();
   }
 }
