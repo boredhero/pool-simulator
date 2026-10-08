@@ -7,7 +7,7 @@ import { type MatchConfig } from '../sim/config';
 import { TableOptions } from './tableOptions';
 import { allAsleep, strike, type Ball, type ShotEvents } from '../sim/physics';
 import { applyShot, beginShot, callRequired, canPlace, legalTargets, newGame, placeCue, type GameState } from '../sim/rules';
-import { breakShot, chooseShot } from '../sim/ai';
+import { breakShot, chooseShot } from '../sim/cpu';
 import { Sfx } from './sfx';
 import { POCKETS, TABLE_H, TABLE_W } from '../sim/table';
 import { init, type SceneHandle } from '../render/scene';
@@ -63,10 +63,10 @@ export class Game {
   room: RoomClient | null = null;
   seat: number | null = null;
   whoShot: number | null = null;
-  aiOpponent = false;
+  cpuOpponent = false;
   account:Account|null=null;
   accountPanel:AccountPanel;
-  aiTimer = 0;
+  cpuTimer = 0;
   sfx = new Sfx();
   lastSpeed = new Map<number, number>();
   lastPotted = 0;
@@ -84,7 +84,7 @@ export class Game {
     this.gs = newGame(1);
     this.el = Object.fromEntries(
       ['msg', 'turn', 'version', 'onlinebtn', 'onlinepanel', 'pname', 'rcode', 'createbtn', 'joinbtn',
-        'roominfo', 'chargefill', 'spin', 'aibtn', 'rack', 'settingsbtn', 'settingspanel',
+        'roominfo', 'chargefill', 'spin', 'cpubtn', 'rack', 'settingsbtn', 'settingspanel',
         'feltsw', 'woodsw', 'feltcustom', 'woodcustom', 'scorecard'].map((id) => [id, document.getElementById(id)!]),
     );
     this.applyTheme(localStorage.getItem('pool:felt') ?? FELTS[0], localStorage.getItem('pool:wood') ?? WOODS[0], false);
@@ -186,11 +186,11 @@ export class Game {
     return true;
   }
 
-  /** Human may act only on their own turn (AI turns are driven by aiMove). */
+  /** Human may act only on their own turn (CPU turns are driven by cpuMove). */
   humanTurn(): boolean {
     if(this.cameraMode || this.cameraGesture)return false;
     if (!this.canShoot()) return false;
-    if (this.aiOpponent && this.gs.current === 1) return false;
+    if (this.cpuOpponent && this.gs.current === 1) return false;
     return true;
   }
 
@@ -390,11 +390,11 @@ export class Game {
     document.getElementById('callball')!.addEventListener('change', e => { this.calledBall = Number((e.target as HTMLSelectElement).value); this.calledPocket = null; this.hud(); });
     document.getElementById('clearcall')!.addEventListener('click', () => { this.calledPocket = null; this.hud(); });
     this.el.rack.addEventListener('click', () => this.reset());
-    this.el.aibtn.addEventListener('click', () => {
+    this.el.cpubtn.addEventListener('click', () => {
       if (this.room) return;
-      this.aiOpponent = !this.aiOpponent;
-      this.el.aibtn.textContent = this.aiOpponent ? 'AI: on' : 'Play vs AI';
-      this.el.aibtn.classList.toggle('on', this.aiOpponent);
+      this.cpuOpponent = !this.cpuOpponent;
+      this.el.cpubtn.textContent = this.cpuOpponent ? 'CPU: on' : 'Play vs CPU';
+      this.el.cpubtn.classList.toggle('on', this.cpuOpponent);
       this.reset();
     });
   }
@@ -422,9 +422,9 @@ export class Game {
     this.hud();
   }
 
-  aiMove(): void {
-    const aiSeat = this.aiOpponent ? 1 : -1;
-    if (aiSeat < 0 || this.gs.current !== aiSeat) return;
+  cpuMove(): void {
+    const cpuSeat = this.cpuOpponent ? 1 : -1;
+    if (cpuSeat < 0 || this.gs.current !== cpuSeat) return;
     if (this.gs.ballInHand) {
       let placed = false;
       for (let x = .15; x < TABLE_W && !placed; x += .1) for (let y = .15; y < TABLE_H && !placed; y += .1) placed = placeCue(this.gs, x, y);
@@ -459,14 +459,14 @@ export class Game {
       }
       this.lastSpeed.set(b.id, v);
     }
-    if ((this.mode === 'aim' || this.mode === 'place') && this.aiOpponent && this.gs.current === 1 && this.gs.winner === null && !this.room) {
-      this.aiTimer += 1 / 60;
-      if (this.aiTimer > 1.2) {
-        this.aiTimer = 0;
-        this.aiMove();
+    if ((this.mode === 'aim' || this.mode === 'place') && this.cpuOpponent && this.gs.current === 1 && this.gs.winner === null && !this.room) {
+      this.cpuTimer += 1 / 60;
+      if (this.cpuTimer > 1.2) {
+        this.cpuTimer = 0;
+        this.cpuMove();
       }
     } else {
-      this.aiTimer = 0;
+      this.cpuTimer = 0;
     }
     if (this.mode === 'rolling') {
       const now = performance.now();
@@ -545,7 +545,7 @@ export class Game {
   }
 
   playerName(seat:number): string {
-    return this.roomNames?.[seat] ?? (seat===1 && this.aiOpponent && !this.room ? 'AI' : `Player ${seat+1}`);
+    return this.roomNames?.[seat] ?? (seat===1 && this.cpuOpponent && !this.room ? 'CPU' : `Player ${seat+1}`);
   }
 
   hud(): void {
@@ -572,7 +572,7 @@ export class Game {
       select.replaceChildren(...targets.map(n => new Option(`Ball ${n}`, String(n), false, n === this.calledBall)));
       document.getElementById('callstatus')!.textContent = this.calledPocket === null ? 'Tap a pocket on the table' : `Pocket called · ready to shoot`;
     }
-    for (const id of ['rack', 'aibtn']) (this.el[id] as HTMLButtonElement).disabled = !!this.room;
+    for (const id of ['rack', 'cpubtn']) (this.el[id] as HTMLButtonElement).disabled = !!this.room;
     this.renderScorecard();
   }
 
@@ -667,7 +667,7 @@ export class Game {
 
   leaveRoom(message:string):void {
     this.room?.close();this.room=null;this.seat=null;this.roomNames=null;this.pendingNetwork=[];
-    this.aiOpponent=false;this.el.aibtn.textContent='Play vs AI';this.el.aibtn.classList.remove('on');
+    this.cpuOpponent=false;this.el.cpubtn.textContent='Play vs CPU';this.el.cpubtn.classList.remove('on');
     this.reset();this.el.roominfo.textContent=message;this.el.msg.textContent=message;
     void this.accountPanel.refresh();
   }

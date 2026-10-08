@@ -1,7 +1,7 @@
 # pool-simulator
 
 GPU-accelerated browser pool (8-Ball extensible) + Python backend.
-Decisions (Socratic dialog 2026-10-06): online private rooms (anonymous), hybrid physics (client predicts / Python validates), realistic 3D adaptive quality, different controls per device, practice + simple AI, dual sim (TS + Python) with shared golden tests.
+Decisions (Socratic dialog 2026-10-06): online private rooms (anonymous), hybrid physics (client predicts / Python validates), realistic 3D adaptive quality, different controls per device, practice + simple CPU, dual sim (TS + Python) with shared golden tests.
 
 ## Layout
 - `backend/` FastAPI + uvicorn, SQLite WAL, serves `frontend/dist` in prod
@@ -47,7 +47,7 @@ Only token hashes are stored in the database; credentials are not kept in browse
 storage. Auth mutations require a same-origin request and a custom request header.
 Account/IP attempt limits persist across server restarts.
 
-Account stats count server-simulated private online matches, not client-submitted results or local/AI games. The ledger stores stable account IDs, guest/name
+Account stats count server-simulated private online matches, not client-submitted results or local/CPU games. The ledger stores stable account IDs, guest/name
 snapshots, opponents, rules/version, timestamps, outcomes, disconnects, and shot
 facts. This is the foundation for future lobbies/matchmaking; private games are
 currently unrated and there is no public matchmaking queue yet.
@@ -118,7 +118,7 @@ retains one-finger orbit and two-finger pan/zoom. Three-finger gestures are not
 required because they can conflict with operating-system accessibility controls.
 
 Mobile player names, groups, and remaining counts stay visible. **Show balls**
-expands the numbered ball details; **More** reveals AI and new-rack controls. Spin and Reset remain visible for every shot.
+expands the numbered ball details; **More** reveals CPU and new-rack controls. Spin and Reset remain visible for every shot.
 Mouse play still uses hover-to-aim and pull/release. On trackpads, Shift-scroll
 orbits, normal scroll/pinch zooms, and camera mode offers left-button dragging.
 

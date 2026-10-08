@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { breakShot, chooseShot, legalTargets } from '../src/sim/ai';
+import { breakShot, chooseShot, legalTargets } from '../src/sim/cpu';
 import { newGame } from '../src/sim/rules';
 import { strike, simulateShot } from '../src/sim/physics';
 
-describe('ai', () => {
+describe('cpu', () => {
   it('break aims at the apex with full power', () => {
     const gs = newGame(3);
     const s = breakShot(gs.balls);

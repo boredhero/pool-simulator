@@ -134,7 +134,7 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
     <button id="morecontrols" aria-expanded="false" aria-controls="shotextras">More</button>
     <div class="power-control"><span class="control-label">Shot power <span id="playbackstate" role="status"></span></span><div id="chargebar"><div id="chargefill"></div></div><div class="control-help">Pull farther for a stronger shot</div></div>
     <div id="spincontrols" class="spin-control"><span class="control-label">Spin</span><div id="spin" tabindex="0" role="group" title="Drag to set spin. Arrow keys adjust; Shift makes smaller adjustments. Home resets." aria-label="Cue ball spin control: centered"></div><button id="resetspin" type="button" aria-label="Reset spin to center" disabled>Reset</button></div>
-    <div id="shotextras" class="row actions"><button id="aibtn">Play vs AI</button><button id="rack">New rack</button></div>
+    <div id="shotextras" class="row actions"><button id="cpubtn">Play vs CPU</button><button id="rack">New rack</button></div>
   </div>
 </div>
 <div id="scorecard"></div><button id="scoretoggle" aria-expanded="false" aria-controls="scorecard">Show balls</button>
@@ -243,7 +243,7 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
     </section>
     <section id="accountprofile" hidden>
       <h3 id="accountname"></h3><p id="accountsince" class="guide-note"></p>
-      <h3>Lifetime casual stats</h3><p class="guide-note">Recorded by the server. Local practice and AI games do not count. Private and custom matches are unranked. Leaving after the first shot counts as a forfeit, even if your connection drops.</p>
+      <h3>Lifetime casual stats</h3><p class="guide-note">Recorded by the server. Local practice and CPU games do not count. Private and custom matches are unranked. Leaving after the first shot counts as a forfeit, even if your connection drops.</p>
       <dl id="accountstats"></dl><h3>Recent matches</h3><ul id="accountmatches"></ul>
       <div class="row"><button id="accountrefresh">Refresh stats</button><button id="accountlogout">Sign out</button></div>
     </section>
