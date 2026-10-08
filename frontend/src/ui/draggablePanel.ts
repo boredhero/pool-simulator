@@ -25,6 +25,7 @@ export function setupDraggablePanels(): void {
       close.className = 'panel-close';
       close.setAttribute('aria-label', `Close ${title.toLowerCase()}`);
       close.textContent = '×';
+      close.classList.add('icon-close');
       header.append(heading, close);
       panel.prepend(header);
       panel.setAttribute('role', 'dialog');

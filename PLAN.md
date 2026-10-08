@@ -41,7 +41,7 @@ Flow: work on `develop`, PR to `main` (protected: PR + `ci` check), merge to shi
 - [x] Refine the input-profile selector above legal controls and rename page/version branding to Pool Simulator.
 - [x] Winner dialog with correct player identity, reduced-motion-aware confetti and mode-specific replay action.
 - [x] Correct tutorial shot controls for each active pointer interface.
-- [x] Animated denarius toss chooses the breaker once for all new game modes.
+- [x] Animated coin toss chooses the breaker once for all new game modes.
 - [x] Immediate human Jev shot playback with authoritative final-state reconciliation.
 - [ ] Final integrated browser/online validation and develop → main PR.
 

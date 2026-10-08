@@ -1,0 +1,5 @@
+/* Geometric strokes stay centered independently of font glyph metrics. */
+button.icon-close{position:relative;display:inline-grid!important;place-items:center;padding:0!important;line-height:1;flex-shrink:0;font-size:0!important}
+button.icon-close::before,button.icon-close::after{content:"";position:absolute;left:50%;top:50%;width:14px;height:2px;border-radius:1px;background:currentColor;pointer-events:none}
+button.icon-close::before{transform:translate(-50%,-50%) rotate(45deg)}
+button.icon-close::after{transform:translate(-50%,-50%) rotate(-45deg)}
