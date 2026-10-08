@@ -21,7 +21,10 @@ Flow: work on `develop`, PR to `main` (protected: PR + `ci` check), merge to shi
 - [x] 0.9.0: develop → main PR #27; CI checks running.
 - [x] 0.9.1: Researched desktop trackpad controls and implemented persisted HUD
   profile, Space/Left Shift height, Q/E rotation, gesture safety and help.
-- [ ] 0.9.1: Final regression checks and separate PR.
+- [x] 0.9.1: 90 unit tests, camera/native-touch browser regressions, visual
+  review and separate PR #28; final CI checks running.
+- [ ] 0.9.2: Visible opponent cue/aim/stroke, player input lock during opponent
+  turns, cluster shot-power research and implementation, tests and separate PR.
 
 ## Stack (locked)
 - Frontend: Vite + TS + Three.js (WebGL2 baseline, WebGPU path later), custom 2D+spin sim
