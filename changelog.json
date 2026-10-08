@@ -1,5 +1,17 @@
 [
   {
+    "version": "1.0.1",
+    "date": "2026-10-08",
+    "title": "Rule-aware opponents and aligned camera controls",
+    "changes": [
+      "Desktop Camera now sits directly above the input-mode selector with matching gaps down to the legal links, and expands upward. Mobile placement is preserved.",
+      "New Jev games use your selected Bar, Tournament or Custom rules. Resumed games retain their original rules, and Jev receives the full authoritative rule context.",
+      "Premium players can explicitly start a new Jev game with edited rules. Existing games never change rules mid-rack.",
+      "CPU and Jev planner power respects custom speed caps; constrained server fallbacks call a legal target.",
+      "Shared policy checks cover all 96 categorical custom configurations, with additional actual-shot checks across presets, call rules and speed boundaries."
+    ]
+  },
+  {
     "version": "1.0.0",
     "date": "2026-10-08",
     "title": "Reliable matches and a polished table",
