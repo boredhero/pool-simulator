@@ -1,0 +1,10 @@
+#passkeys{margin:20px 0;padding:18px;border:1px solid #75634a;border-radius:14px;background:#191610}
+#passkeys h3{margin:0 0 8px}#passkeys h4{margin:0 0 8px}#passkeys .guide-note{line-height:1.5}
+#passkeys button,#passkeylogin{min-height:44px;font-size:16px}#passkeylogin{width:100%;margin:14px 0 4px;border-color:#b3cf97}
+#passkeyoffer{padding:14px;margin-bottom:16px;border:1px solid #b3cf97;border-radius:10px;background:#253325}
+#passkeylist{list-style:none;padding:0;margin:16px 0;display:grid;gap:12px}.passkey-item{padding:12px;border:1px solid #62523b;border-radius:10px;overflow-wrap:anywhere}
+#passkeys .row{flex-wrap:wrap;gap:8px}#passkeys label{display:grid;gap:6px}.passkey-edit:not([hidden]){display:grid;gap:8px;margin-top:10px}
+#passkeyverify:not([hidden]){padding:12px;margin:12px 0;border:1px solid #d5b780;border-radius:10px}#passkeyverifyform{display:grid;gap:8px}
+#passkeyverify .password-field{display:flex}#passkeypasswordeye{flex:none;width:44px;padding:0}#passkeypassword{min-width:0}
+#passkeyoffer[hidden],#passkeyverify[hidden],.passkey-edit[hidden],.passkey-remove[hidden]{display:none}
+@media(max-width:600px){#passkeys{padding:12px}#passkeys .row>button{flex:1}#passkeys .row>input{flex:1 0 100%}}

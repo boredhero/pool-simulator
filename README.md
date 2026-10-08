@@ -100,8 +100,8 @@ Accounts are optional and usernames are 3–20 ASCII letters, digits, or undersc
 unique without regard to case. Passwords are 15–128 characters. Passwords and
 recovery codes are salted Argon2id hashes (19 MiB, two passes, one lane), never
 reversibly encrypted. The 160-bit recovery code is shown once; successful recovery
-rotates it and invalidates all sessions. Without either the password or recovery
-code, there is no administrative bypass or email recovery. Opaque session cookies
+rotates it, invalidates all sessions, and removes saved passkeys. Accounts support optional
+passkey sign-in in addition to passwords. There is no administrative bypass or email recovery. Opaque session cookies
 are HttpOnly, SameSite=Lax, expire after 30 days, and are Secure in production.
 Only token hashes are stored in the database; credentials are not kept in browser
 storage. Auth mutations require a same-origin request and a custom request header.
@@ -425,3 +425,40 @@ The manifest uses the Pool Simulator name, a stable root ID, PNG icons at 192px
 and 512px, and a 180px Apple touch icon. The service worker registers over HTTPS.
 
 The Settings “View source” link uses the unmodified white Invertocat SVG from the [official GitHub logo pack](https://brand.github.com/GitHub_Logos.zip). GitHub marks belong to GitHub, Inc.; see their [brand guidelines](https://brand.github.com/foundations/logo).
+
+
+### Optional passkeys
+
+After account creation and saving the recovery code, players may add a passkey or choose
+**Not now**. Account settings supports multiple named passkeys (up to 20), creation/last-used
+dates, renaming, and removal. **Sign in with a passkey** works without a username; supported
+browsers also offer passkeys through username autofill. Passwords remain available.
+
+WebAuthn uses `webauthn` on the server and `@simplewebauthn/browser` in the browser.
+Registration requires a discoverable credential and user verification, requests no attestation,
+and does not restrict users to platform authenticators. Duplicate credentials are excluded.
+Passkey changes require authentication within five minutes; otherwise players can verify with
+a password or an existing passkey. Removing a key revokes other sessions. Account recovery
+revokes every passkey and session; deletion removes credential records. Disabling accounts
+blocks passkey login as well as password login.
+
+Production pins `WEBAUTHN_ORIGIN=https://pool.martinospizza.dev` and
+`WEBAUTHN_RP_ID=pool.martinospizza.dev` in Compose. Keep the RP ID stable: credentials are
+scoped to it. For local development, configure the exact browser origin, e.g.
+`WEBAUTHN_ORIGIN=http://localhost:8000 WEBAUTHN_RP_ID=localhost`. HTTPS is required outside
+localhost. Never derive these settings from an untrusted Host header.
+
+New tables (`passkeys`, `passkey_challenges`, `auth_fresh`) are created idempotently by the
+existing schema initializer. No existing account/password migration is required. Challenges
+expire after five minutes, are browser/session bound, and are atomically consumed before
+verification. Signed origin, RP ID, user presence/verification, account handle and signatures
+are checked. Passkey data is essential account security data, independent of analytics consent.
+
+Validation: `cd backend && uv run pytest tests/test_passkeys.py`; after building the frontend,
+`cd frontend && npm run test:passkeys` runs isolated real-server browser tests with virtual
+WebAuthn authenticators. CI runs these alongside the existing browser integration checks.
+Physical Safari/iOS passkey-provider behavior still benefits from a device smoke test.
+
+References: [WebAuthn server verification](https://duo-labs.github.io/py_webauthn/),
+[passkey management](https://web.dev/articles/passkey-management),
+[conditional autofill](https://web.dev/articles/passkey-form-autofill).

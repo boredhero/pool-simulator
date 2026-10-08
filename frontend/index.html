@@ -169,6 +169,7 @@ body:has(#tutorial:not([hidden])) .privacy-notice{display:none}
 <div id="settingspanel" role="dialog" aria-labelledby="settings-title">
   <header class="settings-header"><h2 id="settings-title">Settings <span id="settingspremium" class="premium-badge" hidden>Premium</span></h2><button class="icon-close" id="closesettings" type="button" aria-label="Close settings" title="Close settings">×</button></header>
   <div class="settings-body">
+  <button id="settingspasskeys" type="button" hidden>Manage passkeys</button>
   <button id="adminbtn" hidden type="button">Admin settings</button>
   <button id="installapp" data-install-app type="button">Install app</button><p id="installappstatus" role="status"></p>
   <a id="viewsource" href="https://github.com/boredhero/pool-simulator" target="_blank" rel="noopener noreferrer" aria-label="View source on GitHub (opens in a new tab)"><img src="/github-mark-white.svg" alt="" width="24" height="24">View source</a>
@@ -243,8 +244,9 @@ body:has(#tutorial:not([hidden])) .privacy-notice{display:none}
     <p id="accountplaying" class="guide-note" hidden>Leave your room before signing in, recovering an account, or signing out.</p>
     <section id="accountauth">
       <div class="account-tabs"><button id="account-login" aria-pressed="true">Sign in</button><button id="account-register" aria-pressed="false">Create account</button><button id="account-recover" aria-pressed="false">Recover</button></div>
+      <button id="passkeylogin" type="button" hidden>Sign in with a passkey</button>
       <form id="accountform">
-        <label for="accountusername">Username</label><input id="accountusername" required minlength="3" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" autocomplete="username" aria-describedby="usernamehelp" />
+        <label for="accountusername">Username</label><input id="accountusername" required minlength="3" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" autocomplete="username webauthn" aria-describedby="usernamehelp" />
         <p id="usernamehelp" class="guide-note">3–20 letters, numbers, or underscores. Names are case-insensitive.</p>
         <label id="accountpasswordlabel" for="accountpassword">Password</label><input id="accountpassword" type="password" required minlength="15" maxlength="128" autocomplete="current-password" aria-describedby="passwordhelp" />
         <p id="passwordhelp" class="guide-note">15–128 characters. A long passphrase works well.</p>
@@ -252,16 +254,24 @@ body:has(#tutorial:not([hidden])) .privacy-notice{display:none}
         <label id="accountrecoverylabel" hidden>Recovery code<input id="accountrecovery" autocomplete="off" maxlength="128" spellcheck="false" disabled /></label>
         <label id="registerterms" class="terms-check" hidden><input id="registeradult" type="checkbox"><span>I am 18 or older and agree to the <a href="/terms.html" target="_blank" rel="noopener">Terms</a>. I have read the <a href="/privacy.html" target="_blank" rel="noopener">Privacy Notice</a>.</span></label><button id="accountsubmit" type="submit">Sign in</button>
       </form>
-      <p class="guide-note">Accounts are optional. No email required. Keep your recovery code: without it or your password, the account cannot be recovered.</p>
+      <p class="guide-note">Accounts are optional. No email required. Keep your recovery code even if you use a passkey, in case you lose access to your sign-in methods.</p>
     </section>
     <section id="recoverypanel" hidden>
       <h3>Save your recovery code</h3><p>This is shown only once. Write it down or save it in your password manager. Anyone with it can reset your password.</p>
       <input id="recoveryvalue" readonly aria-label="Your recovery code" autocomplete="off" spellcheck="false" />
-      <p class="guide-note">After a password reset, this new code replaces the previous one and all previous sessions are signed out.</p>
+      <p class="guide-note">After a password reset, this new code replaces the previous one all previous sessions are signed out, and saved passkeys are removed. You can add new passkeys after signing in.</p>
       <div class="row"><button id="recoverycopy">Copy code</button><button id="recoverysaved">I've saved my code</button></div>
     </section>
     <section id="accountprofile" hidden>
       <h3><span id="accountname"></span> <span id="accountpremium" class="premium-badge" hidden>Premium</span></h3><p id="accountsince" class="guide-note"></p>
+      <section id="passkeys" aria-labelledby="passkeystitle">
+        <div id="passkeyoffer" hidden><h3>Add a passkey?</h3><p>Sign in next time with your device’s fingerprint, face unlock, or screen lock. It’s optional—your password will still work.</p><div class="row"><button id="passkeyofferadd" type="button">Add a passkey</button><button id="passkeyskip" type="button">Not now</button></div></div>
+        <h3 id="passkeystitle">Passkeys</h3><p class="guide-note">An alternative to your password. Save passkeys with multiple providers or devices so you always have another way in. Your biometric data stays on your device.</p>
+        <p id="passkeystatus" role="status" tabindex="-1"></p><p id="passkeyunsupported" class="guide-note" hidden>This browser doesn’t support passkeys here. You can still sign in with your password.</p>
+        <p id="passkeyempty">No passkeys added yet.</p><ul id="passkeylist"></ul>
+        <label for="passkeyname">Name for a new passkey (optional)</label><div class="row"><input id="passkeyname" maxlength="64" placeholder="e.g. Personal password manager" autocomplete="off"><button id="passkeyadd" type="button">Add passkey</button></div>
+        <div id="passkeyverify" hidden><h4>Verify it’s you</h4><p class="guide-note">Confirm your identity before changing your sign-in methods.</p><form id="passkeyverifyform"><label for="passkeypassword">Current password</label><div class="password-field"><input id="passkeypassword" type="password" autocomplete="current-password" required maxlength="128"><button id="passkeypasswordeye" type="button" aria-label="Show verification password" aria-pressed="false"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button></div><button type="submit">Verify password</button></form><div class="row"><button id="passkeyverifykey" type="button">Use a saved passkey</button><button id="passkeyverifycancel" type="button">Cancel</button></div></div>
+      </section>
       <h3>Lifetime casual stats</h3><p class="guide-note">Recorded by the server. Local practice and CPU games do not count. Private and custom matches are unranked. Leaving after the first shot counts as a forfeit, even if your connection drops.</p>
       <p id="accountjev"></p><p id="accounttermsstatus" role="status"></p><div id="termsupdate" hidden><label class="terms-check"><input id="termsadult" type="checkbox"> <span>I am 18 or older and agree to the <a href="/terms.html" target="_blank" rel="noopener">Terms</a>. I have read the <a href="/privacy.html" target="_blank" rel="noopener">Privacy Notice</a>.</span></label><button id="acceptterms" type="button">Accept Terms for Jev AI</button></div><dl id="accountstats"></dl><h3>Recent matches</h3><ul id="accountmatches"></ul>
       <div class="row"><button id="accountlogout">Sign out</button></div>

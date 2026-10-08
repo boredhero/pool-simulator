@@ -1,5 +1,5 @@
 // Minimal PWA: precache shell, cache-first hashed assets, SWR for navigations.
-const CACHE = 'pool-v112-source';
+const CACHE = 'pool-v120-passkeys';
 const SHELL = ['/', '/index.html', '/manifest.json', '/icon.svg', '/github-mark-white.svg', '/icon-192.png', '/icon-512.png', '/apple-touch-icon.png', '/fonts/AtkinsonHyperlegible-Regular.woff2', '/fonts/AtkinsonHyperlegible-Bold.woff2'];
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

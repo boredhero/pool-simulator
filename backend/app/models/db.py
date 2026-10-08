@@ -261,3 +261,36 @@ class JevBudgetAdjustment(Base):
     kind: Mapped[str] = mapped_column(String(16))
     amount_nano: Mapped[int] = mapped_column(Integer)
     occurred_at: Mapped[int] = mapped_column(Integer)
+
+
+class Passkey(Base):
+    __tablename__ = "passkeys"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), index=True)
+    credential_id: Mapped[str] = mapped_column(Text, unique=True)
+    public_key: Mapped[str] = mapped_column(Text)
+    sign_count: Mapped[int] = mapped_column(Integer, default=0)
+    name: Mapped[str] = mapped_column(String(64))
+    transports: Mapped[str] = mapped_column(Text, default="[]")
+    backed_up: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[int] = mapped_column(Integer)
+    last_used_at: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class AuthFresh(Base):
+    __tablename__ = "auth_fresh"
+    session_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), index=True)
+    expires_at: Mapped[int] = mapped_column(Integer, index=True)
+
+
+class PasskeyChallenge(Base):
+    __tablename__ = "passkey_challenges"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    challenge: Mapped[str] = mapped_column(Text)
+    purpose: Mapped[str] = mapped_column(String(16))
+    binding: Mapped[str] = mapped_column(String(64))
+    account_id: Mapped[str | None] = mapped_column(ForeignKey("accounts.id"), nullable=True)
+    origin: Mapped[str] = mapped_column(Text)
+    rp_id: Mapped[str] = mapped_column(Text)
+    expires_at: Mapped[int] = mapped_column(Integer, index=True)

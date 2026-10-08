@@ -1,6 +1,6 @@
 [project]
 name = "pool-simulator-backend"
-version = "1.1.2"
+version = "1.2.0"
 requires-python = ">=3.13"
 dependencies = [
     "fastapi>=0.115",
@@ -13,6 +13,7 @@ dependencies = [
     "pyyaml>=6.0",
     "argon2-cffi>=25.1.0",
     "websockets>=17.2",
+    "webauthn>=3.0.1",
 ]
 
 [dependency-groups]
