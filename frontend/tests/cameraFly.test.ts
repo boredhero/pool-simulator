@@ -45,3 +45,15 @@ describe('ground-plane camera flight', () => {
     expect(camera.position.y).toBe(3);
   });
 });
+
+it('raises and descends in world height with clamps while preserving viewing offset',()=>{
+  const {camera,target}=fixture(),offset=camera.position.clone().sub(target);
+  translateCamera(camera,target,0,0,1,1);
+  expect(camera.position.y).toBeCloseTo(3.25);
+  expect(camera.position.clone().sub(target).distanceTo(offset)).toBeLessThan(1e-10);
+  translateCamera(camera,target,0,0,100,1);expect(camera.position.y).toBe(8);
+  translateCamera(camera,target,0,0,100,-1);expect(camera.position.y).toBeGreaterThanOrEqual(.15);
+  expect(camera.position.clone().sub(target).distanceTo(offset)).toBeLessThan(1e-10);
+  const settled=camera.position.clone();translateCamera(camera,target,0,0,1,0);
+  expect(camera.position.distanceTo(settled)).toBeLessThan(1e-10);
+});

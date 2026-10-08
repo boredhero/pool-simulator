@@ -65,35 +65,52 @@ export class CameraRig {
   revision=0;
   private flyForward=0;
   private flyRight=0;
+  private flyUp=0;
+  private flyYaw=0;
+  inputProfile: 'mouse' | 'trackpad' = 'mouse';
   private lastUpdate=0;
+  private wheelUntil=0;
   private motion?:{time:number;target:Vector3;end:Vector3;orbit:Spherical;endOrbit:Spherical};
   constructor(private camera:PerspectiveCamera,private controls:OrbitControls,private canvas:HTMLCanvasElement) {
     controls.maxDistance=8;controls.enablePan=false;controls.zoomSpeed=.8;controls.rotateSpeed=1;controls.dampingFactor=.12;
     controls.addEventListener('start',()=>this.cancel(true));
     canvas.addEventListener('pointerdown',()=>this.cancel(),{capture:true});
     canvas.addEventListener('wheel',e=>{
-      this.cancel(true);
-      // Shift + two-finger scroll gives trackpads an orbit gesture without a secondary click.
-      // Pinch arrives as ctrl+wheel and remains handled by OrbitControls' zoom path.
-      if(e.shiftKey&&!e.ctrlKey){
-        e.preventDefault();e.stopImmediatePropagation();
-        controls.dispatchEvent({type:'start'});
-        const unit=e.deltaMode===1?16:e.deltaMode===2?canvas.clientHeight:1;
-        controls.rotateLeft((e.deltaX||e.deltaY)*unit*.004);
-        if(e.deltaX)controls.rotateUp(e.deltaY*unit*.004);
-        controls.update();controls.dispatchEvent({type:'end'});
+      if(e.metaKey || document.querySelector('dialog[open]')) {
+        e.stopImmediatePropagation();return;
       }
+      e.preventDefault();e.stopImmediatePropagation();
+      this.wheelUntil=performance.now()+220;
+      this.cancel(true);controls.dispatchEvent({type:'start'});
+      const unit=e.deltaMode===1?16:e.deltaMode===2?canvas.clientHeight:1;
+      const dx=MathUtils.clamp(e.deltaX*unit,-150,150),dy=MathUtils.clamp(e.deltaY*unit,-150,150);
+      if(e.ctrlKey) this.zoom(Math.exp(dy*.008));
+      else if(e.altKey) {
+        const size=Math.max(Math.abs(dx),Math.abs(dy));
+        if(size)translateCamera(camera,controls.target,-dy/size,dx/size,size*.003);
+      } else if(this.inputProfile==='trackpad') {
+        controls.rotateLeft(dx*.002);controls.rotateUp(dy*.002);controls.update();
+      } else this.zoom(Math.exp(dy*.003));
+      controls.dispatchEvent({type:'end'});
     },{capture:true,passive:false});
   }
   get moving(){return !!this.motion;}
-  setFlyInput(forward:number,right:number){
-    if(forward===this.flyForward&&right===this.flyRight)return;
-    this.flyForward=forward;this.flyRight=right;
-    if(forward||right)this.cancel(true);
+  get interacting(){return !!(this.flyForward||this.flyRight||this.flyUp||this.flyYaw)||performance.now()<this.wheelUntil;}
+  setInputProfile(profile:'mouse'|'trackpad'){
+    if(profile===this.inputProfile)return;
+    this.wheelUntil=0;this.setFlyInput(0,0);this.inputProfile=profile;this.cancel(true);
   }
-  nudgeFly(forward:number,right:number){
-    this.cancel(true);
-    translateCamera(this.camera,this.controls.target,forward,right,.12);
+  setFlyInput(forward:number,right:number,up=0,yaw=0){
+    if(forward===this.flyForward&&right===this.flyRight&&up===this.flyUp&&yaw===this.flyYaw)return;
+    this.flyForward=forward;this.flyRight=right;this.flyUp=up;this.flyYaw=yaw;
+    if(forward||right||up||yaw){this.cancel(true);this.controls.dispatchEvent({type:'start'});}
+    else this.controls.dispatchEvent({type:'end'});
+  }
+  nudgeFly(forward:number,right:number,up=0,yaw=0){
+    this.cancel(true);this.controls.dispatchEvent({type:'start'});
+    translateCamera(this.camera,this.controls.target,forward,right,.12,up);
+    if(yaw){this.controls.rotateLeft(yaw*.12);this.controls.update();}
+    this.controls.dispatchEvent({type:'end'});
   }
   cancel(manual=false){this.motion=undefined;if(manual)this.revision++;}
   setMode(enabled:boolean){this.cancel(true);this.controls.enablePan=enabled;this.controls.mouseButtons.LEFT=enabled?MOUSE.ROTATE:-1 as MOUSE;this.controls.panSpeed=.6;this.controls.touches.ONE=enabled?TOUCH.ROTATE:-1 as TOUCH;this.controls.touches.TWO=enabled?TOUCH.DOLLY_PAN:TOUCH.DOLLY_ROTATE;}
@@ -120,9 +137,10 @@ export class CameraRig {
   update(now:number){
     const dt=this.lastUpdate?Math.min(.05,Math.max(0,(now-this.lastUpdate)/1000)):0;
     this.lastUpdate=now;
-    if(this.flyForward||this.flyRight){
+    if(this.flyForward||this.flyRight||this.flyUp||this.flyYaw){
       this.cancel();
-      translateCamera(this.camera,this.controls.target,this.flyForward,this.flyRight,dt);
+      translateCamera(this.camera,this.controls.target,this.flyForward,this.flyRight,dt,this.flyUp);
+      if(this.flyYaw){this.controls.rotateLeft(this.flyYaw*dt);this.controls.update();}
       return;
     }
     const m=this.motion;if(!m)return;
