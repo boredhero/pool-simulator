@@ -18,3 +18,13 @@
 @media(max-height:600px){#camera-fly-hud.expanded{max-height:calc(100dvh - var(--above-controls,136px) - 20px);overflow-y:auto}.camera-hud-header{position:sticky;top:0;z-index:1;background:#211d18}}
 
 #camera-input-profile:focus-visible,#camera-fly-toggle:focus-visible{outline:2px solid #e7c384;outline-offset:-4px}
+
+/* Input preference lives beside the legal footer; movement stays above the shot tray. */
+#camera-profile-dock{position:fixed;right:10px;bottom:40px;z-index:5;display:flex;align-items:center;gap:6px;padding:2px 5px 2px 12px;border:1px solid #635747;border-radius:10px;background:#211d18;color:#caba9e;box-shadow:0 4px 16px #0003}
+#camera-profile-dock label{font-size:12px;letter-spacing:.03em}
+#camera-profile-dock #camera-input-profile{font-size:13px;min-height:44px;padding:0 5px;max-width:210px}
+#camera-fly-hud{width:130px}#camera-fly-hud.expanded{width:284px}
+#camera-fly-toggle{width:100%;border:0;border-radius:9px;justify-content:space-between}
+.camera-toggle-label{display:inline}
+@media(hover:hover) and (pointer:fine){.control-tray{bottom:100px}}
+@media(hover:none) and (pointer:coarse){#camera-profile-dock{display:none}#camera-fly-hud.expanded{width:206px}}

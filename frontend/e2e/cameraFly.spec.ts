@@ -169,7 +169,7 @@ test('trackpad momentum never steers or fires the cue and Shift spin precision s
 });
 
 
-test('camera HUD keeps mode and disclosure together, reveals help on demand and stays clear of shooting',async({page})=>{
+test('camera HUD reveals help on demand and stays clear of shooting',async({page})=>{
   await page.setViewportSize({width:1024,height:768});
   const hud=page.locator('#camera-fly-hud'),toggle=page.locator('#camera-fly-toggle');
   await expect(page.locator('#camera-input-profile')).toBeVisible();

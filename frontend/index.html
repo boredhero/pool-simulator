@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <link rel="manifest" href="/manifest.json" />
 <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-<title>Play Pool</title>
+<title>Pool Simulator</title>
 <link rel="preload" href="/fonts/AtkinsonHyperlegible-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <style>
 @font-face{font-family:"Atkinson Hyperlegible";src:url('/fonts/AtkinsonHyperlegible-Regular.woff2') format('woff2');font-weight:400;font-style:normal;font-display:swap}
@@ -77,7 +77,7 @@ button:disabled,fieldset:disabled{opacity:.55;cursor:default}fieldset{border:0;p
 @media(min-width:900px){#settingspanel{width:min(540px,calc(100vw - 320px));padding:26px;gap:14px}#rulefields{display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:12px 20px}#rulefields>label:not(.check){margin:0}#rulefields>.check{grid-column:1 / -1}#settingspanel h2{font-size:26px}}
 
 button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{font-size:24px}.pcard .grp{font-size:17px}.pcard{padding:16px}#scorecard{width:280px}.control-label{font-size:16px}.control-help,.hint{font-size:16px}.spin-control .control-label{font-size:16px}#helppanel{width:320px}#helppanel h2{font-size:28px}.eyebrow{font-size:13px}dt{font-size:19px}dd,.guide-note,.rules-summary{font-size:16px;line-height:1.5}#settingspanel label,#onlinepanel label{font-size:18px}select,input[type=number],#roominfo{font-size:18px}#callpanel label,#callstatus,#clearcall{font-size:17px}.pball{width:30px;height:30px}.pball span{width:19px;height:19px;font-size:14px}#version{font-size:16px}
-@media(min-width:901px){#version{position:fixed;left:24px;bottom:24px;background:#211d18;border:1px solid #635747;border-radius:12px;padding:12px 16px;color:#ddd0b9;box-shadow:0 6px 20px #0003;line-height:1.3}#version::before{content:'PLAY POOL';display:block;font-size:12px;letter-spacing:.12em;color:#b6a27e;margin-bottom:4px}.control-tray{max-width:900px;left:160px;right:24px}}
+@media(min-width:901px){#version{position:fixed;left:24px;bottom:24px;background:#211d18;border:1px solid #635747;border-radius:12px;padding:12px 16px;color:#ddd0b9;box-shadow:0 6px 20px #0003;line-height:1.3}#version::before{content:'POOL SIMULATOR';display:block;font-size:12px;letter-spacing:.12em;color:#b6a27e;margin-bottom:4px}.control-tray{max-width:900px;left:160px;right:24px}}
 @media(max-width:1100px) and (min-width:901px){#helppanel{width:290px}.control-tray{gap:14px}.spin-control{padding-left:14px}}
 @media(max-width:900px){#scorecard{width:auto}.pcard .pname{font-size:20px}.pcard .grp{font-size:16px}}
 @media(max-width:600px){#msg{font-size:21px}#turn{font-size:14px}#version{font-size:13px}.toolbar button{font-size:16px;padding:0 9px}.topbar{gap:10px}.pcard{padding:10px}.pcard .pname{font-size:20px}.pcard .grp{font-size:15px}.pball{width:25px;height:25px}.pball span{font-size:12px;width:17px;height:17px}.control-label,.spin-control .control-label{font-size:15px}.control-help{font-size:15px}.control-tray{gap:10px}#helppanel{width:auto}.status-meta{gap:6px}#callpanel{bottom:190px}#callpanel label,#callstatus,#clearcall{font-size:16px}}
@@ -130,6 +130,7 @@ body:has(#tutorial:not([hidden])) .privacy-notice{display:none}
       <div id="msg" role="status" aria-live="polite">Player 1 to break</div>
       <p id="opponentstatus" role="status" aria-live="polite"></p>
     </div>
+    <button id="accountidentity" type="button" aria-label="Sign in or create an account" aria-haspopup="dialog"><span aria-hidden="true" class="accountidentityicon">◉</span><span id="accountidentityname">Sign in</span></button>
     <div class="toolbar">
       <button id="helpbtn" aria-label="How to play" aria-expanded="false" aria-controls="helppanel"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.5" r=".9" fill="currentColor" stroke="none"/></svg></button>
       <button id="settingsbtn" title="Table and rules">⚙ <span class="settings-label">Table</span></button>

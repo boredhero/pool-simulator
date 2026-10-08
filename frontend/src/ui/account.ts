@@ -1,3 +1,4 @@
+import './accountIdentity.css';
 import { AdminPanel } from './admin';
 export interface Account {id:string;username:string;createdAt:number;premium:boolean;isAdmin:boolean}
 interface Stats {matches:number;wins:number;losses:number;abandoned:number;shots:number;ballsPocketed:number;scratches:number;fouls:number;recent:Array<{id:string;opponent:string;status:string;result:string|null}>}
@@ -8,12 +9,14 @@ export class AccountPanel {
   private mode:'login'|'register'|'recover'='login';
   private recoveryPending=false;
   private busy=false;
+  private opener:HTMLElement|null=null;
   private admin=new AdminPanel(()=>void this.refresh());
   constructor(private playing:()=>boolean,private changed:(account:Account|null)=>void) {
-    el('accountbtn').addEventListener('click',()=>{el<HTMLDialogElement>('accountdialog').showModal();void this.refresh();});
+    for(const id of ['accountbtn','accountidentity'])el(id).addEventListener('click',()=>{this.opener=el(id);el<HTMLDialogElement>('accountdialog').showModal();void this.refresh();});
+    el('accountdialog').addEventListener('keydown',e=>e.stopPropagation());
     el('accountclose').addEventListener('click',()=>el<HTMLDialogElement>('accountdialog').close());
     el('accountdialog').addEventListener('cancel',e=>{if(this.recoveryPending||this.busy)e.preventDefault();});
-    el('accountdialog').addEventListener('close',()=>el('accountbtn').focus());
+    el('accountdialog').addEventListener('close',()=>this.opener?.focus());
     for(const mode of ['login','register','recover'] as const)el('account-'+mode).addEventListener('click',()=>this.setMode(mode));
     el('accountform').addEventListener('submit',e=>{e.preventDefault();void this.submit();});
     el('accountlogout').addEventListener('click',()=>void this.logout());
@@ -63,6 +66,10 @@ export class AccountPanel {
     this.admin.setAccount(this.account);
     for(const id of ['accountpremium','settingspremium'])el(id).hidden=!this.account?.premium;
     el('accountbtn').textContent=this.account?`${this.account.username} · Account`:'Sign in / Create account';
+    const identity=el('accountidentity');
+    el('accountidentityname').textContent=this.account?.username??'Sign in';
+    identity.setAttribute('aria-label',this.account?`Account settings for ${this.account.username}`:'Sign in or create an account');
+    identity.title=this.account?`${this.account.username} · Account settings`:'Sign in or create an account';
     el('accountauth').hidden=!!this.account||this.recoveryPending;
     el('accountprofile').hidden=!this.account||this.recoveryPending;
     if(this.account){
