@@ -122,8 +122,10 @@ required because they can conflict with operating-system accessibility controls.
 
 Mobile player names, groups, and remaining counts stay visible. **Show balls**
 expands the numbered ball details; **More** reveals CPU and new-rack controls. Spin and Reset remain visible for every shot.
-Mouse play still uses hover-to-aim and pull/release. On trackpads, Shift-scroll
-orbits, normal scroll/pinch zooms, and camera mode offers left-button dragging.
+Mouse play uses hover-to-aim and pull/release. Select Trackpad Mode in the HUD
+for two-finger orbit, pinch zoom and Option/Alt-scroll pan. WASD moves horizontally,
+Space rises, Left Shift descends and Q/E turns. With the table focused, Enter
+fires a 40% power shot. Camera mode also offers left-button dragging.
 
 The gesture implementation uses [Pointer Events](https://www.w3.org/TR/pointerevents3/)
 and [Three.js OrbitControls](https://threejs.org/docs/pages/OrbitControls.html).
@@ -284,3 +286,13 @@ Settings, View and Online panels have draggable headers, click/keyboard Move
 controls and Reset position. WASD moves the camera relative to its view; the
 HUD Fly control opens a four-arrow touch pad. Camera movement pauses while
 editing fields or using dialogs.
+
+## Trackpad and keyboard camera controls (0.9.1)
+
+Desktop players can switch the HUD between **Mouse & Keyboard Mode** and
+**Trackpad Mode**; the choice is saved on that device. Trackpad mode uses
+two-finger scroll to orbit, pinch to zoom, and Option/Alt-scroll to pan.
+WASD moves horizontally, Space rises, Left Shift descends, and Q/E turns.
+Space no longer fires a shot; Enter is a quick shot only with the table focused.
+Pull-and-release shooting and mobile touch controls remain available.
+See [control mappings and research](docs/camera-controls.md).

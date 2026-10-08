@@ -1,5 +1,15 @@
 [
   {
+    "version": "0.9.1",
+    "date": "2026-10-08",
+    "title": "Trackpad camera controls and keyboard flight",
+    "changes": [
+      "Added a visible desktop Mouse & Keyboard Mode / Trackpad Mode selector that remembers your preference. Trackpad mode uses two-finger scrolling to orbit, pinch to zoom and Option/Alt-scroll to pan.",
+      "Expanded camera flight: WASD moves across the table, Space rises, Left Shift descends and Q/E turns. Enter takes a quick shot only when the table has keyboard focus; Space no longer shoots.",
+      "Camera gestures cancel pending shot pulls and protect cue aim while you adjust your view. Visible camera controls provide alternatives to gestures."
+    ]
+  },
+  {
     "version": "0.9.0",
     "date": "2026-10-08",
     "title": "Tactical AI planning and reliable ball placement",
