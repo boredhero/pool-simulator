@@ -19,7 +19,7 @@ test('optional account creation, recovery, session reset, and mobile profile',as
   const code=await page.locator('#recoveryvalue').inputValue();expect(code.length).toBe(39);
   await page.keyboard.press('Escape');await expect(page.locator('#accountdialog')).toBeVisible();
   await page.locator('#recoverysaved').click();await expect(page.locator('#accountname')).toHaveText(name);
-  await expect(page.locator('#accountstats')).toContainText('Casual matches');
+  await expect(page.locator('#accountstats')).toContainText('Online + Jev matches');
   await page.locator('#accountlogout').click();await page.locator('#account-recover').click();
   await page.locator('#accountusername').fill(name);await page.locator('#accountpassword').fill(password+' new');
   await page.locator('#accountrecovery').fill(code);await page.locator('#accountsubmit').click();
