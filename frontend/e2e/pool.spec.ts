@@ -831,3 +831,28 @@ test('practice touch aiming and profile-specific coaching use real controls',asy
   await page.locator('#camera-input-profile').selectOption('mouse');
   await expect(page.locator('#tutorialbody')).toContainText('Right-drag');
 });
+
+test('accepted placement frames a clear shot without aiming or calling it and respects manual camera input',async({page})=>{
+  await openGame(page);
+  const result=await page.evaluate(()=>{
+    const g=(window as any).__pool,rig=g.scene.cameraRig;
+    for(const b of g.gs.balls)b.potted=true;
+    Object.assign(g.gs.balls[0],{potted:false,x:.9,y:.54});Object.assign(g.gs.balls.find((b:any)=>b.n===1),{potted:false,x:.45,y:.27});
+    Object.assign(g.gs,{breakShot:false,ballInHand:false,groups:['solid','stripe'],open:false,current:0});
+    g.options.autoCamera=true;g.angle=g.targetAngle=.7;g.calledBall=1;g.calledPocket=2;
+    let calls:any[]=[];const frame=rig.frame.bind(rig);rig.frame=(...args:any[])=>{calls.push(args);return frame(...args);};
+    g.frameBalls(false,true);
+    const direct={count:calls.length,points:calls[0][0].length,theta:typeof calls[0][3],angle:g.targetAngle,ball:g.calledBall,pocket:g.calledPocket};
+    g.options.autoCamera=false;g.frameBalls(false,true);const disabled=calls.length;
+    g.options.autoCamera=true;g.cameraMode=true;g.frameBalls(false,true);const manual=calls.length;g.cameraMode=false;
+    g.tutorial.start();g.frameBalls(false,true);const practice=calls.length;g.tutorial.close();
+    const room={ready:true};g.room=room;g.seat=0;
+    const state=()=>({balls:g.gs.balls.map((b:any)=>({...b})),current:0,groups:['solid','stripe'],open:false,return_order:[],ball_in_hand:false,winner:null,message:'Placed',break_shot:false,placement:'none',kitchen_shot:false,rules:g.gs.rules});
+    const pending=()=>{g.gs.ballInHand=true;g.pendingPlacementCamera={revision:rig.revision,seat:0,room,x:.9,y:.54};};
+    pending();rig.cancel(true);g.applyServerState(state());const moved=calls.length;
+    pending();g.applyServerState(state());const accepted=calls.length;
+    g.gs.ballInHand=true;g.applyServerState(state());const unsolicited=calls.length;
+    g.room=null;return{direct,disabled,manual,practice,moved,accepted,unsolicited};
+  });
+  expect(result).toEqual({direct:{count:1,points:4,theta:'number',angle:.7,ball:1,pocket:2},disabled:1,manual:1,practice:1,moved:1,accepted:2,unsolicited:2});
+});

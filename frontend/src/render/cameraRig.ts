@@ -115,7 +115,7 @@ export class CameraRig {
   cancel(manual=false){this.motion=undefined;if(manual)this.revision++;}
   setMode(enabled:boolean){this.cancel(true);this.controls.enablePan=enabled;this.controls.mouseButtons.LEFT=enabled?MOUSE.ROTATE:-1 as MOUSE;this.controls.panSpeed=.6;this.controls.touches.ONE=enabled?TOUCH.ROTATE:-1 as TOUCH;this.controls.touches.TWO=enabled?TOUCH.DOLLY_PAN:TOUCH.DOLLY_ROTATE;}
   zoom(factor:number){this.cancel(true);const offset=this.camera.position.clone().sub(this.controls.target);offset.setLength(MathUtils.clamp(offset.length()*factor,.6,8));this.camera.position.copy(this.controls.target).add(offset);this.controls.update();}
-  frame(points:Point[],cue?:Point,targets:Point[]=[]):number|undefined {
+  frame(points:Point[],cue?:Point,targets:Point[]=[],laneTheta?:number):number|undefined {
     this.cancel();
     const rect=this.canvas.getBoundingClientRect(),mobile=rect.width<900;
     const header=document.querySelector('.topbar')!.getBoundingClientRect(),cards=document.getElementById('scorecard')!.getBoundingClientRect(),tray=document.querySelector('.control-tray')!.getBoundingClientRect();
@@ -124,7 +124,7 @@ export class CameraRig {
     const left=mobile?20:Math.min(cards.right+24,rect.width*.3);
     const safe={left:2*left/rect.width-1,right:1-40/rect.width,top:1-2*top/rect.height,bottom:1-2*bottom/rect.height};
     const currentTheta=new Spherical().setFromVector3(this.camera.position.clone().sub(this.controls.target)).theta;
-    const facing=cue?{cue,theta:majorityFacing(cue,targets,currentTheta)}:undefined;
+    const facing=cue?{cue,theta:laneTheta??majorityFacing(cue,targets,currentTheta)}:undefined;
     const pose=framePose(this.camera,this.controls.target,points,safe,facing);
     if(pose.target.distanceTo(this.controls.target)<.04&&pose.position.distanceTo(this.camera.position)<.12)return facing?.theta;
     const orbit=new Spherical().setFromVector3(this.camera.position.clone().sub(this.controls.target));

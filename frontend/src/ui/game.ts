@@ -1,3 +1,4 @@
+import {placementLane} from './placementCamera';
 import type { PerspectiveCamera } from 'three';
 import { WinnerDialog } from './winner';
 import { animateOpponentCue, cuePresentation, freezeShot, type SelectedShot, type CuePhase } from './opponentCue';
@@ -331,7 +332,14 @@ export class Game {
     return Math.min(1, d / PULL_FULL);
   }
 
-  frameBalls(whole=false): void {
+  private pendingPlacementCamera:{revision:number;seat:number;room:RoomClient;x:number;y:number}|null=null;
+
+  frameBalls(whole=false,placement=false): void {
+    if(placement){
+      if(this.tutorial.active||!this.options.autoCamera||this.cameraMode||this.scene.cameraRig.interacting)return;
+      const lane=placementLane(this.gs);
+      if(lane){this.scene.cameraRig.frame([lane.cue,lane.ghost,lane.object,lane.pocket],lane.cue,[],lane.theta);return;}
+    }
     const eligible=legalTargets(this.gs);
     const targets=this.gs.balls.filter(b=>!b.potted&&b.n!==null&&eligible.includes(b.n));
     const points=this.gs.balls.filter(b=>!b.potted&&(whole||b.n===null||eligible.includes(b.n))).map(b=>({x:b.x,y:b.y}));
@@ -340,7 +348,7 @@ export class Game {
       for(const x of [0,edge])for(const y of [0,TABLE_H])points.push({x,y});
     }
     const facing=this.scene.cameraRig.frame(points,!whole&&!this.gs.ballInHand&&!this.cue().potted?this.cue():undefined,targets);
-    if(facing!==undefined&&this.humanTurn()&&!this.pulling)
+    if(!placement&&facing!==undefined&&this.humanTurn()&&!this.pulling)
       this.targetAngle=Math.atan2(-Math.cos(facing),-Math.sin(facing));
   }
 
@@ -374,10 +382,13 @@ export class Game {
     const tryPlace = (cx: number, cy: number) => {
       if(!this.humanCueControls())return;
       if (this.room) {
-        if (this.seat === this.gs.current) this.room.place(cx, cy);
+        if (this.seat === this.gs.current) {
+          this.pendingPlacementCamera={revision:this.scene.cameraRig.revision,seat:this.seat,room:this.room,x:cx,y:cy};
+          this.room.place(cx, cy);
+        }
       } else if (placeCue(this.gs, cx, cy)) {
         this.mode = 'aim';
-        if(this.options.autoCamera)this.frameBalls();
+        this.frameBalls(false,true);
       }
       this.hud();
     };
@@ -928,6 +939,7 @@ export class Game {
   applyServerState(s: RoomState): void {
     this.cancelOpponent();
     const wasPlacing=this.gs.ballInHand;
+    const placementCamera=this.pendingPlacementCamera;this.pendingPlacementCamera=null;
     for (const sb of s.balls) {
       const b = this.gs.balls.find((q) => q.id === sb.id);
       if (!b) continue;
@@ -949,7 +961,7 @@ export class Game {
     this.gs.message = s.message;
     this.mode = s.winner !== null ? 'over' : s.ball_in_hand && s.current === this.seat ? 'place' : 'aim';
     this.pulling = false; this.pressPt = null;
-    if(wasPlacing&&!s.ball_in_hand&&s.winner===null&&this.options.autoCamera&&!this.cameraMode)this.frameBalls();
+    if(wasPlacing&&!s.ball_in_hand&&s.winner===null&&placementCamera&&placementCamera.room===this.room&&Math.hypot(this.cue().x-placementCamera.x,this.cue().y-placementCamera.y)<.002&&placementCamera.seat===this.seat&&s.current===this.seat&&placementCamera.revision===this.scene.cameraRig.revision)this.frameBalls(false,true);
     this.lastPotted = this.gs.balls.filter((b) => b.potted).length;
     this.lastSpeed.clear();
     this.hud();
