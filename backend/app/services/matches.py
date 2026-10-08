@@ -63,12 +63,19 @@ def record_shot(
             match.ended_at = int(time.time())
 
 
-def abandon_match(match_id: str, seat: int) -> None:
+def abandon_match(
+    match_id: str, seat: int, started: bool = False, interrupted: bool = False
+) -> None:
     with Session.begin() as db:
         db.execute(
             update(GameMatch)
             .where(GameMatch.id == match_id, GameMatch.status == "active")
-            .values(status="abandoned", ended_at=int(time.time()), ended_by=seat)
+            .values(
+                status="interrupted" if interrupted else "forfeit" if started else "abandoned",
+                ended_at=int(time.time()),
+                ended_by=None if interrupted else seat,
+                winner_seat=1 - seat if started and not interrupted else None,
+            )
         )
 
 
@@ -85,7 +92,7 @@ def interrupt_matches() -> None:
 
 def account_stats(account_id: str) -> dict:
     with Session() as db:
-        completed = GameMatch.status == "completed"
+        completed = GameMatch.status.in_(("completed", "forfeit"))
         won = GameMatch.winner_seat == MatchPlayer.seat
         totals = db.execute(
             select(
@@ -95,7 +102,7 @@ def account_stats(account_id: str) -> dict:
                     func.sum(
                         case(
                             (
-                                (GameMatch.status == "abandoned")
+                                (GameMatch.status.in_(("abandoned", "forfeit")))
                                 & (GameMatch.ended_by == MatchPlayer.seat),
                                 1,
                             ),
@@ -130,11 +137,13 @@ def account_stats(account_id: str) -> dict:
                     "opponent": opponent.display_name,
                     "startedAt": match.started_at,
                     "result": ("win" if match.winner_seat == seat else "loss")
-                    if match.status == "completed"
+                    if match.status in ("completed", "forfeit")
                     else None,
                 }
             )
         return {
+            "category": "casual",
+            "ranked": False,
             "matches": matches,
             "wins": wins,
             "losses": matches - wins,

@@ -95,7 +95,7 @@ export class Game {
       this.account=account;
       const input=this.el.pname as HTMLInputElement;input.disabled=!!account;
       if(account)input.value=account.username;
-      document.getElementById('onlineidentity')!.textContent=account?`Signed in as ${account.username}. Online matches count toward your stats.`:'Playing as a guest. Create an account to keep lifetime online stats.';
+      document.getElementById('onlineidentity')!.textContent=account?`Signed in as ${account.username}. Private matches count toward unranked casual stats.`:'Playing as a guest. Create an account to keep lifetime online stats.';
     });
     const invitation=new URLSearchParams(location.hash.slice(1)).get('join')??new URLSearchParams(location.search).get('join');
     if(invitation&&/^[A-Z2-9]{8}$/i.test(invitation)){
@@ -111,6 +111,10 @@ export class Game {
     new ResizeObserver(()=>{
       document.documentElement.style.setProperty('--below-scores',`${this.el.scorecard.getBoundingClientRect().bottom+6}px`);
     }).observe(this.el.scorecard);
+    new ResizeObserver(()=>{
+      const tray=document.querySelector('.control-tray')!.getBoundingClientRect();
+      document.documentElement.style.setProperty('--above-controls',`${innerHeight-tray.top+12}px`);
+    }).observe(document.querySelector('.control-tray')!);
     this.scene.onFrame(() => this.frame());
     try {
       if (localStorage.getItem('pool:seen')) document.getElementById('hint')?.classList.add('gone');

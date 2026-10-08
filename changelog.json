@@ -1,5 +1,18 @@
 [
   {
+    "version": "0.6.1",
+    "date": "2026-10-08",
+    "title": "Safer online play",
+    "changes": [
+      "Removed legacy score and replay endpoints, their unused database models, and the obsolete frontend REST transport. Unknown API reads now return 404 instead of a successful SPA fallback.",
+      "Added strict WebSocket field validation, message throttles, connection caps, bounded simulation concurrency, and HTTP request-size limits.",
+      "Leaving or losing connection after the first shot counts as a casual forfeit. Production shutdowns and server failures remain interruptions without a fabricated winner.",
+      "Account stats explicitly describe unranked casual play; private and custom matches do not establish a competitive rating.",
+      "Added browser security headers and HTTPS-only HSTS responses. Production WebSockets now enforce smaller transport queues and message limits.",
+      "Mobile spin adjustment and Reset stay visible beside the shot controls; More only collapses secondary actions such as AI and New rack."
+    ]
+  },
+  {
     "version": "0.6.0",
     "date": "2026-10-08",
     "title": "Room to play on mobile",

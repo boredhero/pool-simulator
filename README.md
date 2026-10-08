@@ -47,8 +47,7 @@ Only token hashes are stored in the database; credentials are not kept in browse
 storage. Auth mutations require a same-origin request and a custom request header.
 Account/IP attempt limits persist across server restarts.
 
-Account stats count server-simulated private online matches, not client-posted
-legacy scores or local/AI games. The ledger stores stable account IDs, guest/name
+Account stats count server-simulated private online matches, not client-submitted results or local/AI games. The ledger stores stable account IDs, guest/name
 snapshots, opponents, rules/version, timestamps, outcomes, disconnects, and shot
 facts. This is the foundation for future lobbies/matchmaking; private games are
 currently unrated and there is no public matchmaking queue yet.
@@ -58,9 +57,9 @@ currently unrated and there is no public matchmaking queue yet.
 Both Compose files retain the existing named `pool_data` volume at `/srv/data`,
 with `DATABASE_URL=sqlite:////srv/data/pool.db`. Rebuilding/replacing the container
 preserves accounts, session verifiers, match history, and stats. Initial startup
-adds the new tables idempotently without dropping existing scores/replays. This
-release adds tables only; future changes to existing columns need an explicit
-migration rather than relying on `create_all`.
+creates the current tables idempotently. Changes to existing columns need an
+explicit migration rather than relying on `create_all`. Obsolete test tables in
+an existing database are no longer mapped or exposed by the application.
 
 Production publishes port 8000 on host loopback for the existing HTTPS reverse
 proxy, and trusts that proxy’s forwarded client IP so rate limits apply per client.
@@ -72,9 +71,10 @@ off by default. No Fernet key or application encryption key is required. Protect
 the database and its backups as account data.
 
 Run **one Uvicorn worker / one API instance** while live rooms are held in memory.
-SQLite uses WAL, foreign keys, and a busy timeout. Restarting the server closes
-live rooms and marks their persisted active matches interrupted, without inventing
-wins/losses. PostgreSQL can replace the SQLAlchemy database URL later, but horizontal
+SQLite uses WAL, foreign keys, and a busy timeout. The production entrypoint (`python -m app.server`) marks shutdown before closing
+live sockets; restarting marks persisted active matches interrupted without inventing
+wins/losses. Leaving or losing connection after the first accepted shot is a casual
+forfeit; leaving before play starts is an abandonment without a winner. PostgreSQL can replace the SQLAlchemy database URL later, but horizontal
 scaling also needs shared room coordination and distributed rate limiting.
 
 For a consistent live backup (including the WAL), use the backup API rather than
@@ -118,7 +118,7 @@ retains one-finger orbit and two-finger pan/zoom. Three-finger gestures are not
 required because they can conflict with operating-system accessibility controls.
 
 Mobile player names, groups, and remaining counts stay visible. **Show balls**
-expands the numbered ball details; **More** reveals spin, AI, and new-rack controls.
+expands the numbered ball details; **More** reveals AI and new-rack controls. Spin and Reset remain visible for every shot.
 Mouse play still uses hover-to-aim and pull/release. On trackpads, Shift-scroll
 orbits, normal scroll/pinch zooms, and camera mode offers left-button dragging.
 
@@ -132,3 +132,34 @@ and development dependencies are grouped separately for npm and uv; container
 images and Actions each have their own group. Version-update PRs target `develop`
 so they go through tests before the release PR to `main`. Configuration follows
 [GitHub's grouping reference](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference).
+
+
+### Online security (0.6.1)
+
+The server simulates shots, checks turns and placements, and records results.
+Browser state and playback acknowledgements are not trusted. The legacy `/api/scores` and `/api/replays` routes, database models, and unused
+REST replay transport have been removed entirely.
+Account totals are unranked casual statistics, including private/custom games and
+forfeits. They are not a matchmaking rating: cooperating players and aiming bots
+can still produce valid shots. Future ranked games need a separate eligibility and
+abuse policy; never reuse these casual totals as ranked results.
+
+Connections are capped at eight per IP and 400 total, with 200 rooms and four
+concurrent simulations. Each socket has a 30-message burst, replenishing at one
+message per second. Before joining a room, sockets time out after 30 seconds;
+room sockets time out after 15 minutes without a message. HTTP bodies and production
+WebSocket messages are limited to 16 KiB. The single-worker production entrypoint
+also limits WebSocket queues and marks planned shutdowns before disconnecting
+players. Use `python -m app.server` for production, as the Dockerfile does.
+
+HTTPS pages use same-origin HTTPS and WSS with normal browser certificate validation.
+Browsers no longer support site-controlled HPKP certificate pinning; we do not
+attempt JavaScript pinning. HTTPS responses send HSTS (one year, this host only),
+plus CSP, anti-framing, no-referrer, and MIME-sniffing protection. TLS terminates at
+the host proxy, with the backend port published only on loopback. Keep the proxy's
+HTTP-to-HTTPS redirect and certificate renewal working. Do not expose the backend
+port publicly or widen forwarded-header trust.
+
+References: [OWASP WebSocket security](https://cheatsheetseries.owasp.org/cheatsheets/WebSocket_Security_Cheat_Sheet.html),
+[Chrome HPKP removal](https://developer.chrome.com/blog/chrome-72-deps-rems/),
+and [HSTS](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Strict-Transport-Security).

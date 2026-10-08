@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from app.api.accounts import router as accounts_router
 from app.api.routes import router
 from app.net.rooms import handle as handle_room_ws
+from app.security import BodyLimit
 from app.services.matches import interrupt_matches
 
 
@@ -22,6 +23,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="pool-simulator", lifespan=lifespan)
+app.add_middleware(BodyLimit)
 app.include_router(router, prefix="/api")
 app.include_router(accounts_router, prefix="/api")
 
@@ -39,6 +41,17 @@ async def validation_error(request, exc):
 @app.middleware("http")
 async def account_cache_control(request, call_next):
     response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; "
+        "base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+    )
+    if request.url.scheme == "https":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000"
     if request.url.path.startswith("/api/account"):
         response.headers["Cache-Control"] = "no-store"
     return response
@@ -64,7 +77,7 @@ if DIST.exists():
     @app.get("/{full_path:path}")
     def spa(full_path: str = ""):
         if full_path.startswith("api/"):
-            return {"detail": "not found"}
+            raise HTTPException(404, "Not found")
         f = (DIST / full_path).resolve()
         if not f.is_relative_to(DIST.resolve()):
             raise HTTPException(404, "Not found")

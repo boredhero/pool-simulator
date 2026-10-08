@@ -281,3 +281,9 @@ Auto-framing refinement: use a 26-degree elevation above the cloth, fit padded b
   sessions persist through reconnecting the SQLAlchemy engine; live rooms do not.
 - Deliberately deferred: ranked matchmaking, public lobbies, reconnection/resume of
   live rooms, email recovery, and tracking local practice/AI as verified matches.
+
+### 0.6.1 legacy cleanup
+
+Removed the unused client-submitted score/replay API, ORM models, and REST transport.
+Online shot submission uses the authoritative WebSocket protocol; account statistics
+come from its server-owned match ledger. Earlier score/replay notes above are historical.

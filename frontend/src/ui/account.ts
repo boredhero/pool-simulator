@@ -58,11 +58,11 @@ export class AccountPanel {
     }
     if(stats){
       const list=el('accountstats');list.replaceChildren();
-      for(const [label,value] of [['Completed matches',stats.matches],['Wins',stats.wins],['Losses',stats.losses],['Shots',stats.shots],['Balls pocketed',stats.ballsPocketed],['Scratches',stats.scratches],['Fouls',stats.fouls],['Matches left',stats.abandoned]]){
+      for(const [label,value] of [['Casual matches',stats.matches],['Wins',stats.wins],['Losses',stats.losses],['Shots',stats.shots],['Balls pocketed',stats.ballsPocketed],['Scratches',stats.scratches],['Fouls',stats.fouls],['Matches left',stats.abandoned]]){
         const div=document.createElement('div'),dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=String(label);dd.textContent=String(value);div.append(dt,dd);list.append(div);
       }
       const recent=el('accountmatches');recent.replaceChildren();
-      for(const match of stats.recent){const li=document.createElement('li');li.textContent=`${match.opponent} · ${match.result??match.status}`;recent.append(li);}
+      for(const match of stats.recent){const li=document.createElement('li');li.textContent=`${match.opponent} · ${match.result??match.status}${match.status==='forfeit'?' (forfeit)':''}`;recent.append(li);}
     }
     el<HTMLButtonElement>('accountlogout').disabled=this.playing();
     el('accountplaying').hidden=!this.playing();

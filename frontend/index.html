@@ -107,8 +107,8 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
  #scorecard.expanded .balls{display:flex;flex-wrap:wrap}#scorecard.expanded .live-pots{display:block;font-size:12px}.pcard.active{border-left-width:4px}
  #scoretoggle{display:block;position:fixed;z-index:5;right:12px;top:var(--below-scores,185px);min-height:44px;padding:0 10px;font-size:12px;background:#211d18ed}
  .control-tray{bottom:max(8px,env(safe-area-inset-bottom));left:10px;right:10px;padding:8px 10px;display:flex;flex-wrap:wrap;gap:8px}
- .power-control{flex:1}.control-help{font-size:12px}.control-tray .spin-control,.control-tray .actions{display:none}.control-tray.expanded .spin-control,.control-tray.expanded .actions{display:flex;flex:1 0 100%;padding:0;border:0}
- #morecontrols{display:block;padding:0 12px;min-height:44px;font-size:14px}.touch-shot{flex:1}#hint{display:none}#callpanel{bottom:110px;max-width:calc(100vw - 24px)}
+ .control-tray .power-control,.touch-input .control-tray .touch-shot{order:0;flex:1 0 100%}.control-help{font-size:12px}.control-tray .spin-control{order:1;display:flex;flex:0 0 auto;align-items:center;gap:10px;padding:0;border:0;margin-right:auto}.control-tray .actions{display:none;order:3}.control-tray.expanded .actions{display:flex;flex:1 0 100%;padding:0;border:0}
+ #morecontrols{order:2;display:block;padding:0 12px;min-height:44px;font-size:14px}.touch-shot{flex:1}#hint{display:none}#callpanel{bottom:var(--above-controls,166px);max-width:calc(100vw - 24px)}
  #settingspanel,#onlinepanel,#helppanel,#viewpanel{top:var(--below-header,120px);max-height:calc(100dvh - var(--below-header,120px) - 16px);overflow-y:auto;z-index:10}
 }
 </style>
@@ -131,7 +131,7 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
   <div class="hint" id="hint">Aim on the felt · pull back and release to shoot · right-drag to orbit</div>
   <div class="control-tray">
     <div class="touch-shot"><label id="touchpowerlabel" for="touchpower">Power 50%</label><input id="touchpower" type="range" min="4" max="100" value="50" aria-label="Shot power"><button id="touchshoot">Shoot</button></div>
-    <button id="morecontrols" aria-expanded="false" aria-controls="spincontrols shotextras">More</button>
+    <button id="morecontrols" aria-expanded="false" aria-controls="shotextras">More</button>
     <div class="power-control"><span class="control-label">Shot power <span id="playbackstate" role="status"></span></span><div id="chargebar"><div id="chargefill"></div></div><div class="control-help">Pull farther for a stronger shot</div></div>
     <div id="spincontrols" class="spin-control"><span class="control-label">Spin</span><div id="spin" tabindex="0" role="group" title="Drag to set spin. Arrow keys adjust; Shift makes smaller adjustments. Home resets." aria-label="Cue ball spin control: centered"></div><button id="resetspin" type="button" aria-label="Reset spin to center" disabled>Reset</button></div>
     <div id="shotextras" class="row actions"><button id="aibtn">Play vs AI</button><button id="rack">New rack</button></div>
@@ -243,7 +243,7 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
     </section>
     <section id="accountprofile" hidden>
       <h3 id="accountname"></h3><p id="accountsince" class="guide-note"></p>
-      <h3>Lifetime online stats</h3><p class="guide-note">Recorded by the server. Local practice and AI games do not count. Private matches are unrated.</p>
+      <h3>Lifetime casual stats</h3><p class="guide-note">Recorded by the server. Local practice and AI games do not count. Private and custom matches are unranked. Leaving after the first shot counts as a forfeit, even if your connection drops.</p>
       <dl id="accountstats"></dl><h3>Recent matches</h3><ul id="accountmatches"></ul>
       <div class="row"><button id="accountrefresh">Refresh stats</button><button id="accountlogout">Sign out</button></div>
     </section>
