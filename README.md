@@ -119,7 +119,7 @@ retains one-finger orbit and two-finger pan/zoom. Three-finger gestures are not
 required because they can conflict with operating-system accessibility controls.
 
 Mobile player names, groups, and remaining counts stay visible. **Show balls**
-expands the numbered ball details; **More** reveals spin, AI, and new-rack controls.
+expands the numbered ball details; **More** reveals AI and new-rack controls. Spin and Reset remain visible for every shot.
 Mouse play still uses hover-to-aim and pull/release. On trackpads, Shift-scroll
 orbits, normal scroll/pinch zooms, and camera mode offers left-button dragging.
 

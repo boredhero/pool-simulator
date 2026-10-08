@@ -8,7 +8,8 @@
       "Added strict WebSocket field validation, message throttles, connection caps, bounded simulation concurrency, and HTTP request-size limits.",
       "Leaving or losing connection after the first shot counts as a casual forfeit. Production shutdowns and server failures remain interruptions without a fabricated winner.",
       "Account stats explicitly describe unranked casual play; private and custom matches do not establish a competitive rating.",
-      "Added browser security headers and HTTPS-only HSTS responses. Production WebSockets now enforce smaller transport queues and message limits."
+      "Added browser security headers and HTTPS-only HSTS responses. Production WebSockets now enforce smaller transport queues and message limits.",
+      "Mobile spin adjustment and Reset stay visible beside the shot controls; More only collapses secondary actions such as AI and New rack."
     ]
   },
   {

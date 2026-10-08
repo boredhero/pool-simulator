@@ -111,6 +111,10 @@ export class Game {
     new ResizeObserver(()=>{
       document.documentElement.style.setProperty('--below-scores',`${this.el.scorecard.getBoundingClientRect().bottom+6}px`);
     }).observe(this.el.scorecard);
+    new ResizeObserver(()=>{
+      const tray=document.querySelector('.control-tray')!.getBoundingClientRect();
+      document.documentElement.style.setProperty('--above-controls',`${innerHeight-tray.top+12}px`);
+    }).observe(document.querySelector('.control-tray')!);
     this.scene.onFrame(() => this.frame());
     try {
       if (localStorage.getItem('pool:seen')) document.getElementById('hint')?.classList.add('gone');

@@ -255,7 +255,7 @@ test('spin resets both axes and supports keyboard adjustments on desktop and mob
   await spin.focus();await page.keyboard.press('ArrowLeft');await page.keyboard.press('Shift+ArrowDown');
   expect(await page.evaluate(()=>{const g=(window as any).__pool;return[g.tipX,g.tipY];})).toEqual([-.025,-.005]);
   await page.keyboard.press('Home');await expect(reset).toBeDisabled();
-  await page.setViewportSize({width:390,height:844});await page.locator('#morecontrols').click();await expect(reset).toBeVisible();
+  await page.setViewportSize({width:390,height:844});await expect(reset).toBeVisible();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
 
@@ -439,10 +439,13 @@ test('compact mobile scores expand and trackpad shift-scroll orbits',async({page
   await page.locator('#scoretoggle').click();
   await expect(page.locator('.pcard .balls').first()).toBeVisible();
   await page.locator('#scoretoggle').click();
-  await expect(page.locator('#spin')).toBeHidden();
+  await expect(page.locator('#spin')).toBeVisible();
+  await expect(page.locator('#resetspin')).toBeVisible();
+  await expect(page.locator('#aibtn')).toBeHidden();
+  await page.locator('#morecontrols').click();
+  await expect(page.locator('#aibtn')).toBeVisible();
   await page.locator('#morecontrols').click();
   await expect(page.locator('#spin')).toBeVisible();
-  await page.locator('#morecontrols').click();
   const before=await page.evaluate(()=>(window as any).__pool.scene.controls.getAzimuthalAngle());
   await page.locator('#game-canvas').dispatchEvent('wheel',{deltaY:80,shiftKey:true,bubbles:true,cancelable:true});
   const after=await page.evaluate(()=>{const g=(window as any).__pool;return {theta:g.scene.controls.getAzimuthalAngle(),mode:g.mode};});
