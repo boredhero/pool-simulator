@@ -734,7 +734,7 @@ export class Game {
     const fdt = this.lastFrame ? Math.min((fnow - this.lastFrame) / 1000, 0.1) : 0.016;
     this.lastFrame = fnow;
     this.coin.update(this.gs,fdt,this.tutorial.active||document.hidden||!!document.querySelector('dialog[open]'),[this.playerName(0),this.playerName(1)]);
-    if(this.coin.status!==this.lastCoinStatus){this.lastCoinStatus=this.coin.status;this.hud();}
+    if(this.coin.status!==this.lastCoinStatus||(this.coinPending()&&this.coin.status&&this.el.msg.textContent!==this.coin.status)){this.lastCoinStatus=this.coin.status;this.hud();}
     let ballDt = fdt;
     for (const b of this.gs.balls) {
       if (b.potted) continue;
