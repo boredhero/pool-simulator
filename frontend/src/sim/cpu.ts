@@ -1,4 +1,4 @@
-// L1 geometry AI: ghost-ball aiming with clearance checks + aim noise.
+// L1 geometry CPU: ghost-ball aiming with clearance checks + aim noise.
 // Later: L2 Monte-Carlo rollouts over (aim, power, tip).
 import { BALL_R, POCKETS, TABLE_H, TABLE_W } from './table';
 import type { Ball } from './physics';

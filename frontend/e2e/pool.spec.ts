@@ -337,15 +337,15 @@ test('desktop starts behind the cue facing the rack and renders a captured ball 
 });
 
 
-test('AI name appears in turn, foul, rolling, and winner messages',async({page})=>{
+test('CPU name appears in turn, foul, rolling, and winner messages',async({page})=>{
   await openGame(page);
   for(const [mode,message,expected] of [
-    ['place','Foul: No contact · Player 2, place anywhere','Foul: No contact · AI, place anywhere'],
-    ['rolling','Player 2 to shoot','AI · shot in motion'],
-    ['over','Player 2 wins!','AI wins!'],
+    ['place','Foul: No contact · Player 2, place anywhere','Foul: No contact · CPU, place anywhere'],
+    ['rolling','Player 2 to shoot','CPU · shot in motion'],
+    ['over','Player 2 wins!','CPU wins!'],
   ]) {
-    const state=await page.evaluate(({mode,message})=>{const g=(window as any).__pool;g.aiOpponent=true;g.gs.current=1;g.gs.message=message;g.mode=mode;g.hud();return{turn:document.getElementById('turn')!.textContent,message:document.getElementById('msg')!.textContent};},{mode,message});
-    expect(state.turn).toBe('AI');expect(state.message).toContain(expected);expect(state.message).not.toContain('Player 2');
+    const state=await page.evaluate(({mode,message})=>{const g=(window as any).__pool;g.cpuOpponent=true;g.gs.current=1;g.gs.message=message;g.mode=mode;g.hud();return{turn:document.getElementById('turn')!.textContent,message:document.getElementById('msg')!.textContent};},{mode,message});
+    expect(state.turn).toBe('CPU');expect(state.message).toContain(expected);expect(state.message).not.toContain('Player 2');
   }
 });
 
@@ -441,9 +441,9 @@ test('compact mobile scores expand and trackpad shift-scroll orbits',async({page
   await page.locator('#scoretoggle').click();
   await expect(page.locator('#spin')).toBeVisible();
   await expect(page.locator('#resetspin')).toBeVisible();
-  await expect(page.locator('#aibtn')).toBeHidden();
+  await expect(page.locator('#cpubtn')).toBeHidden();
   await page.locator('#morecontrols').click();
-  await expect(page.locator('#aibtn')).toBeVisible();
+  await expect(page.locator('#cpubtn')).toBeVisible();
   await page.locator('#morecontrols').click();
   await expect(page.locator('#spin')).toBeVisible();
   const before=await page.evaluate(()=>(window as any).__pool.scene.controls.getAzimuthalAngle());

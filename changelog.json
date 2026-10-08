@@ -1,5 +1,13 @@
 [
   {
+    "version": "0.6.2",
+    "date": "2026-10-08",
+    "title": "CPU opponent terminology",
+    "changes": [
+      "Standardized the computer opponent name as CPU throughout controls, player cards, turn and result messages, account notes, and documentation. Opponent behavior is unchanged."
+    ]
+  },
+  {
     "version": "0.6.1",
     "date": "2026-10-08",
     "title": "Safer online play",
@@ -9,7 +17,7 @@
       "Leaving or losing connection after the first shot counts as a casual forfeit. Production shutdowns and server failures remain interruptions without a fabricated winner.",
       "Account stats explicitly describe unranked casual play; private and custom matches do not establish a competitive rating.",
       "Added browser security headers and HTTPS-only HSTS responses. Production WebSockets now enforce smaller transport queues and message limits.",
-      "Mobile spin adjustment and Reset stay visible beside the shot controls; More only collapses secondary actions such as AI and New rack."
+      "Mobile spin adjustment and Reset stay visible beside the shot controls; More only collapses secondary actions such as CPU and New rack."
     ]
   },
   {
@@ -31,7 +39,7 @@
     "changes": [
       "Create a private room and share its invite link. Friends can join as guests with no account required.",
       "Optional accounts have case-insensitive usernames, secure password hashing, cookie sessions, and a one-use recovery code shown when created. Password recovery issues a new code and revokes existing sessions.",
-      "Your account shows lifetime online stats and recent matches recorded by the server, with durable match history for future lobby and matchmaking features. Local practice and AI games remain untracked.",
+      "Your account shows lifetime online stats and recent matches recorded by the server, with durable match history for future lobby and matchmaking features. Local practice and CPU games remain untracked.",
       "Online results no longer wait for client acknowledgement. Account identities are verified by the server, and disconnected rooms close cleanly without awarding fabricated wins.",
       "Accounts, sessions, and match history persist in the existing SQLite Docker volume. Added authentication limits, request-origin checks, and protection against serving files outside the frontend directory."
     ]
@@ -45,7 +53,7 @@
       "Automatic framing uses a lower, closer playing view and tighter bounds around the visible balls. Cue alignment remains adjustable and never overrides a shot being pulled.",
       "Automatic camera framing now swings behind the cue toward the majority of the current player\u2019s legal targets, including the final 8-Ball, with the idle cue facing forward from the new view.",
       "Bar house rules now keep the layout after an empty break instead of automatically reracking. Players alternate until a legal pot assigns groups; pots made with a scratch stay down without assigning a group.",
-      "Turn, foul, and result messages use the AI opponent\u2019s name consistently. Illegal-break reracks now explain the missing pocket and four-rail requirement.",
+      "Turn, foul, and result messages use the CPU opponent\u2019s name consistently. Illegal-break reracks now explain the missing pocket and four-rail requirement.",
       "Once groups are assigned, player cards show the 8-Ball after their group, highlighted when it becomes the final target.",
       "Desktop tables open from behind the cue, looking toward the fresh rack.",
       "Pocketed balls visibly fall into deeper pocket wells before entering the return, while scoring updates immediately.",
@@ -69,10 +77,10 @@
   {
     "version": "0.2.0",
     "date": "2026-10-07",
-    "title": "Playable 8-Ball, online rooms, and an AI opponent",
+    "title": "Playable 8-Ball, online rooms, and a CPU opponent",
     "changes": [
       "Added a playable 3D pool table with racked balls, aiming, shot power, spin, cue ball placement, and 8-Ball rules for turns, fouls, and winning.",
-      "Added online rooms with join codes and synchronized shots, plus an optional AI opponent. Fixed the AI getting stuck before taking its turn.",
+      "Added online rooms with join codes and synchronized shots, plus an optional CPU opponent. Fixed the CPU getting stuck before taking its turn.",
       "Added player scorecards, a compact lobby, felt and wood color settings, and desktop camera orbit with right-drag.",
       "Refined pull-back shot controls, softened the power curve for gentler shots, previewed legal cue ball placement, and made aiming independent of frame rate.",
       "Improved pocket capture and jaw geometry, cushion rebounds, spin and collision behavior, and visible ball rolling. Break shots can use more power than regular shots.",

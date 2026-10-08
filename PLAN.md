@@ -19,7 +19,7 @@ Flow: work on `develop`, PR to `main` (protected: PR + `ci` check), merge to shi
 
 ## Done
 - P0 skeleton, P1 solo sim+rules+controls, P2 Python mirror+API, P3 WS rooms,
-  P4 PWA+audio+e2e, P5 L1 AI, P6 UX (hold/pull shooting, scorecards, themes,
+  P4 PWA+audio+e2e, P5 L1 CPU, P6 UX (hold/pull shooting, scorecards, themes,
   lobby), P7 research constants, P8 pockets (segmented rails, holes, lip dip)
 - Table graphics repair: continuous beveled wood surround, true pocket cutouts
   and recessed wells, leather facings, sloped cushions and instanced jaws tied
@@ -83,7 +83,7 @@ Flow: work on `develop`, PR to `main` (protected: PR + `ci` check), merge to shi
 ## Open / known gaps
 - Pocket forgiveness for casual play (strict-pro now); cloth-speed setting
 - Rooms never tested live with two browsers; scores/replays API unwired in UI
-- Synth-only audio (no rolling loop); AI is L1 only; no real-device testing
+- Synth-only audio (no rolling loop); CPU is L1 only; no real-device testing
 - Version: bump info.yml + backend/pyproject.toml TOGETHER (see CLAUDE.md)
 
 ## Key docs
@@ -262,9 +262,9 @@ Flow: work on `develop`, PR to `main` (protected: PR + `ci` check), merge to shi
 - Version badge opens a native dialog backed by root changelog.json; contributor docs require keeping it current.
 - Camera interaction research: https://www.w3.org/WAI/WCAG21/Understanding/pointer-gestures and https://threejs.org/docs/pages/OrbitControls.html.
 
-Camera direction uses sorted cue-relative bearings and a wrapped sliding window of floor(n/2)+1 targets. Near-ties prefer the smallest rotation; azimuth interpolates over the shortest arc. Group eligibility comes from legalTargets rather than shot-selection AI. Whole-table and placement views retain the existing azimuth. Reference: https://threejs.org/docs/pages/Spherical.html and https://threejs.org/docs/pages/MathUtils.html.
+Camera direction uses sorted cue-relative bearings and a wrapped sliding window of floor(n/2)+1 targets. Near-ties prefer the smallest rotation; azimuth interpolates over the shortest arc. Group eligibility comes from legalTargets rather than shot-selection CPU. Whole-table and placement views retain the existing azimuth. Reference: https://threejs.org/docs/pages/Spherical.html and https://threejs.org/docs/pages/MathUtils.html.
 
-Auto-framing refinement: use a 26-degree elevation above the cloth, fit padded bounds around individual balls, and align the idle human cue with the final view. Do not align during a pull, placement, AI turn, or opponent turn.
+Auto-framing refinement: use a 26-degree elevation above the cloth, fit padded bounds around individual balls, and align the idle human cue with the final view. Do not align during a pull, placement, CPU turn, or opponent turn.
 
 ### 0.5.0 optional identity and online foundation
 - Guest room links carry 8-character random invitation codes; no account wall.
@@ -280,7 +280,7 @@ Auto-framing refinement: use a 26-degree elevation above the cloth, fit padded b
 - Real online browser suite uses an isolated temporary database. Accounts and
   sessions persist through reconnecting the SQLAlchemy engine; live rooms do not.
 - Deliberately deferred: ranked matchmaking, public lobbies, reconnection/resume of
-  live rooms, email recovery, and tracking local practice/AI as verified matches.
+  live rooms, email recovery, and tracking local practice/CPU as verified matches.
 
 ### 0.6.1 legacy cleanup
 
