@@ -266,3 +266,38 @@ def test_account_status_upgrade_is_idempotent_and_preserves_credentials():
         connection.exec_driver_sql("UPDATE accounts SET disabled=1")
         upgrade_account_status(connection)
         assert connection.exec_driver_sql("SELECT disabled FROM accounts").scalar() == 1
+
+
+def test_sim_permission_owner_only_and_independent_of_premium(monkeypatch):
+    admin, _ = owner(monkeypatch)
+    other, target = register("SimViewer")
+    url = f"/api/admin/accounts/{target['id']}/simulation"
+    assert target["simEnabled"] is False
+    assert other.patch(url, headers=HEADERS, json={"simEnabled": True}).status_code == 404
+    assert admin.patch(url, json={"simEnabled": True}).status_code == 403
+    assert admin.patch(url, headers=HEADERS, json={"simEnabled": True}).status_code == 200
+    account = other.get("/api/account").json()["account"]
+    assert account["simEnabled"] is True and account["premium"] is False
+    assert admin.patch(url, headers=HEADERS, json={"simEnabled": False}).status_code == 200
+    assert other.get("/api/account").json()["account"]["simEnabled"] is False
+
+
+def test_sim_migration_preserves_existing_allowance_and_is_idempotent():
+    from sqlalchemy import create_engine, text
+
+    from app.models.migrations import upgrade_simulation
+
+    engine = create_engine("sqlite://")
+    with engine.begin() as connection:
+        connection.execute(text("CREATE TABLE accounts (id TEXT PRIMARY KEY)"))
+        connection.execute(text("CREATE TABLE jev_games (id TEXT PRIMARY KEY, daily_slot INTEGER)"))
+        connection.execute(text("INSERT INTO accounts VALUES ('a')"))
+        connection.execute(text("INSERT INTO jev_games VALUES ('g', 3)"))
+        upgrade_simulation(connection)
+        upgrade_simulation(connection)
+        assert connection.execute(text("SELECT sim_enabled FROM accounts")).scalar() == 0
+        assert tuple(
+            connection.execute(
+                text("SELECT daily_slot, daily_cost, simulation FROM jev_games")
+            ).one()
+        ) == (3, 1, "")

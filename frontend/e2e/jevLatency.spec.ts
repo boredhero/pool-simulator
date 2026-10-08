@@ -74,11 +74,11 @@ test('failed human sync settles without awarding a result and resumes authoritat
   const state=await setup(page);
   await page.route('**/api/opponents/jev/games/latency/turn',route=>route.fulfill({status:503,json:{detail:'Temporarily unavailable'}}));
   await page.evaluate(()=>{const g=(window as any).__pool;g.fire(.2);});
-  await expect(page.locator('#opponentstatus')).toContainText('Select Jev AI to resume');
+  await expect(page.locator('#opponentstatus')).toContainText('Temporarily unavailable');
   await settlePrediction(page);
   expect(await page.evaluate(()=>{const g=(window as any).__pool;return{mode:g.mode,current:g.gs.current,revision:g.jevGame.revision,winner:g.gs.winner};})).toEqual({mode:'wait',current:0,revision:0,winner:null});
   await page.route('**/api/opponents/jev/games',route=>route.fulfill({json:{id:'latency',created:false,state,expiresAt:null}}));
-  await page.evaluate(async()=>{await (window as any).__pool.startJev();});
+  await page.locator('#resumejev').click();await expect(page.locator('#resumejev')).toHaveCount(0);
   expect(await page.evaluate(()=>{const g=(window as any).__pool;return{mode:g.mode,revision:g.jevGame.revision,x:g.cue().x,coin:g.coinPending()};})).toEqual({mode:'aim',revision:1,x:.8,coin:false});
 });
 

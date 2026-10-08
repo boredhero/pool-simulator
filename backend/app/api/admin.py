@@ -122,6 +122,7 @@ def accounts(
                     "createdAt": row["Account"].created_at,
                     "premium": row["Account"].premium,
                     "disabled": row["Account"].disabled,
+                    "simEnabled": row["Account"].sim_enabled,
                     "isAdmin": is_admin(row["Account"].id),
                     "usage": usage_dict(row),
                 }
@@ -152,6 +153,7 @@ def account_detail(account_id: str):
         return {
             "username": account.username,
             "disabled": account.disabled,
+            "simEnabled": account.sim_enabled,
             "lifetimeAttempts": lifetime.attempts if lifetime else 0,
             "lifetimeCompleted": lifetime.completed if lifetime else 0,
             "games": [
@@ -283,3 +285,24 @@ async def delete_account(account_id: str, payload: AccountDeletion, actor=Depend
         log_account_action(db, actor, account_id, "deleted")
         db.delete(account)
     return {"deleted": True, "id": account_id}
+
+
+class SimulationChange(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    simEnabled: bool
+
+
+@router.patch("/accounts/{account_id}/simulation", dependencies=[Depends(mutation_guard)])
+def set_account_simulation(
+    account_id: str, payload: SimulationChange, actor=Depends(require_admin)
+):
+    with Session.begin() as db:
+        account = db.get(Account, account_id)
+        if account is None:
+            raise HTTPException(404, "Account not found.")
+        if account.sim_enabled != payload.simEnabled:
+            account.sim_enabled = payload.simEnabled
+            log_account_action(
+                db, actor, account_id, "sim-enabled" if payload.simEnabled else "sim-disabled"
+            )
+        return {"id": account_id, "simEnabled": account.sim_enabled}

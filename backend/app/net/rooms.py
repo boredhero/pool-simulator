@@ -319,7 +319,7 @@ async def handle(ws: WebSocket) -> None:
                 if (
                     not all(math.isfinite(v) for v in (aim, power, tip_x, tip_y))
                     or not 0 < power <= 1
-                    or math.hypot(tip_x, tip_y) > 0.55
+                    or math.hypot(tip_x, tip_y) > 0.55 + 1e-12
                 ):
                     await room.reject(ws, "bad shot")
                     continue
@@ -342,7 +342,7 @@ async def handle(ws: WebSocket) -> None:
                     begin_shot(next_state, called_ball, called_pocket)
                     room.started = True
                     vmax = next_state.rules["breakMax" if next_state.break_shot else "normalMax"]
-                    elevation = cue_elevation(cue.x, cue.y, aim, 0, next_state.balls)
+                    elevation = cue_elevation(cue.x, cue.y, aim, 0, next_state.balls, tip_x, tip_y)
                     shot = {
                         "aim": aim,
                         "power": power,

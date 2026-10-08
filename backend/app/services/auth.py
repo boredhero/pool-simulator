@@ -35,6 +35,7 @@ def public_account(user: Account) -> dict:
         "username": user.username,
         "createdAt": user.created_at,
         "premium": user.premium,
+        "simEnabled": user.sim_enabled,
         "isAdmin": is_admin(user.id),
     }
 

@@ -88,3 +88,21 @@ def upgrade_account_status(connection) -> None:
         Operations(MigrationContext.configure(connection)).add_column(
             "accounts", Column("disabled", Boolean, nullable=False, server_default=false())
         )
+
+
+def upgrade_simulation(connection) -> None:
+    """Preserve used daily slots while adding owner-granted spectator games."""
+    op = Operations(MigrationContext.configure(connection))
+    if "sim_enabled" not in {c["name"] for c in inspect(connection).get_columns("accounts")}:
+        op.add_column(
+            "accounts", Column("sim_enabled", Boolean, nullable=False, server_default=false())
+        )
+    columns = {c["name"] for c in inspect(connection).get_columns("jev_games")}
+    if "daily_cost" not in columns:
+        op.add_column(
+            "jev_games", Column("daily_cost", Integer, nullable=False, server_default="1")
+        )
+    if "simulation" not in columns:
+        op.add_column(
+            "jev_games", Column("simulation", String(16), nullable=False, server_default="")
+        )

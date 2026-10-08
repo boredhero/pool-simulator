@@ -58,6 +58,7 @@ def init_db() -> None:
         upgrade_jev_allowance,
         upgrade_match_modes,
         upgrade_premium,
+        upgrade_simulation,
         upgrade_terms,
     )
 
@@ -65,6 +66,7 @@ def init_db() -> None:
         upgrade_account_status(connection)
         upgrade_premium(connection)
         upgrade_jev_allowance(connection)
+        upgrade_simulation(connection)
         upgrade_terms(connection)
         upgrade_match_modes(connection)
         from app.services.matches import backfill_jev_matches
@@ -81,6 +83,7 @@ class Account(Base):
     recovery_hash: Mapped[str] = mapped_column(Text)
     created_at: Mapped[int] = mapped_column(Integer)
     premium: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    sim_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     disabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
 
 
@@ -165,6 +168,8 @@ class JevGame(Base):
     # Free allowance day; premium games do not consume daily slots.
     day: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     daily_slot: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    daily_cost: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    simulation: Mapped[str] = mapped_column(String(16), default="", server_default="")
     network_hash: Mapped[str] = mapped_column(String(64), index=True)
     started_at: Mapped[int] = mapped_column(Integer)
     updated_at: Mapped[int] = mapped_column(Integer)

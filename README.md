@@ -283,7 +283,9 @@ is an estimate, not an invoice. Failed or incomplete provider responses can leav
 actual charges unknown, explicitly counted as unmetered. These records have no
 public reporting endpoint. Account/game ownership checks protect resume endpoints.
 `jev_usage` retains lifetime attempt/completion counters. The five-start daily allowance is per account, enforced with durable unique
-slots. Network-wide and global usage caps and Jev start/turn throttles are removed.
+slots and stored game costs. Sim games consume two starts for Jev vs Jev, one for
+Jev vs CPU, and zero for offline CPU vs CPU. Existing usage is preserved.
+Network-wide and global usage caps and Jev start/turn throttles are removed.
 Concurrent Jev turns remain bounded at four to protect simulation capacity.
 
 
@@ -370,3 +372,15 @@ budgets and provider accounting remain unchanged. See
 Camera input mode and expandable controls share one compact HUD surface; hints
 appear inside its expanded panel. Legal footer links and Privacy choices use
 matching control styles and remain clear of the shot tray.
+
+### Simulation games (1.0.3)
+
+The owner dashboard has a separate Sim permission for each account, disabled by
+default. Enable it for your own account to reveal the Sim button on desktop and
+mobile. On mobile it sits between Reset and Move Camera and opens a replacement
+tray; Done returns to the shot tray. CPU vs CPU runs locally; games involving Jev
+use server-authoritative turns and the same daily allowance as ordinary games.
+Both players act automatically, human shot controls are locked, and spectator
+games do not contribute to the viewer’s win/loss statistics. Premium removes the
+allowance limit but does not grant Sim permission. Server checks enforce Sim
+permission at game creation and on each automated Jev-game turn.

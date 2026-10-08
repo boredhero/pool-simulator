@@ -419,3 +419,38 @@ def test_busy_rejection_contains_last_completed_table_not_worker_positions(monke
                 release.set()
             assert first.receive_json()["revision"] == second.receive_json()["revision"] == 1
             assert not room.busy and lobby.simulations == 0
+
+
+@pytest.mark.parametrize(
+    "tip_x,tip_y", [(0.029955471237928386, 0.5491836393620205), (0, 0.5500000000000002)]
+)
+def test_spin_roundoff_boundary_is_accepted(tip_x, tip_y):
+    with (
+        TestClient(app).websocket_connect("/ws") as first,
+        TestClient(app).websocket_connect("/ws") as second,
+    ):
+        pair(first, second)
+        first.send_json(
+            {
+                "t": "shot",
+                "revision": 0,
+                "shot": {"aim": 0, "power": 0.1, "tipX": tip_x, "tipY": tip_y},
+            }
+        )
+        assert first.receive_json()["t"] == "shot"
+        assert second.receive_json()["t"] == "shot"
+        assert first.receive_json()["t"] == "result"
+        assert second.receive_json()["t"] == "result"
+
+
+def test_real_spin_overflow_still_rejected():
+    with (
+        TestClient(app).websocket_connect("/ws") as first,
+        TestClient(app).websocket_connect("/ws") as second,
+    ):
+        code = pair(first, second)
+        first.send_json(
+            {"t": "shot", "revision": 0, "shot": {"aim": 0, "power": 0.1, "tipX": 0.4, "tipY": 0.4}}
+        )
+        assert "error" in first.receive_json()
+        assert lobby.get(code).revision == 0

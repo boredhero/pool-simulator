@@ -2,7 +2,7 @@ import type { Account } from './account';
 import './admin.css';
 
 type Usage = {games:number;requests:number;input_tokens:number;output_tokens:number;estimated_cost_nano:number;unmetered_requests:number;last_activity:number|null};
-type User = {id:string;username:string;createdAt:number;premium:boolean;disabled?:boolean;isAdmin:boolean;usage:Usage};
+type User = {id:string;username:string;createdAt:number;premium:boolean;simEnabled?:boolean;disabled?:boolean;isAdmin:boolean;usage:Usage};
 type Game = {id:string;status:string;startedAt:number;updatedAt:number;premiumGame:boolean} & Usage;
 const el=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 const number=(n:number)=>n.toLocaleString();
@@ -111,6 +111,13 @@ export class AdminPanel {
       } catch(error){el('adminstatus').textContent=error instanceof Error?error.message:'Update failed.';toggle.disabled=false;}
     });
     status.append(toggle);
+    const simulation=node('button',user.simEnabled?'Sim on':'Sim off','admin-switch');simulation.type='button';
+    simulation.setAttribute('role','switch');simulation.setAttribute('aria-checked',String(!!user.simEnabled));simulation.setAttribute('aria-label',`Simulation for ${user.username}`);
+    simulation.addEventListener('click',async()=>{
+      simulation.disabled=true;
+      try {await this.request(`/accounts/${encodeURIComponent(user.id)}/simulation`,{method:'PATCH',body:JSON.stringify({simEnabled:!user.simEnabled})});await this.load();this.accountChanged();}
+      catch(error){el('adminstatus').textContent=error instanceof Error?error.message:'Update failed.';simulation.disabled=false;}
+    });status.append(simulation);
     const requests=node('td',number(user.usage.requests),'admin-numeric');
     requests.append(node('small',`${number(user.usage.games)} games`));
     const cost=node('td',money(user.usage.estimated_cost_nano),'admin-numeric');

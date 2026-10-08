@@ -1,0 +1,18 @@
+#sim-button[hidden],#sim-panel[hidden]{display:none!important}
+#sim-button{min-height:44px;order:2}
+#sim-panel{position:fixed;z-index:7;bottom:130px;left:24px;width:330px;max-width:calc(100vw - 32px);padding:14px;border:1px solid #786549;border-radius:14px;background:#211d18;color:#eee2cb;box-shadow:0 8px 28px #0005;display:flex;flex-direction:column;gap:8px}
+#sim-panel header{display:flex;align-items:center;justify-content:space-between;gap:12px}#sim-panel button{min-height:44px}#sim-panel p{font-size:13px;line-height:1.4;margin:2px 0 6px;color:#caba9e}
+#resumejev{min-height:44px;font-size:14px}
+body.tutorial-practice #sim-button{display:none}
+@media(max-width:900px) and (pointer:coarse){
+ body.sim-panel-open .control-tray{display:none!important}
+ #sim-panel{left:8px;right:8px;bottom:max(8px,env(safe-area-inset-bottom));width:auto;max-width:none;max-height:calc(100dvh - var(--below-header,100px) - 16px);overflow:auto;padding:10px}
+ #sim-button{font-size:12px;padding:0 7px}
+ body.sim-enabled .control-tray{gap:6px}
+ body.sim-enabled .control-tray .spin-control{gap:5px;margin-right:0}
+ body.sim-enabled .spin-control .control-label{display:none}
+ body.sim-enabled #resetspin{font-size:12px;padding:0 5px}
+ body.sim-enabled #mobile-move-camera{padding:0 5px;font-size:11px}
+ body.sim-enabled #morecontrols{padding:0 5px;font-size:11px}
+}
+@media(max-width:900px) and (pointer:coarse) and (orientation:landscape){#sim-panel{left:auto;right:8px;top:8px;bottom:8px;width:180px;max-height:none}}

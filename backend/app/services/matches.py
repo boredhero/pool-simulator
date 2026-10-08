@@ -185,9 +185,10 @@ def account_stats(account_id: str) -> dict:
 
 def ensure_jev_match(db, game, *, historical=True):
     """Jev's globally random game ID also identifies its durable match ledger."""
+    mode = "simulation" if game.simulation else "jev"
     match = db.get(GameMatch, game.id)
     if match is not None:
-        if match.mode != "jev":
+        if match.mode != mode:
             raise ValueError("Match identifier collision")
         return match
     state = json.loads(game.state)
@@ -196,7 +197,7 @@ def ensure_jev_match(db, game, *, historical=True):
     account = db.get(Account, game.account_id)
     match = GameMatch(
         id=game.id,
-        mode="jev",
+        mode=mode,
         shot_stats_complete=not historical,
         rules=json.dumps(state["rules"]),
         ruleset="eight-ball:unknown" if historical else "eight-ball:2",
@@ -211,9 +212,23 @@ def ensure_jev_match(db, game, *, historical=True):
     db.add_all(
         [
             MatchPlayer(
-                match_id=game.id, seat=0, account_id=game.account_id, display_name=account.username
+                match_id=game.id,
+                seat=0,
+                account_id=None if game.simulation else game.account_id,
+                display_name=("Jev AI 1" if game.simulation == "jev-jev" else "Jev AI")
+                if game.simulation
+                else account.username,
             ),
-            MatchPlayer(match_id=game.id, seat=1, account_id=None, display_name="Jev AI"),
+            MatchPlayer(
+                match_id=game.id,
+                seat=1,
+                account_id=None,
+                display_name="CPU"
+                if game.simulation == "jev-cpu"
+                else "Jev AI 2"
+                if game.simulation == "jev-jev"
+                else "Jev AI",
+            ),
         ]
     )
     db.flush()
