@@ -341,7 +341,7 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
     if (!running) return;
     controls.update();
     cameraRig.update(performance.now());
-    constrainTableCamera(camera, controls);
+    constrainTableCamera(camera, controls, renderer.domElement.clientWidth < 900);
     for (const cb of cbs) cb();
     if (kitchen.visible && !kitchenDismissed) {
       const anchor=kitchenAnchor.clone().project(camera), rect=canvas.getBoundingClientRect();

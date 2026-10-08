@@ -37,6 +37,37 @@ for(const viewport of [{width:390,height:844},{width:844,height:390}])test(`mobi
   const optedOut=await page.evaluate(()=>{const g=(window as any).__pool;g.options.autoCamera=false;const before=g.scene.controls.object.position.toArray();g.frameBalls(false,true);return{before,after:g.scene.controls.object.position.toArray()};});
   expect(optedOut.after).toEqual(optedOut.before);
 });
+
+for(const viewport of [{width:390,height:844},{width:844,height:390}])test(`rail and corner framing keeps its angle during mobile pinch at ${viewport.width}x${viewport.height}`,async({page})=>{
+  await page.setViewportSize(viewport);await page.emulateMedia({reducedMotion:'reduce'});await prepare(page);
+  for(const [x,y]of [[.04,.5],[.04,.06],[2.5,1.21]]){
+    const before=await page.evaluate(async([x,y])=>{
+      const g=(window as any).__pool;Object.assign(g.cue(),{x,y});g.frameBalls();
+      await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+      const c=g.scene.controls,o=c.object.position.clone().sub(c.target);
+      return{phi:Math.acos(o.y/o.length()),distance:o.length()};
+    },[x,y]);
+    expect(before.phi).toBeCloseTo(1.12,3);
+    // Browser pinch input reaches OrbitControls through real touch pointer events.
+    const session=await page.context().newCDPSession(page);
+    const cy=viewport.height/2,cx=viewport.width/2;
+    await session.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:cx-25,y:cy,id:1},{x:cx+25,y:cy,id:2}]});
+    for(const d of [45,70,100,140])await session.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:cx-d,y:cy,id:1},{x:cx+d,y:cy,id:2}]});
+    await session.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await session.detach();
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    const after=await page.evaluate(()=>{
+      const c=(window as any).__pool.scene.controls,o=c.object.position.clone().sub(c.target);
+      return{phi:Math.acos(o.y/o.length()),distance:o.length(),height:c.object.position.y,moving:(window as any).__pool.scene.cameraRig.moving};
+    });
+    expect(after.phi).toBeCloseTo(before.phi,3);expect(after.distance).toBeLessThan(before.distance);
+    expect(after.height).toBeGreaterThan(.058);expect(after.moving).toBe(false);
+    if(x===.04&&y===.5){
+      await page.evaluate(async()=>{const g=(window as any).__pool;g.angle=g.targetAngle;g.__cameraShow=true;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));});
+      await page.screenshot({path:`/tmp/pool-101-rail-pinch-${viewport.width}.png`});
+      await page.evaluate(()=>{(window as any).__pool.__cameraShow=false;});
+    }
+  }
+});
 });
 test('desktop framing retains all legal targets and manual camera input cancels automatic motion',async({page})=>{
   await page.setViewportSize({width:1280,height:800});await prepare(page);
