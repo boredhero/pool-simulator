@@ -107,3 +107,28 @@ or production account database. Ordinary UI tests stay backend-independent.
 Security references: [OWASP password storage](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html),
 [session management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html), and
 [account recovery](https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html).
+
+### Mobile and trackpad controls (0.6.0)
+
+On a touchscreen, drag one finger on the felt to aim continuously. Lift without
+shooting, set the power slider, then tap **Shoot**. Two fingers moving together
+orbit the table; spreading/pinching the same fingers zooms without needing to
+restart the gesture. Lift both fingers before aiming again. **View → Move camera**
+retains one-finger orbit and two-finger pan/zoom. Three-finger gestures are not
+required because they can conflict with operating-system accessibility controls.
+
+Mobile player names, groups, and remaining counts stay visible. **Show balls**
+expands the numbered ball details; **More** reveals spin, AI, and new-rack controls.
+Mouse play still uses hover-to-aim and pull/release. On trackpads, Shift-scroll
+orbits, normal scroll/pinch zooms, and camera mode offers left-button dragging.
+
+The gesture implementation uses [Pointer Events](https://www.w3.org/TR/pointerevents3/)
+and [Three.js OrbitControls](https://threejs.org/docs/pages/OrbitControls.html).
+Browser tests exercise real multi-touch pinch-to-orbit and partial finger release;
+physical Android/iOS hardware remains useful for evaluating feel and OS gestures.
+
+Dependabot checks weekly for npm, uv, Docker, and GitHub Actions updates. Runtime
+and development dependencies are grouped separately for npm and uv; container
+images and Actions each have their own group. Version-update PRs target `develop`
+so they go through tests before the release PR to `main`. Configuration follows
+[GitHub's grouping reference](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference).

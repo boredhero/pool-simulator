@@ -3,25 +3,33 @@ updates:
   - package-ecosystem: npm
     directory: /frontend
     schedule: { interval: weekly, day: monday }
-    target-branch: "main"
+    target-branch: "develop"
     groups:
-      frontend:
+      frontend-runtime:
+        dependency-type: production
+        patterns: ["*"]
+      frontend-development:
+        dependency-type: development
         patterns: ["*"]
     commit-message: { prefix: "chore(deps):" }
 
   - package-ecosystem: uv
     directory: /backend
     schedule: { interval: weekly, day: monday }
-    target-branch: "main"
+    target-branch: "develop"
     groups:
-      backend:
+      backend-runtime:
+        dependency-type: production
+        patterns: ["*"]
+      backend-development:
+        dependency-type: development
         patterns: ["*"]
     commit-message: { prefix: "chore(deps):" }
 
   - package-ecosystem: docker
     directory: /
     schedule: { interval: weekly, day: monday }
-    target-branch: "main"
+    target-branch: "develop"
     groups:
       images:
         patterns: ["*"]
@@ -30,7 +38,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly, day: monday }
-    target-branch: "main"
+    target-branch: "develop"
     groups:
       actions:
         patterns: ["*"]

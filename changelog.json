@@ -1,5 +1,17 @@
 [
   {
+    "version": "0.6.0",
+    "date": "2026-10-08",
+    "title": "Room to play on mobile",
+    "changes": [
+      "Touch and drag to aim continuously, then choose power and tap Shoot. Lifting your aiming finger no longer fires accidentally.",
+      "Mobile keeps compact player scores visible, with ball details available on demand and secondary shot controls under More.",
+      "Use two fingers together to orbit during play and pinch to zoom in the same gesture. Camera mode still offers one-finger orbit and two-finger panning. Trackpads can use Shift-scroll to orbit.",
+      "Placement outlines, cue placement rings, head strings, and pocket-call markers now use a contrasting tint of the chosen felt, with dark guides on light cloth.",
+      "Dependabot groups frontend and backend runtime and development updates separately, plus Docker images and GitHub Actions, targeting develop for testing before release."
+    ]
+  },
+  {
     "version": "0.5.0",
     "date": "2026-10-08",
     "title": "Play together, with or without an account",

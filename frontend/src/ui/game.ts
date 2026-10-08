@@ -43,6 +43,8 @@ export class Game {
   calledPocket: number | null = null;
   accumulator = 0;
   pointers = new Set<number>();
+  touchAim=false;
+  scoresExpanded=false;
   cameraMode=false;
   cameraGesture=false;
   placementPress:[number,number]|null=null;
@@ -104,7 +106,11 @@ export class Game {
     new ResizeObserver(entries => {
       const bar = entries[0].target.getBoundingClientRect();
       document.documentElement.style.setProperty('--below-header', `${bar.bottom + 12}px`);
+      document.documentElement.style.setProperty('--below-scores',`${this.el.scorecard.getBoundingClientRect().bottom+6}px`);
     }).observe(document.querySelector('.topbar')!);
+    new ResizeObserver(()=>{
+      document.documentElement.style.setProperty('--below-scores',`${this.el.scorecard.getBoundingClientRect().bottom+6}px`);
+    }).observe(this.el.scorecard);
     this.scene.onFrame(() => this.frame());
     try {
       if (localStorage.getItem('pool:seen')) document.getElementById('hint')?.classList.add('gone');
@@ -242,12 +248,12 @@ export class Game {
       const p = this.scene.pickFelt(e.clientX, e.clientY);
       if (!p) return;
       this.hoverPt = p;
-      if (!this.pulling) aimAt(p[0], p[1]); // aim locks once the pull starts
+      if (!this.pulling && (e.pointerType === 'mouse' || this.touchAim)) aimAt(p[0], p[1]); // aim locks once the pull starts
     });
     canvas.addEventListener('pointerdown', (e) => {
       this.sfx.unlock();
       this.pointers.add(e.pointerId);
-      if(this.cameraMode || this.pointers.size>1){this.cameraGesture=true;this.pulling=false;this.pressPt=null;this.placementPress=null;return;}
+      if(this.cameraMode || this.pointers.size>1){this.cameraGesture=true;this.touchAim=false;this.pulling=false;this.pressPt=null;this.placementPress=null;return;}
       if(this.cameraGesture)return;
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       const p = this.scene.pickFelt(e.clientX, e.clientY);
@@ -268,16 +274,22 @@ export class Game {
         const dx = p[0] - c.x, dy = p[1] - c.y;
         if (Math.hypot(dx, dy) > 0.02) this.targetAngle = Math.atan2(dy, dx);
       }
+      if (e.pointerType !== 'mouse') {
+        this.touchAim=this.humanTurn();
+        canvas.setPointerCapture(e.pointerId);
+        return;
+      }
       if (this.humanTurn()) {
         this.pulling = true;
         this.pressPt = p;
         this.hoverPt = p;
       }
     });
-    const cancelPull = () => { this.pulling = false; this.pressPt = null; };
+    const cancelPull = () => { this.touchAim=false; this.pulling = false; this.pressPt = null; };
     this.scene.controls.addEventListener('start',()=>{cancelPull();this.placementPress=null;});
     canvas.addEventListener('pointerup', (e) => {
       this.pointers.delete(e.pointerId);
+      this.touchAim=false;
       if(this.cameraMode || this.cameraGesture){cancelPull();this.placementPress=null;if(!this.pointers.size)this.cameraGesture=false;return;}
       if(this.placementPress){const start=this.placementPress;this.placementPress=null;if(Math.hypot(e.clientX-start[0],e.clientY-start[1])<12){const p=this.scene.pickFelt(e.clientX,e.clientY);if(p)tryPlace(...p);}return;}
       if (!this.pulling) return;
@@ -290,7 +302,22 @@ export class Game {
     canvas.addEventListener('pointercancel', e => { this.pointers.delete(e.pointerId); cancelPull(); });
     const releasePointer=(e:PointerEvent)=>{this.pointers.delete(e.pointerId);if(!this.pointers.size){this.cameraGesture=false;this.placementPress=null;}};
     addEventListener('pointerup',releasePointer);addEventListener('pointercancel',releasePointer);
-    canvas.addEventListener('pointerleave', cancelPull);
+    canvas.addEventListener('pointerleave', e => {if(e.pointerType==='mouse')cancelPull();});
+    const touchPower=document.getElementById('touchpower') as HTMLInputElement;
+    touchPower.addEventListener('input',()=>{document.getElementById('touchpowerlabel')!.textContent=`Power ${touchPower.value}%`;});
+    document.getElementById('touchshoot')!.addEventListener('click',()=>{
+      if(this.humanTurn()&&!this.pointers.size){this.angle=this.targetAngle;this.fire(touchPower.valueAsNumber/100);}
+    });
+    document.getElementById('scoretoggle')!.addEventListener('click',()=>{
+      this.scoresExpanded=!this.scoresExpanded;
+      this.el.scorecard.classList.toggle('expanded',this.scoresExpanded);
+      document.getElementById('scoretoggle')!.setAttribute('aria-expanded',String(this.scoresExpanded));
+      document.getElementById('scoretoggle')!.textContent=this.scoresExpanded?'Hide balls':'Show balls';
+    });
+    document.getElementById('morecontrols')!.addEventListener('click',()=>{
+      const open=document.querySelector('.control-tray')!.classList.toggle('expanded');
+      document.getElementById('morecontrols')!.setAttribute('aria-expanded',String(open));
+    });
     addEventListener('keydown', (e) => {
       if ((e.target as HTMLElement)?.closest('input,select,button,textarea')) return;
       if(this.cameraMode)return;
@@ -498,6 +525,7 @@ export class Game {
       while (d < -Math.PI) d += 2 * Math.PI;
       this.angle += d * Math.min(1, fdt * 14);
     }
+    (document.getElementById('touchshoot') as HTMLButtonElement).disabled=!this.humanTurn()||this.pointers.size>0;
     const aiming = this.mode === 'aim' && !this.cue().potted;
     const pulling = this.pulling && aiming;
     const pull = pulling ? 0.02 + this.pullPower() * 0.18 : 0.02 + this.power * 0.1;
@@ -518,7 +546,7 @@ export class Game {
 
   hud(): void {
     let msg = this.gs.message;
-    if (this.mode === 'place') msg += ' — tap a green spot to place the cue ball';
+    if (this.mode === 'place') msg += ' — tap inside the outlined area to place the cue ball';
     else if (this.mode === 'rolling') msg = `Player ${this.gs.current + 1} · shot in motion`;
     else if (this.mode === 'wait' && this.room) msg += ' — waiting…';
     else if (this.room && this.seat !== null && this.seat !== this.gs.current && this.mode === 'aim') msg += ' — opponent aiming…';
@@ -558,6 +586,7 @@ export class Game {
       const g = displayedGroups[i];
       const provisional=this.gs.groups[i]!==g;
       const card = document.createElement('div');
+      card.setAttribute('aria-label',`${this.playerName(i)}${this.gs.current===i?' — current player':''}`);
       card.className = 'pcard' + (provisional ? ' provisional' : '') + (this.gs.current === i && this.gs.winner === null ? ' active' : '');
       const head = document.createElement('div');
       head.className = 'pname';
@@ -573,7 +602,7 @@ export class Game {
       );
 
       const left = nums.filter((n) => !this.gs.balls.find((q) => q.n === n)?.potted).length;
-      gr.textContent = g === null ? 'Open table · groups unassigned' : onEight ? 'On the 8-Ball' : `${label} · ${left} remaining`;
+      gr.textContent = g === null ? 'Open table' : onEight ? 'On the 8-Ball' : `${label} · ${left} remaining`;
       if(provisional)gr.textContent = `${label} · pending shot result`;
       if(g!==null)nums.push(8);
       head.appendChild(nm);
