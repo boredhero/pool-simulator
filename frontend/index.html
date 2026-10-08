@@ -242,6 +242,7 @@ body:has(#tutorial:not([hidden])) .privacy-notice{display:none}
         <p id="usernamehelp" class="guide-note">3–20 letters, numbers, or underscores. Names are case-insensitive.</p>
         <label id="accountpasswordlabel" for="accountpassword">Password</label><input id="accountpassword" type="password" required minlength="15" maxlength="128" autocomplete="current-password" aria-describedby="passwordhelp" />
         <p id="passwordhelp" class="guide-note">15–128 characters. A long passphrase works well.</p>
+        <div id="accountconfirmation" hidden><label for="accountpasswordconfirm">Confirm password</label><input id="accountpasswordconfirm" type="password" minlength="15" maxlength="128" autocomplete="new-password" disabled aria-describedby="passwordhelp" /></div>
         <label id="accountrecoverylabel" hidden>Recovery code<input id="accountrecovery" autocomplete="off" maxlength="128" spellcheck="false" disabled /></label>
         <label id="registerterms" class="terms-check" hidden><input id="registeradult" type="checkbox"><span>I am 18 or older and agree to the <a href="/terms.html" target="_blank" rel="noopener">Terms</a>. I have read the <a href="/privacy.html" target="_blank" rel="noopener">Privacy Notice</a>.</span></label><button id="accountsubmit" type="submit">Sign in</button>
       </form>
