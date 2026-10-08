@@ -119,10 +119,11 @@ def test_tokens_cost_and_failures_are_private_game_records(monkeypatch):
     game = start()
     set_cpu_turn(game)
     calls = []
+    monkeypatch.setattr(jev, "plan_shots", lambda gs: plans())
 
     async def evaluate(payload, key):
         calls.append(payload)
-        return 0, 1200, 30
+        return jev.Evaluation(payload.candidates[0]["id"], 1200, 30)
 
     monkeypatch.setattr(jev, "evaluate", evaluate)
     response = client.post(
@@ -144,6 +145,7 @@ def test_tokens_cost_and_failures_are_private_game_records(monkeypatch):
 
 
 def test_provider_failure_finishes_turn_with_cpu(monkeypatch):
+    monkeypatch.setattr(jev, "plan_shots", lambda gs: plans())
     game = start()
     set_cpu_turn(game)
 
@@ -176,18 +178,55 @@ def test_no_configuration_and_expired_game(monkeypatch):
     assert client.post("/api/opponents/jev/games", headers=HEADERS, json={}).status_code == 503
 
 
+def plans():
+    return [
+        {
+            "id": "s0",
+            "family": "direct",
+            "aim": 0.0,
+            "power": 0.2,
+            "tipX": 0,
+            "tipY": 0,
+            "calledBall": 1,
+            "calledPocket": 0,
+            "evidence": {"verified": True, "legal": True, "continues": True, "nextShots": 2},
+        },
+        {
+            "id": "s1",
+            "family": "safety",
+            "aim": 0.1,
+            "power": 0.2,
+            "tipX": 0,
+            "tipY": 0,
+            "calledBall": 1,
+            "calledPocket": 1,
+            "evidence": {"verified": True, "legal": True, "opponentShots": 0},
+        },
+    ]
+
+
 @pytest.mark.asyncio
 async def test_provider_contract_validates_selection_and_usage(monkeypatch):
     original = httpx.AsyncClient
     result = {
-        "answers": {"shot": {"type": "choice", "choice": "1"}},
+        "answers": {
+            "tactic": {"type": "choice", "choice": "safety"},
+            "shot_safety": {"type": "choice", "choice": "s1"},
+        },
         "usage": {"input_tokens": 200, "output_tokens": 20},
     }
 
     async def handler(request):
         body = json.loads(request.content)
         assert body["model"] == "jev-1.13.0"
-        assert set(body["questions"]["shot"]["criteria"]) == {"0", "1"}
+        assert set(body["questions"]) == {"tactic", "shot_direct", "shot_safety"}
+        assert set(body["questions"]["shot_safety"]["criteria"]) == {"s1"}
+        assert "power" not in body["questions"]["shot_safety"]["criteria"]["s1"]
+        assert "username" not in request.content.decode()
+        assert (
+            body["questions"]["shot_safety"]["criteria"]["s1"]["evidence"]
+            == "settled physics preview"
+        )
         return httpx.Response(200, json=result)
 
     monkeypatch.setattr(
@@ -195,11 +234,113 @@ async def test_provider_contract_validates_selection_and_usage(monkeypatch):
         "AsyncClient",
         lambda **kw: original(transport=httpx.MockTransport(handler), **kw),
     )
-    item = jev.Candidate(
-        ball=1, pocket=0, cutDegrees=10.0, cueDistance=0.5, pocketDistance=0.3, power=0.3
+    payload = jev.Selection(candidates=plans(), state={"legal_targets": [1, 2]})
+    assert await jev.evaluate(payload, "test-placeholder") == jev.Evaluation("s1", 200, 20)
+    # A real candidate from the wrong family is not accepted either.
+    for choice in ("s0", "unknown", {"aim": 1}):
+        result["answers"]["shot_safety"]["choice"] = choice
+        assert await jev.evaluate(payload, "test-placeholder") == jev.Evaluation(None, 200, 20)
+    result["answers"]["shot_safety"]["choice"] = "s1"
+    result["usage"] = {"input_tokens": True, "output_tokens": -1}
+    assert await jev.evaluate(payload, "test-placeholder") == jev.Evaluation("s1", None, None)
+
+
+def test_invalid_choice_with_valid_usage_is_metered(monkeypatch):
+    game = start()
+    set_cpu_turn(game)
+    monkeypatch.setattr(jev, "plan_shots", lambda gs: plans())
+
+    async def evaluate(payload, key):
+        return jev.Evaluation(None, 500, 20)
+
+    monkeypatch.setattr(jev, "evaluate", evaluate)
+    response = client.post(
+        f"/api/opponents/jev/games/{game['id']}/turn", headers=HEADERS, json={"revision": 0}
     )
-    payload = jev.Selection(candidates=[item, item], remaining=7)
-    assert await jev.evaluate(payload, "test-placeholder") == (1, 200, 20)
-    result["answers"]["shot"]["choice"] = "99"
-    with pytest.raises(ValueError):
-        await jev.evaluate(payload, "test-placeholder")
+    assert response.status_code == 200, response.text
+    assert response.json()["source"] == "cpu-fallback"
+    with Session() as db:
+        row = db.get(JevGame, game["id"])
+        assert (row.requests, row.input_tokens, row.unmetered_requests) == (1, 500, 0)
+
+
+def test_planned_kitchen_placement_committed_only_after_selection(monkeypatch):
+    game = start()
+    gs = new_game(3)
+    gs.current, gs.break_shot = 1, False
+    gs.ball_in_hand, gs.placement, gs.kitchen_shot = True, "kitchen", True
+    with Session.begin() as db:
+        db.get(JevGame, game["id"]).state = json.dumps(asdict(gs))
+    options = plans()
+    for i, option in enumerate(options):
+        option["placement"] = {"x": 0.3, "y": 0.3 + i * 0.1}
+
+    def planner(state):
+        assert state.ball_in_hand and state.placement == "kitchen"
+        return options
+
+    async def evaluate(payload, key):
+        assert payload.state["ball_in_hand"]
+        return jev.Evaluation("s1", 300, 20)
+
+    monkeypatch.setattr(jev, "plan_shots", planner)
+    monkeypatch.setattr(jev, "evaluate", evaluate)
+    response = client.post(
+        f"/api/opponents/jev/games/{game['id']}/turn", headers=HEADERS, json={"revision": 0}
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["placement"] == {"x": 0.3, "y": 0.4}
+    assert response.json()["family"] == "safety"
+    assert response.json()["state"]["revision"] == 1
+
+
+def test_client_cannot_supply_candidates_or_game_state():
+    game = start()
+    for extra in ({"candidates": plans()}, {"state": {"current": 1}}, {"placement": {"x": 1}}):
+        response = client.post(
+            f"/api/opponents/jev/games/{game['id']}/turn",
+            headers=HEADERS,
+            json={"revision": 0, **extra},
+        )
+        assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", [401, 422, 429, 529])
+async def test_provider_http_errors_are_not_retried(monkeypatch, status):
+    original = httpx.AsyncClient
+    calls = []
+
+    async def handler(request):
+        calls.append(request)
+        return httpx.Response(status, json={"detail": "private provider error"})
+
+    monkeypatch.setattr(
+        jev.httpx,
+        "AsyncClient",
+        lambda **kw: original(transport=httpx.MockTransport(handler), **kw),
+    )
+    with pytest.raises(httpx.HTTPStatusError):
+        await jev.evaluate(jev.Selection(plans(), {}), "test-placeholder")
+    assert len(calls) == 1
+
+
+def test_invalid_planned_placement_does_not_consume_turn(monkeypatch):
+    game = start()
+    gs = new_game(3)
+    gs.current, gs.break_shot = 1, False
+    gs.ball_in_hand, gs.placement, gs.kitchen_shot = True, "kitchen", True
+    raw = json.dumps(asdict(gs))
+    with Session.begin() as db:
+        db.get(JevGame, game["id"]).state = raw
+    invalid = plans()[0]
+    invalid["placement"] = {"x": 2.0, "y": 0.5}
+    monkeypatch.setattr(jev, "plan_shots", lambda state: [invalid])
+    response = client.post(
+        f"/api/opponents/jev/games/{game['id']}/turn", headers=HEADERS, json={"revision": 0}
+    )
+    assert response.status_code == 409
+    assert not jev.active_games
+    with Session() as db:
+        row = db.get(JevGame, game["id"])
+        assert row.revision == 0 and row.state == raw

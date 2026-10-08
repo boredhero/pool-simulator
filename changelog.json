@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.9.0",
+    "date": "2026-10-08",
+    "title": "Tactical AI planning and reliable ball placement",
+    "changes": [
+      "Jev now chooses tactical shots using previews from the real game physics, including direct pots, banks, kicks, combinations and safeties. Plans consider cue position, continuation and opponent replies.",
+      "Fixed CPU and Jev ball-in-hand planning so they place the cue and execute a shot together. Head-string shots can plan a legal cushion escape before returning to a ball in the kitchen.",
+      "The offline CPU now tests a bounded set of shots before playing, instead of falling back to a break shot when direct pots are unavailable.",
+      "Jev records reported token usage even when a model answer is invalid and a local fallback is used. Shot status identifies model choices and local plans."
+    ]
+  },
+  {
     "version": "0.8.0",
     "date": "2026-10-08",
     "title": "Owner dashboard and movable camera controls",

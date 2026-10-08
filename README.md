@@ -198,10 +198,20 @@ see changes on their next account refresh or Jev request. Revocation prevents
 premium-only games from continuing and does not reset a consumed free allowance.
 Back up the existing database before upgrading; preserve the `pool_data` volume.
 
-Jev 1.13 selects among at most 12 server-calculated direct-pot candidates. Geometry
-owns aim and physics. Standard breaks and positions without multiple clear pots
-use geometry; provider failures or the emergency paid-call budget use a visible
-CPU fallback. This experimental opponent is not established to outperform CPU.
+Jev 1.13 chooses among up to 12 server-planned shots with semantic descriptions
+of settled physics previews. A bounded planner proposes direct pots, banks,
+kicks, combinations and safeties, including cue placement when needed. One model
+request selects a tactical family and its corresponding offered plan. The server
+owns placement, aim, power, spin and all outcomes. Single-plan turns need no model
+call; provider failures or the emergency paid-call budget use a visible local
+fallback. Reported usage is metered even when an answer is invalid.
+
+The offline CPU also previews a bounded set of legal-target shots and plans
+placement together with the shot. Kitchen escapes can leave the head string
+before returning to a target inside it. Deterministic regression fixtures improve
+legality and pots over the old geometry policy; this does not establish Jev's
+competitive win rate. See [planner research and benchmark](docs/planner-research.md)
+and [Jev decision design](docs/jev.md) for sources and limits.
 Jev games do not count toward online account win/loss statistics.
 
 Set `JEV_API_KEY` only in the backend process environment or deployment folder's
