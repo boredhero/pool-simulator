@@ -1,4 +1,5 @@
 import './accountIdentity.css';
+import {acceptTerms,termsStatus,type TermsStatus} from './terms';
 import { AdminPanel } from './admin';
 export interface Account {id:string;username:string;createdAt:number;premium:boolean;isAdmin:boolean}
 interface Stats {matches:number;wins:number;losses:number;abandoned:number;shots:number;ballsPocketed:number;scratches:number;fouls:number;recent:Array<{id:string;opponent:string;status:string;result:string|null}>}
@@ -10,6 +11,9 @@ export class AccountPanel {
   private recoveryPending=false;
   private busy=false;
   private opener:HTMLElement|null=null;
+  private agreement:TermsStatus|null=null;
+  private agreementBusy=false;
+  private agreementRevision=0;
   private admin=new AdminPanel(()=>void this.refresh());
   constructor(private playing:()=>boolean,private changed:(account:Account|null)=>void) {
     for(const id of ['accountbtn','accountidentity'])el(id).addEventListener('click',()=>{this.opener=el(id);el<HTMLDialogElement>('accountdialog').showModal();void this.refresh();});
@@ -20,13 +24,7 @@ export class AccountPanel {
     for(const mode of ['login','register','recover'] as const)el('account-'+mode).addEventListener('click',()=>this.setMode(mode));
     el('accountform').addEventListener('submit',e=>{e.preventDefault();void this.submit();});
     el('accountlogout').addEventListener('click',()=>void this.logout());
-    el('acceptterms').addEventListener('click',()=>{
-      if(!el<HTMLInputElement>('termsadult').checked){this.status('Confirm you are 18 or older and accept the Terms.');return;}
-      void fetch('/api/privacy/terms',{method:'POST',headers:{'Content-Type':'application/json','X-Pool-Request':'1'},body:JSON.stringify({version:'2026-10-08',adult:true})})
-        .then(r=>{if(!r.ok)throw new Error();this.status('Terms accepted. You can now start your daily Jev game.');void this.refreshJevUsage();})
-        .catch(()=>this.status('Could not save acceptance. Please try again.'));
-    });
-    el('accountrefresh').addEventListener('click',()=>void this.refresh());
+    el('acceptterms').addEventListener('click',()=>void this.acceptAgreement());
     el('settingsbtn').addEventListener('click',()=>void this.refresh());
     el('recoverycopy').addEventListener('click',()=>void navigator.clipboard.writeText(el<HTMLInputElement>('recoveryvalue').value).then(()=>this.status('Recovery code copied. Keep it somewhere safe.')).catch(()=>this.status('Select and copy the recovery code above.')));
     el('recoverysaved').addEventListener('click',()=>{
@@ -47,8 +45,36 @@ export class AccountPanel {
   }
   async refresh() {
     if(this.recoveryPending||this.busy)return;
-    try {const data=await this.request('');this.account=data.account;this.changed(this.account);this.render(data.stats);}
+    try {const data=await this.request('');this.account=data.account;this.changed(this.account);this.render(data.stats);void this.refreshAgreement();}
     catch {this.status('Account service unavailable. Local play still works.');}
+  }
+  private async refreshAgreement(){
+    const revision=++this.agreementRevision,accountId=this.account?.id;
+    this.agreement=null;el('termsupdate').hidden=true;
+    el('accounttermsstatus').textContent=accountId?'Checking Terms acceptance…':'';
+    try{
+      const status=await termsStatus();
+      if(revision!==this.agreementRevision||this.account?.id!==accountId)return;
+      this.agreement=status;
+      el('termsupdate').hidden=!accountId||status.accepted||!status.authenticated;
+      el<HTMLInputElement>('termsadult').checked=false;
+      el('accounttermsstatus').textContent=accountId?(status.accepted?'Current Terms accepted.':status.authenticated?'Please review and accept the current Terms to use Jev AI.':'Sign in again to manage Terms acceptance.'):'';
+    }catch{
+      if(revision===this.agreementRevision&&this.account?.id===accountId)el('accounttermsstatus').textContent=accountId?'Terms status is unavailable. Reopen Account to try again.':'';
+    }
+  }
+  private async acceptAgreement(){
+    if(this.agreementBusy||!this.account||!this.agreement)return;
+    if(!el<HTMLInputElement>('termsadult').checked){this.status('Confirm you are 18 or older and accept the Terms.');return;}
+    const accountId=this.account.id,version=this.agreement.version;
+    this.agreementBusy=true;el<HTMLButtonElement>('acceptterms').disabled=true;
+    try{
+      await acceptTerms(version);
+      if(this.account?.id!==accountId)return;
+      el('termsupdate').hidden=true;this.status('Terms accepted. You can now use Jev AI.');
+      await this.refreshAgreement();void this.refreshJevUsage();
+    }catch(error){if(this.account?.id===accountId)this.status(error instanceof Error?error.message:'Could not save acceptance. Please try again.');}
+    finally{this.agreementBusy=false;el<HTMLButtonElement>('acceptterms').disabled=false;}
   }
   private setMode(mode:typeof this.mode) {
     this.mode=mode;
@@ -61,6 +87,7 @@ export class AccountPanel {
     el('accountsubmit').textContent=mode==='register'?'Create account':mode==='recover'?'Reset password':'Sign in';
     el('accountpasswordlabel').textContent=mode==='recover'?'New password':'Password';
     this.status('');
+    if(mode==='register')void this.refreshAgreement();
   }
   private render(stats?:Stats) {
     this.admin.setAccount(this.account);
@@ -112,7 +139,9 @@ export class AccountPanel {
     this.busy=true;el<HTMLButtonElement>('accountsubmit').disabled=true;el<HTMLButtonElement>('accountclose').disabled=true;
     const password=el<HTMLInputElement>('accountpassword'),recovery=el<HTMLInputElement>('accountrecovery');
     try {
-      const data=await this.request('/'+this.mode,{username:el<HTMLInputElement>('accountusername').value.trim(),password:password.value,...(this.mode==='register'?{terms_version:'2026-10-08',adult:el<HTMLInputElement>('registeradult').checked}:{}),...(this.mode==='recover'?{recovery:recovery.value}:{})});
+      const currentTerms=this.mode==='register'?await termsStatus():null;
+      if(currentTerms&&this.agreement?.version!==currentTerms.version){this.agreement=currentTerms;el<HTMLInputElement>('registeradult').checked=false;throw Error('The Terms have changed. Please review them and confirm acceptance again.');}
+      const data=await this.request('/'+this.mode,{username:el<HTMLInputElement>('accountusername').value.trim(),password:password.value,...(this.mode==='register'?{terms_version:currentTerms!.version,adult:el<HTMLInputElement>('registeradult').checked}:{}),...(this.mode==='recover'?{recovery:recovery.value}:{})});
       this.account=data.account??null;this.changed(this.account);this.status('');
       if(data.recovery){this.recoveryPending=true;el<HTMLInputElement>('recoveryvalue').value=data.recovery;el('recoverypanel').hidden=false;}
       this.render();
@@ -122,7 +151,7 @@ export class AccountPanel {
   }
   private async logout(){
     if(this.playing()||this.busy){this.status('Leave your current room before signing out.');return;}
-    try {await this.request('/logout',{});this.account=null;this.changed(null);this.render();this.status('Signed out. You can still play as a guest.');}
+    try {await this.request('/logout',{});this.account=null;this.changed(null);this.render();void this.refreshAgreement();this.status('Signed out. You can still play as a guest.');}
     catch(error){this.status(error instanceof Error?error.message:'Unable to sign out.');}
   }
 }

@@ -3,3 +3,10 @@
 #accountidentity:hover{background:#403729;border-color:#b9a178}#accountidentity:focus-visible{outline:2px solid #e7c384;outline-offset:3px}
 @media(min-width:901px){#version::before{font-size:10px;letter-spacing:1px}}
 @media(max-width:900px){#accountidentity{order:0;max-width:calc(100% - 70px);margin-left:auto}.topbar .status-meta{flex:1}.topbar .toolbar{order:1;flex-basis:100%;justify-content:flex-end}.topbar #msg{order:2}}
+/* Account agreements use the same compact native checkbox as onboarding. */
+#accountdialog .terms-check{gap:12px;align-items:flex-start;line-height:1.5;padding:8px 0;margin:0;cursor:pointer}
+#accountdialog .terms-check input[type=checkbox]{appearance:auto;accent-color:#bad3a1;box-sizing:border-box;width:22px!important;height:22px;min-height:22px!important;min-width:22px;margin:2px 0 0;padding:0;border-radius:4px;flex:none}
+#accountdialog .terms-check input:focus-visible{outline:3px solid #e7c384;outline-offset:3px}
+#termsupdate{display:grid;gap:12px;margin:18px 0 24px;padding:16px;border:1px solid #75634a;border-radius:12px;background:#282219}
+#termsupdate[hidden]{display:none}#acceptterms{justify-self:start;max-width:100%;white-space:normal}
+#accounttermsstatus{font-size:14px;color:#c9d9b4;margin:12px 0 20px}#accounttermsstatus:empty{display:none}
