@@ -32,7 +32,7 @@ export interface SceneHandle {
     visualDt?: number,
   ): void;
   /** Cue stick. pull in meters of drawback. */
-  setCue(visible: boolean, cx: number, cy: number, angle: number, pull: number, tipX?: number, tipY?: number): void;
+  setCue(visible: boolean, cx: number, cy: number, angle: number, pull: number, tipX?: number, tipY?: number, authoritativeElevation?:number): void;
   /** Ball-in-hand placement preview: legal-zone outline + cursor ring. */
   setPlace(visible: boolean, x: number, y: number, legal: boolean, zone?: string): void;
   setSights(style: SightStyle): void;
@@ -438,12 +438,12 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
       ring.position.set(rx, 0.004, rz);
       ringMat.color.copy(legal ? guide : new THREE.Color(0xf44336));
     },
-    setCue(visible, cx, cy, angle, pull, tipX = 0, tipY = 0) {
+    setCue(visible, cx, cy, angle, pull, tipX = 0, tipY = 0, authoritativeElevation?:number) {
       cueGroup.visible = visible;
       if (!visible) return;
       const [rx, rz] = toRender(cx, cy);
       const dx = Math.cos(angle), dy = Math.sin(angle);
-      const elevation = cueElevation(cx, cy, angle, 0, cueObstacles);
+      const elevation = authoritativeElevation??cueElevation(cx, cy, angle, 0, cueObstacles);
       // Local +z is the butt. Tilt up around the ball, then yaw along -aim.
       cueGroup.rotation.set(-elevation, Math.atan2(-dx, -dy), 0, 'YXZ');
       const scale = Math.min(1, .55 / (Math.hypot(tipX, tipY) || 1));

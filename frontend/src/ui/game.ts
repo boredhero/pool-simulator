@@ -1,3 +1,4 @@
+import { animateOpponentCue, cuePresentation, freezeShot, type SelectedShot, type CuePhase } from './opponentCue';
 import { Tutorial } from './tutorial';
 import { AccountPanel, type Account } from './account';
 import { cueStyle } from '../render/ballTextures';
@@ -74,6 +75,9 @@ export class Game {
   account:Account|null=null;
   accountPanel:AccountPanel;
   cpuTimer = 0;
+  opponentGeneration=0;
+  opponentAction:{controller:AbortController;shot:Readonly<SelectedShot>|null;elapsed:number;phase:CuePhase;reduced:boolean}|null=null;
+  humanPower=50;
   sfx = new Sfx();
   lastSpeed = new Map<number, number>();
   lastPotted = 0;
@@ -101,6 +105,7 @@ export class Game {
     this.accountPanel=new AccountPanel(()=>!!this.room,account=>{
       this.account=account;
       if (!account && this.jevOpponent) {
+        this.cancelOpponent();
         this.jevRequest?.abort(); this.jevRequest=null;this.jevGame=null;
         this.jevOpponent=false; this.cpuOpponent=true;
         this.el.jevbtn.classList.remove('on');this.el.jevbtn.setAttribute('aria-pressed','false');
@@ -139,6 +144,7 @@ export class Game {
 
   reset(rules: MatchConfig = this.gs.rules): void {
     if (this.room) return;
+    this.cancelOpponent();this.pendingNetwork=[];
     this.jevRequest?.abort(); this.jevRequest = null;
     if(this.jevGame){
       this.jevGame=null;
@@ -153,6 +159,37 @@ export class Game {
     this.angle=this.targetAngle=0;
     this.lastPotted = 0; this.lastSpeed.clear(); this.calledBall = this.calledPocket = null;
     this.options.write(rules); this.hud();
+  }
+
+  cancelOpponent():void {
+    this.opponentGeneration++;this.opponentAction?.controller.abort();this.opponentAction=null;
+    this.pulling=false;this.touchAim=false;this.pressPt=null;this.placementPress=null;this.cpuTimer=0;
+  }
+
+  humanCueControls():boolean {
+    return !this.opponentAction&&!this.jevRequest&&this.gs.winner===null
+      && (this.mode==='aim'||this.mode==='place')
+      && (this.room?this.room.ready&&this.seat===this.gs.current:!this.cpuOpponent||this.gs.current===0);
+  }
+
+  async showOpponentShot(shot:SelectedShot,valid:()=>boolean):Promise<boolean> {
+    const action=this.opponentAction;
+    if(!action||!valid())return false;
+    action.shot=freezeShot(shot);action.elapsed=0;action.phase='aiming';this.hud();
+    const done=await animateOpponentCue(action.controller.signal,action.reduced,elapsed=>{
+      if(!valid()){action.controller.abort();return;}
+      action.elapsed=elapsed;
+      const phase=cuePresentation(elapsed,shot.power,action.reduced).phase;
+      if(phase!==action.phase){action.phase=phase;this.hud();}
+    });
+    return done&&valid();
+  }
+
+  beginOpponent():NonNullable<Game['opponentAction']> {
+    this.pulling=false;this.touchAim=false;this.pressPt=null;this.placementPress=null;
+    const action={controller:new AbortController(),shot:null,elapsed:0,phase:'planning' as CuePhase,
+      reduced:matchMedia('(prefers-reduced-motion: reduce)').matches};
+    this.opponentAction=action;this.hud();return action;
   }
 
   cue(): Ball { return this.gs.balls[0]; }
@@ -211,7 +248,7 @@ export class Game {
 
   /** Human may act only on their own turn (CPU turns are driven by cpuMove). */
   humanTurn(): boolean {
-    if(this.cameraMode || this.cameraGesture || this.scene.cameraRig.interacting || this.jevRequest)return false;
+    if(!this.humanCueControls()||this.cameraMode || this.cameraGesture || this.scene.cameraRig.interacting)return false;
     if (!this.canShoot()) return false;
     if (this.cpuOpponent && this.gs.current === 1) return false;
     return true;
@@ -236,7 +273,8 @@ export class Game {
       this.targetAngle=Math.atan2(-Math.cos(facing),-Math.sin(facing));
   }
 
-  setSpin(x: number, y: number): void {
+  setSpin(x: number, y: number, internal=false): void {
+    if(!internal&&!this.humanCueControls())return;
     if(!this.cpuOpponent||this.gs.current===0)this.tutorial.record('spin');
     const scale=Math.min(1,.55/(Math.hypot(x,y)||1));
     this.tipX=x*scale;this.tipY=y*scale;
@@ -252,6 +290,7 @@ export class Game {
 
   wire(canvas: HTMLCanvasElement): void {
     const aimAt = (cx: number, cy: number) => {
+      if(!this.humanCueControls())return;
       if (this.mode === 'place') {
         this.placeX = cx; this.placeY = cy;
         return;
@@ -262,7 +301,7 @@ export class Game {
       if (Math.hypot(dx, dy) > 0.02) {this.targetAngle = Math.atan2(dy, dx);this.tutorial.record('aim');}
     };
     const tryPlace = (cx: number, cy: number) => {
-      if (this.jevRequest || (this.cpuOpponent && this.gs.current === 1 && !this.room)) return;
+      if(!this.humanCueControls())return;
       if (this.room) {
         if (this.seat === this.gs.current) this.room.place(cx, cy);
       } else if (placeCue(this.gs, cx, cy)) {
@@ -288,6 +327,7 @@ export class Game {
       if(this.cameraMode || this.scene.cameraRig.interacting || this.pointers.size>1){this.cameraGesture=true;this.touchAim=false;this.pulling=false;this.pressPt=null;this.placementPress=null;return;}
       if(this.cameraGesture)return;
       if (e.pointerType === 'mouse' && e.button !== 0) return;
+      if(!this.humanCueControls())return;
       const p = this.scene.pickFelt(e.clientX, e.clientY);
       if (!p) return;
       if (this.mode === 'place') {
@@ -336,7 +376,7 @@ export class Game {
     addEventListener('pointerup',releasePointer);addEventListener('pointercancel',releasePointer);
     canvas.addEventListener('pointerleave', e => {if(e.pointerType==='mouse')cancelPull();});
     const touchPower=document.getElementById('touchpower') as HTMLInputElement;
-    touchPower.addEventListener('input',()=>{document.getElementById('touchpowerlabel')!.textContent=`Power ${touchPower.value}%`;});
+    touchPower.addEventListener('input',()=>{if(!this.humanCueControls()){touchPower.value=String(this.humanPower);return;}this.humanPower=touchPower.valueAsNumber;document.getElementById('touchpowerlabel')!.textContent=`Power ${touchPower.value}%`;});
     document.getElementById('touchshoot')!.addEventListener('click',()=>{
       if(this.humanTurn()&&!this.pointers.size){this.angle=this.targetAngle;this.fire(touchPower.valueAsNumber/100);}
     });
@@ -358,7 +398,7 @@ export class Game {
     addEventListener('keydown', (e) => {
       if (document.querySelector('dialog[open]') || e.isComposing || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
       if ((e.target as HTMLElement)?.closest('input,select,button,a,textarea,summary,[role="button"],[contenteditable],dialog,[role="dialog"]')) return;
-      if(this.cameraMode)return;
+      if(this.cameraMode||!this.humanCueControls())return;
       if (e.code === 'ArrowLeft') this.targetAngle += 0.03;
       if (e.code === 'ArrowRight') this.targetAngle -= 0.03;
       if (e.code === 'Enter' && document.activeElement===canvas) {
@@ -372,11 +412,13 @@ export class Game {
       this.setSpin(Math.max(-.55,Math.min(.55,((e.clientX-r.left)/r.width-.5)*1.1)),Math.max(-.55,Math.min(.55,(.5-(e.clientY-r.top)/r.height)*1.1)));
     };
     spin.addEventListener('pointerdown',e=>{
+      if(!this.humanCueControls())return;
       if(e.pointerType==='mouse' && e.button!==0)return;
       e.stopPropagation();spin.setPointerCapture(e.pointerId);setTip(e);
     });
     spin.addEventListener('pointermove',e=>{if(spin.hasPointerCapture(e.pointerId))setTip(e);});
     spin.addEventListener('keydown',e=>{
+      if(!this.humanCueControls())return;
       const step=e.shiftKey ? .005 : .025;
       const keys:Record<string,[number,number]>={ArrowLeft:[-step,0],ArrowRight:[step,0],ArrowUp:[0,step],ArrowDown:[0,-step]};
       if(keys[e.key]){e.preventDefault();e.stopPropagation();this.setSpin(this.tipX+keys[e.key][0],this.tipY+keys[e.key][1]);}
@@ -420,8 +462,8 @@ export class Game {
     });
     this.el.createbtn.addEventListener('click', () => this.connectRoom(true));
     this.el.joinbtn.addEventListener('click', () => this.connectRoom(false));
-    document.getElementById('callball')!.addEventListener('change', e => { this.calledBall = Number((e.target as HTMLSelectElement).value); this.calledPocket = null; this.hud(); });
-    document.getElementById('clearcall')!.addEventListener('click', () => { this.calledPocket = null; this.hud(); });
+    document.getElementById('callball')!.addEventListener('change', e => { if(!this.humanCueControls())return;this.calledBall = Number((e.target as HTMLSelectElement).value); this.calledPocket = null; this.hud(); });
+    document.getElementById('clearcall')!.addEventListener('click', () => { if(!this.humanCueControls())return;this.calledPocket = null; this.hud(); });
     this.el.rack.addEventListener('click', () => {
       if(this.jevGame && this.account?.premium)void this.startJev(true);
       else this.reset();
@@ -449,7 +491,9 @@ export class Game {
   }
 
   async startJev(fresh=false): Promise<void> {
+    if(fresh){this.cancelOpponent();this.jevRequest?.abort();this.jevRequest=null;}
     if(this.jevRequest)return;
+    this.cancelOpponent();
     const controller=new AbortController();this.jevRequest=controller;
     this.el.opponentstatus.textContent=fresh?'Starting a new Jev game…':'Starting or resuming your Jev game…';
     try {
@@ -479,40 +523,47 @@ export class Game {
   }
 
   async playJevTurn(power?: number): Promise<void> {
-    if(!this.jevGame||this.jevRequest)return;
-    const game=this.jevGame,controller=new AbortController();this.jevRequest=controller;
+    if(!this.jevGame||this.jevRequest||this.opponentAction)return;
+    const game=this.jevGame,state=this.gs,generation=this.opponentGeneration;
+    const controller=new AbortController();this.jevRequest=controller;
+    const opponent=power===undefined,action=opponent?this.beginOpponent():null;
+    const valid=()=>!controller.signal.aborted&&this.jevGame===game&&this.gs===state
+      &&this.opponentGeneration===generation&&!this.room;
     const cue=this.cue();
-    const shot=power===undefined?undefined:{aim:this.angle,power,tipX:this.tipX,tipY:this.tipY,
+    const shot=opponent?undefined:{aim:this.angle,power,tipX:this.tipX,tipY:this.tipY,
       calledBall:this.calledBall,calledPocket:this.calledPocket,x:cue.x,y:cue.y};
     this.el.opponentstatus.textContent=shot?'Checking your shot…':'Jev AI is choosing a shot…';
     try {
       const result=await jevRequest(`/games/${game.id}/turn`,{revision:game.revision,shot},controller.signal);
-      if(controller.signal.aborted||this.jevGame!==game||this.room)return;
-      this.jevRequest=null;
-      Object.assign(cue,{x:result.placement.x,y:result.placement.y,potted:false});
+      if(!valid())return;
+      const selected=freezeShot({...result.shot,placement:result.placement});
+      if(opponent && !await this.showOpponentShot(selected,valid))return;
+      if(!valid())return;
+      if(this.opponentAction===action)this.opponentAction=null;
+      Object.assign(cue,{x:selected.placement.x,y:selected.placement.y,potted:false});
       this.gs.ballInHand=false;this.mode='aim';
-      this.angle=this.targetAngle=result.shot.aim;
-      this.calledBall=result.shot.calledBall;this.calledPocket=result.shot.calledPocket;
-      this.setSpin(result.shot.tipX,result.shot.tipY);
+      this.angle=this.targetAngle=selected.aim;
+      this.calledBall=selected.calledBall;this.calledPocket=selected.calledPocket;
+      this.setSpin(selected.tipX,selected.tipY,true);
       this.jevPlayback=true;
-      try {this.fire(result.shot.power,result.shot.vmax);} finally {this.jevPlayback=false;}
-      this.pendingNetwork.push(()=>{if(this.jevGame===game)this.applyJevState(result.state);});
+      try {this.fire(selected.power,selected.vmax,selected.elevation);} finally {this.jevPlayback=false;}
+      this.pendingNetwork.push(()=>{if(valid())this.applyJevState(result.state);});
       this.el.opponentstatus.textContent=result.source==='jev'?`Jev AI selected a ${result.family??'planned'} shot`:
         result.source==='cpu-fallback'?'Jev AI unavailable or capacity reached · CPU took this shot':
         result.source==='planner'?`Jev AI · local ${result.family??'planned'} shot (no model choice needed)`:
-        result.source==='geometry'?'Jev AI · geometry shot (no model choice needed)':
         result.expiresAt===null?'Premium · Unlimited Jev AI':'Daily Jev game';
     } catch(error) {
-      if(!controller.signal.aborted){
-        // Do not retry an ambiguous paid turn automatically. The server persists
-        // completed turns; starting/resuming fetches its latest revision safely.
+      if(valid()){
         this.mode='wait';
         this.el.opponentstatus.textContent=(error instanceof Error?error.message:'Connection lost')+' Select Jev AI to resume.';
       }
-    } finally {if(this.jevRequest===controller)this.jevRequest=null;}
+    } finally {
+      if(this.jevRequest===controller)this.jevRequest=null;
+      if(this.opponentAction===action)this.opponentAction=null;
+    }
   }
 
-  fire(power: number, vmax = this.gs.breakShot ? this.gs.rules.breakMax : this.gs.rules.normalMax): void {
+  fire(power: number, vmax = this.gs.breakShot ? this.gs.rules.breakMax : this.gs.rules.normalMax, authoritativeElevation?:number): void {
     if (!this.canShoot()) return;
     document.querySelector('.hint')?.classList.add('gone');
     try { localStorage.setItem('pool:seen', '1'); } catch { /* private mode */ }
@@ -521,9 +572,11 @@ export class Game {
     if (callRequired(this.gs) && (this.calledBall === null || this.calledPocket === null)) {
       this.el.msg.textContent = 'Choose a ball and tap its destination pocket before shooting'; return;
     }
+    // Latch the actual strike direction; pending aim smoothing must not reverse the cue.
+    this.targetAngle=this.angle;
     if(this.jevGame && !this.jevPlayback){void this.playJevTurn(power);return;}
     this.power = power;
-    const elevation = cueElevation(c.x, c.y, this.angle, 0, this.gs.balls);
+    const elevation = authoritativeElevation??cueElevation(c.x, c.y, this.angle, 0, this.gs.balls);
     beginShot(this.gs, this.calledBall, this.calledPocket);
     const params = { aim: this.angle, power, tipX: this.tipX, tipY: this.tipY, vmax, elevation, calledBall: this.calledBall, calledPocket: this.calledPocket };
     if(!this.cpuOpponent||this.gs.current===0)this.tutorial.record('shot');
@@ -538,24 +591,27 @@ export class Game {
   }
 
   async cpuMove(): Promise<void> {
-    if (this.jevRequest) return;
-    const cpuSeat = this.cpuOpponent ? 1 : -1;
-    if (cpuSeat < 0 || this.gs.current !== cpuSeat) return;
+    if(this.jevRequest||this.opponentAction||!this.cpuOpponent||this.gs.current!==1
+      ||this.room||this.gs.winner!==null||!['aim','place'].includes(this.mode))return;
     if(this.jevGame){await this.playJevTurn();return;}
-    if (this.room || this.gs.winner !== null || !['aim','place'].includes(this.mode)) return;
-    const shot = planCpuTurn(this.gs);
-    if (!shot) return;
-    if (this.gs.ballInHand) {
-      if (!shot.placement || !placeCue(this.gs,shot.placement.x,shot.placement.y)) return;
-    }
-    // Placement and firing are one CPU action, including recovery from place mode.
-    this.mode = 'aim';
-    this.angle = shot.angle;
-    this.targetAngle = shot.angle;
-    this.power = shot.power;
-    this.setSpin(shot.tipX, shot.tipY);
-    this.calledBall = shot.ball; this.calledPocket = shot.pocket;
-    this.fire(shot.power);
+    const state=this.gs,generation=this.opponentGeneration,action=this.beginOpponent();
+    const valid=()=>this.opponentAction===action&&!action.controller.signal.aborted
+      &&this.gs===state&&this.opponentGeneration===generation&&this.cpuOpponent&&!this.jevGame&&!this.room;
+    try {
+      // Yield a frame so the genuine planning phase hides the idle human cue.
+      await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
+      if(!valid())return;
+      const plan=planCpuTurn(state);if(!plan)return;
+      const selected=freezeShot({aim:plan.angle,power:plan.power,tipX:plan.tipX,tipY:plan.tipY,
+        calledBall:plan.ball,calledPocket:plan.pocket,placement:plan.placement??{x:this.cue().x,y:this.cue().y}});
+      if(!await this.showOpponentShot(selected,valid))return;
+      if(state.ballInHand&&!placeCue(state,selected.placement.x,selected.placement.y))return;
+      this.opponentAction=null;this.mode='aim';
+      this.angle=this.targetAngle=selected.aim;this.power=selected.power;
+      this.setSpin(selected.tipX,selected.tipY,true);
+      this.calledBall=selected.calledBall;this.calledPocket=selected.calledPocket;
+      this.fire(selected.power);
+    } finally {if(this.opponentAction===action)this.opponentAction=null;}
   }
 
   lastTutorialCameraRevision = 0;
@@ -577,8 +633,8 @@ export class Game {
       }
       this.lastSpeed.set(b.id, v);
     }
-    if ((this.mode === 'aim' || this.mode === 'place') && this.cpuOpponent && this.gs.current === 1 && this.gs.winner === null && !this.room) {
-      this.cpuTimer += 1 / 60;
+    if (!this.opponentAction && (this.mode === 'aim' || this.mode === 'place') && this.cpuOpponent && this.gs.current === 1 && this.gs.winner === null && !this.room) {
+      this.cpuTimer += fdt;
       if (this.cpuTimer > 1.2) {
         this.cpuTimer = 0;
         void this.cpuMove();
@@ -639,7 +695,9 @@ export class Game {
       if(this.mode==='rolling' && (this.ev.potted.length || this.ev.cuePotted))this.el.msg.textContent=this.ev.cuePotted?'Scratch · balls still rolling':`Pocketed ${this.ev.potted.join(', ')} · balls still rolling`;
     }
     const returnOrder = [...new Set([...this.gs.returnOrder, ...(this.mode === 'rolling' || this.mode === 'wait' ? this.ev.potted : [])])].filter(n => this.gs.balls.some(b => b.n === n && b.potted));
-    this.scene.setBalls(this.gs.balls, ballDt, returnOrder, fdt);
+    const presented=this.opponentAction?.shot;
+    const visualBalls=presented?this.gs.balls.map(b=>b.id===0?{...b,...presented.placement,potted:false}:b):this.gs.balls;
+    this.scene.setBalls(visualBalls, ballDt, returnOrder, fdt);
     // Ease aim toward target (kills mouse jitter twitch), frame-rate independent.
     {
       let d = this.targetAngle - this.angle;
@@ -648,14 +706,24 @@ export class Game {
       this.angle += d * Math.min(1, fdt * 14);
     }
     (document.getElementById('touchshoot') as HTMLButtonElement).disabled=!this.humanTurn()||this.pointers.size>0;
-    const aiming = this.mode === 'aim' && !this.cue().potted;
+    const aiming = this.mode === 'aim' && !this.cue().potted && this.humanCueControls();
     const pulling = this.pulling && aiming;
     const pull = pulling ? 0.02 + this.pullPower() * 0.18 : 0.02 + this.power * 0.1;
     this.scene.setCall(this.calledPocket, aiming && callRequired(this.gs));
-    this.scene.setCue(aiming, this.cue().x, this.cue().y, this.angle, pull, this.tipX, this.tipY);
+    if(presented&&this.opponentAction){
+      const pose=cuePresentation(this.opponentAction.elapsed,presented.power,this.opponentAction.reduced);
+      this.scene.setCue(true,presented.placement.x,presented.placement.y,presented.aim,pose.pull,presented.tipX,presented.tipY,presented.elevation);
+      this.scene.setCall(presented.calledPocket,callRequired(this.gs));
+    } else this.scene.setCue(aiming, this.cue().x, this.cue().y, this.angle, pull, this.tipX, this.tipY);
+    const controls=this.humanCueControls();
+    (document.getElementById('touchpower') as HTMLInputElement).disabled=!controls;
+    (document.getElementById('callball') as HTMLSelectElement).disabled=!controls;
+    (document.getElementById('clearcall') as HTMLButtonElement).disabled=!controls;
+    (document.getElementById('resetspin') as HTMLButtonElement).disabled=!controls||Math.hypot(this.tipX,this.tipY)<1e-9;
+    this.el.spin.setAttribute('aria-disabled',String(!controls));
     (this.el.chargefill as HTMLElement).style.width = pulling ? `${this.pullPower() * 100}%` : '0%';
     this.scene.setKitchen((this.mode === 'place' && this.gs.placement === 'kitchen') || (aiming && this.gs.kitchenShot), aiming);
-    if (this.mode === 'place') {
+    if (this.mode === 'place' && this.humanCueControls()) {
       this.scene.setPlace(true, this.placeX, this.placeY, canPlace(this.gs, this.placeX, this.placeY), this.gs.placement);
     } else {
       this.scene.setPlace(false, 0, 0, false);
@@ -668,7 +736,11 @@ export class Game {
 
   hud(): void {
     let msg = this.gs.message;
-    if (this.mode === 'place') msg += this.cpuOpponent && this.gs.current === 1 && !this.room
+    if(this.opponentAction){
+      const phase=this.opponentAction.phase;
+      msg=`${this.playerName(1)} · ${phase==='planning'?'choosing a shot':phase==='aiming'?'lining up':phase==='pulling'?'drawing back':'striking'}`;
+    }
+    if (!this.opponentAction&&this.mode === 'place') msg += this.cpuOpponent && this.gs.current === 1 && !this.room
       ? ' — planning cue placement…' : ' — tap inside the outlined area to place the cue ball';
     else if (this.mode === 'rolling') msg = `Player ${this.gs.current + 1} · shot in motion`;
     else if (this.mode === 'wait' && this.room) msg += ' — waiting…';
@@ -757,6 +829,7 @@ export class Game {
   }
 
   applyServerState(s: RoomState): void {
+    this.cancelOpponent();
     const wasPlacing=this.gs.ballInHand;
     for (const sb of s.balls) {
       const b = this.gs.balls.find((q) => q.id === sb.id);
@@ -804,6 +877,7 @@ export class Game {
     }
     this.jevRequest?.abort();this.jevRequest=null;this.jevGame=null;this.jevOpponent=false;
     this.el.opponentstatus.textContent="";
+    this.cancelOpponent();
     const rc = new RoomClient();
     this.room = rc;
     this.seat = null;
