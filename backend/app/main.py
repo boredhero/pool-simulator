@@ -77,7 +77,7 @@ if DIST.exists():
     @app.get("/{full_path:path}")
     def spa(full_path: str = ""):
         if full_path.startswith("api/"):
-            return {"detail": "not found"}
+            raise HTTPException(404, "Not found")
         f = (DIST / full_path).resolve()
         if not f.is_relative_to(DIST.resolve()):
             raise HTTPException(404, "Not found")

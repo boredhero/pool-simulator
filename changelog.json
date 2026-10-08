@@ -4,7 +4,7 @@
     "date": "2026-10-08",
     "title": "Safer online play",
     "changes": [
-      "Retired unauthenticated legacy score and replay submissions while preserving existing records for reading.",
+      "Removed legacy score and replay endpoints, their unused database models, and the obsolete frontend REST transport. Unknown API reads now return 404 instead of a successful SPA fallback.",
       "Added strict WebSocket field validation, message throttles, connection caps, bounded simulation concurrency, and HTTP request-size limits.",
       "Leaving or losing connection after the first shot counts as a casual forfeit. Production shutdowns and server failures remain interruptions without a fabricated winner.",
       "Account stats explicitly describe unranked casual play; private and custom matches do not establish a competitive rating.",

@@ -10,16 +10,16 @@ def test_version():
     assert r.status_code == 200 and r.json()["name"] == "pool-simulator"
 
 
-def test_legacy_writes_are_retired():
-    from app.models.db import Replay, Score, Session
+def test_removed_legacy_routes_and_models():
+    from app.models.db import Base
 
-    with Session() as db:
-        before = (db.query(Score).count(), db.query(Replay).count())
-    for path in ("scores", "replays"):
-        assert c.post(f"/api/{path}", json={"winner": "invented"}).status_code == 410
-    with Session() as db:
-        assert (db.query(Score).count(), db.query(Replay).count()) == before
-    assert c.get("/api/scores").status_code == 200
+    paths = app.openapi()["paths"]
+    for path in ("/api/scores", "/api/replays", "/api/replays/1"):
+        assert path not in paths
+        assert c.get(path).status_code == 404
+        assert c.post(path, json={}).status_code in (404, 405)
+    assert "scores" not in Base.metadata.tables
+    assert "replays" not in Base.metadata.tables
 
 
 def test_body_limits_and_browser_headers():

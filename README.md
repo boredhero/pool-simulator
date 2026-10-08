@@ -47,8 +47,7 @@ Only token hashes are stored in the database; credentials are not kept in browse
 storage. Auth mutations require a same-origin request and a custom request header.
 Account/IP attempt limits persist across server restarts.
 
-Account stats count server-simulated private online matches, not client-posted
-legacy scores or local/AI games. The ledger stores stable account IDs, guest/name
+Account stats count server-simulated private online matches, not client-submitted results or local/AI games. The ledger stores stable account IDs, guest/name
 snapshots, opponents, rules/version, timestamps, outcomes, disconnects, and shot
 facts. This is the foundation for future lobbies/matchmaking; private games are
 currently unrated and there is no public matchmaking queue yet.
@@ -58,9 +57,9 @@ currently unrated and there is no public matchmaking queue yet.
 Both Compose files retain the existing named `pool_data` volume at `/srv/data`,
 with `DATABASE_URL=sqlite:////srv/data/pool.db`. Rebuilding/replacing the container
 preserves accounts, session verifiers, match history, and stats. Initial startup
-adds the new tables idempotently without dropping existing scores/replays. This
-release adds tables only; future changes to existing columns need an explicit
-migration rather than relying on `create_all`.
+creates the current tables idempotently. Changes to existing columns need an
+explicit migration rather than relying on `create_all`. Obsolete test tables in
+an existing database are no longer mapped or exposed by the application.
 
 Production publishes port 8000 on host loopback for the existing HTTPS reverse
 proxy, and trusts that proxy’s forwarded client IP so rate limits apply per client.
@@ -138,8 +137,8 @@ so they go through tests before the release PR to `main`. Configuration follows
 ### Online security (0.6.1)
 
 The server simulates shots, checks turns and placements, and records results.
-Browser state and playback acknowledgements are not trusted. Legacy POST
-`/api/scores` and `/api/replays` now return 410; existing records remain readable.
+Browser state and playback acknowledgements are not trusted. The legacy `/api/scores` and `/api/replays` routes, database models, and unused
+REST replay transport have been removed entirely.
 Account totals are unranked casual statistics, including private/custom games and
 forfeits. They are not a matchmaking rating: cooperating players and aiming bots
 can still produce valid shots. Future ranked games need a separate eligibility and

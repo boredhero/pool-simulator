@@ -127,8 +127,6 @@ def test_registered_identity_and_authoritative_lifetime_stats():
     stats = client.get("/api/account").json()["stats"]
     assert stats["matches"] == stats["wins"] == stats["shots"] == 1
     assert stats["ballsPocketed"] == 2 and stats["losses"] == 0
-    client.post("/api/scores", json={"winner": "ActualPlayer"})
-    assert client.get("/api/account").json()["stats"] == stats
 
 
 def test_restart_marks_active_matches_interrupted_without_awarding_wins():
