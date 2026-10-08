@@ -54,6 +54,7 @@ def init_db() -> None:
             pass
     Base.metadata.create_all(engine)
     from app.models.migrations import (
+        upgrade_account_status,
         upgrade_jev_allowance,
         upgrade_match_modes,
         upgrade_premium,
@@ -61,6 +62,7 @@ def init_db() -> None:
     )
 
     with engine.begin() as connection:
+        upgrade_account_status(connection)
         upgrade_premium(connection)
         upgrade_jev_allowance(connection)
         upgrade_terms(connection)
@@ -79,6 +81,7 @@ class Account(Base):
     recovery_hash: Mapped[str] = mapped_column(Text)
     created_at: Mapped[int] = mapped_column(Integer)
     premium: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    disabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
 
 
 class LoginSession(Base):
@@ -200,3 +203,12 @@ class FeatureEvent(Base):
     session_id: Mapped[str] = mapped_column(ForeignKey("visitor_sessions.id"), index=True)
     name: Mapped[str] = mapped_column(String(32))
     occurred_at: Mapped[int] = mapped_column(Integer, index=True)
+
+
+class AdminAccountAction(Base):
+    __tablename__ = "admin_account_actions"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    actor_id: Mapped[str] = mapped_column(String(32))
+    account_id: Mapped[str] = mapped_column(String(32), index=True)
+    action: Mapped[str] = mapped_column(String(16))
+    occurred_at: Mapped[int] = mapped_column(Integer)

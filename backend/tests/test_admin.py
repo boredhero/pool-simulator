@@ -150,3 +150,119 @@ def test_dashboard_filters_paginates_and_sums_stored_cost_without_exposing_secre
             "private-network-hash",
         ):
             assert secret not in response.text
+
+
+def test_disable_revokes_sessions_and_blocks_login_recovery_until_enabled(monkeypatch):
+    admin, _ = owner(monkeypatch)
+    user, target = register("SuspendedPlayer")
+    path = f"/api/admin/accounts/{target['id']}/status"
+    assert user.patch(path, headers=HEADERS, json={"disabled": True}).status_code == 404
+    assert admin.patch(path, json={"disabled": True}).status_code == 403
+    assert admin.patch(path, headers=HEADERS, json={"disabled": "true"}).status_code == 422
+    with Session() as db:
+        recovery_hash = db.get(Account, target["id"]).recovery_hash
+    assert admin.patch(path, headers=HEADERS, json={"disabled": True}).status_code == 200
+    assert user.get("/api/account").json()["account"] is None
+    login = {"username": "SuspendedPlayer", "password": "a long admin test password"}
+    assert user.post("/api/account/login", headers=HEADERS, json=login).status_code == 401
+    monkeypatch.setattr("app.api.accounts.verify", lambda *_: True)
+    assert (
+        user.post(
+            "/api/account/recover", headers=HEADERS, json={**login, "recovery": "test"}
+        ).status_code
+        == 401
+    )
+    with Session() as db:
+        assert db.get(Account, target["id"]).recovery_hash == recovery_hash
+        assert db.query(LoginSession).filter_by(account_id=target["id"]).count() == 0
+    assert admin.get(path.removesuffix("/status")).json()["disabled"] is True
+    assert admin.patch(path, headers=HEADERS, json={"disabled": False}).status_code == 200
+    assert user.get("/api/account").json()["account"] is None
+    assert user.post("/api/account/login", headers=HEADERS, json=login).status_code == 200
+
+
+def test_delete_protects_owner_requires_confirmation_and_preserves_shared_history(monkeypatch):
+    from app.models.db import AdminAccountAction, MatchPlayer, TermsAcceptance
+    from app.services.matches import start_match
+    from app.sim.config import match_config
+
+    admin, actor = owner(monkeypatch)
+    user, target = register("DeletedPlayer")
+    path = f"/api/admin/accounts/{target['id']}"
+    own = f"/api/admin/accounts/{actor['id']}"
+    assert admin.patch(own + "/status", headers=HEADERS, json={"disabled": True}).status_code == 409
+    assert (
+        admin.request(
+            "DELETE", own, headers=HEADERS, json={"username": actor["username"]}
+        ).status_code
+        == 409
+    )
+    assert (
+        user.request(
+            "DELETE", path, headers=HEADERS, json={"username": target["username"]}
+        ).status_code
+        == 404
+    )
+    assert admin.request("DELETE", path, json={"username": target["username"]}).status_code == 403
+    assert (
+        admin.request("DELETE", path, headers=HEADERS, json={"username": "wrong"}).status_code
+        == 409
+    )
+    match = start_match(
+        [target["username"], "Other player"], [target["id"], actor["id"]], match_config()
+    )
+    monkeypatch.setenv("JEV_API_KEY", "test-placeholder")
+    game = user.post("/api/opponents/jev/games", headers=HEADERS, json={}).json()["id"]
+    from app.api.jev import active_games
+
+    active_games.add(game)
+    try:
+        assert (
+            admin.request(
+                "DELETE", path, headers=HEADERS, json={"username": target["username"]}
+            ).status_code
+            == 409
+        )
+    finally:
+        active_games.discard(game)
+    assert (
+        admin.request(
+            "DELETE", path, headers=HEADERS, json={"username": target["username"]}
+        ).status_code
+        == 200
+    )
+    assert user.get("/api/account").json()["account"] is None
+    with Session() as db:
+        assert db.get(Account, target["id"]) is None
+        assert db.get(TermsAcceptance, target["id"]) is None
+        assert db.get(JevGame, game) is None
+        player = db.get(MatchPlayer, (match, 0))
+        assert player.account_id is None and player.display_name == "Deleted player"
+        assert db.get(MatchPlayer, (match, 1)).account_id == actor["id"]
+        assert (
+            db.query(AdminAccountAction)
+            .filter_by(account_id=target["id"], action="deleted")
+            .count()
+            == 1
+        )
+
+
+def test_account_status_upgrade_is_idempotent_and_preserves_credentials():
+    from sqlalchemy import create_engine
+
+    from app.models.migrations import upgrade_account_status
+
+    engine = create_engine("sqlite:///:memory:")
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            "CREATE TABLE accounts (id TEXT PRIMARY KEY, password_hash TEXT)"
+        )
+        connection.exec_driver_sql("INSERT INTO accounts VALUES ('existing','hash')")
+        upgrade_account_status(connection)
+        assert connection.exec_driver_sql("SELECT password_hash,disabled FROM accounts").one() == (
+            "hash",
+            0,
+        )
+        connection.exec_driver_sql("UPDATE accounts SET disabled=1")
+        upgrade_account_status(connection)
+        assert connection.exec_driver_sql("SELECT disabled FROM accounts").scalar() == 1

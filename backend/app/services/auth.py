@@ -107,7 +107,7 @@ def account_for_token(token: str | None) -> dict | None:
         if not session or session.expires_at <= int(time.time()):
             return None
         user = db.get(Account, session.account_id)
-        return public_account(user) if user else None
+        return public_account(user) if user and not user.disabled else None
 
 
 def current_account(request: Request) -> dict | None:

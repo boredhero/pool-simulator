@@ -81,3 +81,10 @@ def upgrade_jev_allowance(connection) -> None:
                 batch.drop_constraint(name, type_="unique")
         batch.create_unique_constraint("uq_jev_daily_slot", ["account_id", "day", "daily_slot"])
     # Existing rows have no slot: the new five-game allowance starts unused.
+
+
+def upgrade_account_status(connection) -> None:
+    if "disabled" not in {c["name"] for c in inspect(connection).get_columns("accounts")}:
+        Operations(MigrationContext.configure(connection)).add_column(
+            "accounts", Column("disabled", Boolean, nullable=False, server_default=false())
+        )

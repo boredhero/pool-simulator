@@ -1,5 +1,15 @@
 [
   {
+    "version": "1.0.3",
+    "date": "2026-10-08",
+    "title": "Admin account controls",
+    "changes": [
+      "The owner dashboard can disable and re-enable accounts. Disabling revokes existing sessions and blocks sign-in and recovery.",
+      "Accounts can be permanently deleted after confirming the username. Private account and Jev records are removed; shared match history is anonymized.",
+      "Server-side owner protection prevents disabling or deleting the admin account. Account actions are recorded in the admin audit log."
+    ]
+  },
+  {
     "version": "1.0.2",
     "date": "2026-10-08",
     "title": "Fresh opponent games and five free Jev starts",

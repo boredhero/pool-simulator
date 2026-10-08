@@ -26,12 +26,15 @@ def start_match(names: list[str], accounts: list[str | None], rules: dict) -> st
         )
         db.flush()
         for seat in (0, 1):
+            account = db.get(Account, accounts[seat]) if accounts[seat] else None
             db.add(
                 MatchPlayer(
                     match_id=match_id,
                     seat=seat,
-                    account_id=accounts[seat],
-                    display_name=names[seat],
+                    account_id=account.id if account else None,
+                    display_name="Deleted player"
+                    if accounts[seat] and account is None
+                    else names[seat],
                 )
             )
     return match_id

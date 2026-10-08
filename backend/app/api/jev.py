@@ -17,7 +17,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from app.api.privacy import require_terms
-from app.models.db import JevGame, JevUsage, Session
+from app.models.db import Account, JevGame, JevUsage, Session
 from app.net.rooms import Room
 from app.services.auth import current_account, mutation_guard
 from app.services.matches import ensure_jev_match, record_shot_in_session
@@ -168,6 +168,9 @@ async def start_game(
     premium = account["premium"]
     fresh = payload is not None and payload.new_game
     with Session.begin() as db:
+        current = db.get(Account, account["id"])
+        if current is None or current.disabled:
+            raise HTTPException(401, "Account access is unavailable.")
         existing = resumable_game(db, account, day)
         if existing and existing.status == "active" and not fresh:
             return public_game(existing, premium)
@@ -406,6 +409,9 @@ async def play_turn(
     if game_id in active_games or len(active_games) >= 4:
         raise HTTPException(409, "Game is busy. Resume after this shot.")
     with Session() as db:
+        current = db.get(Account, account["id"])
+        if current is None or current.disabled:
+            raise HTTPException(401, "Account access is unavailable.")
         record = db.get(JevGame, game_id)
         if record is None or record.account_id != account["id"]:
             raise HTTPException(404, "Game not found.")
