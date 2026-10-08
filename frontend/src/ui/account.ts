@@ -1,4 +1,5 @@
 import './accountIdentity.css';
+import './mobileHud.css';
 import {acceptTerms,termsStatus,type TermsStatus} from './terms';
 import { AdminPanel } from './admin';
 export interface Account {id:string;username:string;createdAt:number;premium:boolean;isAdmin:boolean}
