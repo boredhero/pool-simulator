@@ -57,7 +57,7 @@ test('premium Jev replay creates a new server game through the real button',asyn
   await page.locator('#winnerreplay').click();await expect(page.locator('#winnerstatus')).toContainText('Temporarily unavailable');
   await expect(page.locator('#winnerreplay')).toBeEnabled();
   await page.locator('#winnerreplay').click();await expect(page.locator('#winnerdialog')).not.toBeVisible();
-  expect(requests).toEqual([{new_game:true},{new_game:true}]);
+  expect(requests).toEqual([{new_game:true,rules:state.rules},{new_game:true,rules:state.rules}]);
   expect(await page.evaluate(()=>{const g=(window as any).__pool;return [g.jevGame.id,g.jevOpponent,g.gs.winner];})).toEqual(['new-game',true,null]);
 });
 

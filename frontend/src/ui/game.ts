@@ -12,7 +12,7 @@ import { cueStyle } from '../render/ballTextures';
 import { advancePlayback } from './playback';
 import { sightStyle } from '../render/railSights';
 import { cueElevation } from '../sim/cue';
-import { type MatchConfig } from '../sim/config';
+import { matchConfig, type MatchConfig } from '../sim/config';
 import { TableOptions } from './tableOptions';
 import { allAsleep, strike, type Ball, type ShotEvents } from '../sim/physics';
 import { applyShot, beginShot, callRequired, canPlace, legalTargets, newGame, placeCue, type GameState } from '../sim/rules';
@@ -114,7 +114,7 @@ export class Game {
         'feltsw', 'woodsw', 'feltcustom', 'woodcustom', 'scorecard'].map((id) => [id, document.getElementById(id)!]),
     );
     this.applyTheme(localStorage.getItem('pool:felt') ?? FELTS[0], localStorage.getItem('pool:wood') ?? WOODS[0], false);
-    this.options = new TableOptions(rules => this.reset(rules));
+    this.options = new TableOptions(rules => {if(this.jevGame&&this.account?.premium)void this.startJev(true,rules);else this.reset(rules);});
     this.buildThemePanel();
     this.wire(canvas);
     this.accountPanel=new AccountPanel(()=>!!this.room,account=>{
@@ -600,18 +600,19 @@ export class Game {
     });
   }
 
-  async startJev(fresh=false): Promise<void> {
+  async startJev(fresh=false,rules:MatchConfig=this.gs.rules): Promise<void> {
     if(this.tutorial.active)return;
     this.coin.cancel();
     if(fresh){this.cancelOpponent();this.jevRequest?.abort();this.jevRequest=null;}
     if(this.jevRequest)return;
     this.cancelOpponent();
     const controller=new AbortController();this.jevRequest=controller;
-    this.el.opponentstatus.textContent=fresh?'Starting a new Jev game…':'Starting or resuming your Jev game…';
+    const requestedRules=matchConfig(rules);
+    this.el.opponentstatus.textContent=fresh?'Starting a new Jev game…':'Opening your Jev game…';
     try {
-      const game=await jevRequest('/games',fresh?{new_game:true}:{},controller.signal);
+      const game=await jevRequest('/games',{rules:requestedRules,...(fresh?{new_game:true}:{})},controller.signal);
       if(controller.signal.aborted||this.room)return;
-      this.reset(this.gs.rules,false);
+      this.reset(requestedRules,false);
       this.pendingNetwork=[];
       this.jevOpponent=true;this.cpuOpponent=true;
       this.jevGame={id:game.id,revision:game.state.revision};
@@ -622,7 +623,9 @@ export class Game {
       if(game.created===true)this.coin.queue(this.gs,this.gs.current);
       this.el.opponentstatus.textContent=game.expiresAt===null
         ? 'Premium · Unlimited Jev AI · New rack starts another game'
-        : 'Daily Jev game · resets at midnight UTC · select Jev again to resume';
+        : 'Daily Jev game · resets at midnight UTC · select Jev again to continue';
+      if(game.created===false&&(Object.keys(requestedRules) as Array<keyof MatchConfig>).some(key=>requestedRules[key]!==game.state.rules[key]))
+        this.el.opponentstatus.textContent='Your existing Jev game keeps its original rules.'+(this.account?.premium?' Open Table to start a new Jev game with different rules.':' These rules stay fixed for this game.');
     } catch(error) {
       if(!controller.signal.aborted)this.el.opponentstatus.textContent=error instanceof Error?error.message:'Jev unavailable';
     } finally {if(this.jevRequest===controller)this.jevRequest=null;}
@@ -1000,7 +1003,7 @@ export class Game {
     this.gs.open = s.open;
     this.gs.breakShot = s.break_shot; this.gs.placement = s.placement; this.gs.kitchenShot = s.kitchen_shot; this.gs.rules = s.rules;
     this.calledBall = this.calledPocket = null; delete this.gs.shot;
-    this.options.write(s.rules, true);
+    this.options.write(s.rules,this.jevGame?(this.account?.premium?'jev-premium':'jev'):'room');
     this.gs.ballInHand = s.ball_in_hand;
     this.gs.winner = s.winner === 1 ? 1 : s.winner === 0 ? 0 : null;
     this.gs.message = s.message;
