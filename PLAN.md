@@ -28,9 +28,9 @@ Flow: work on `develop`, PR to `main` (protected: PR + `ci` check), merge to shi
   implementation, cohesive camera HUD and consistent legal controls.
 - [x] 0.9.2: 124 backend/96 frontend tests, focused and real online checks;
   PR #29 merged, full browser CI passed and deployment verified live.
-- [ ] 0.9.3: Responsive staged tutorial with isolated practice/restore and
+- [x] 0.9.3: Responsive staged tutorial with isolated practice/restore and
   mouse/trackpad/touch instructions.
-- [ ] 0.9.3: First-visit welcome, explicit Terms acceptance, independent optional
+- [x] 0.9.3: First-visit welcome, explicit Terms acceptance, independent optional
   analytics consent and prominent tutorial handoff.
 - [ ] 0.9.3: Viewport/input/consent regressions, version bump, PR and CI.
 
