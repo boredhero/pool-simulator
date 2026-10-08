@@ -1,5 +1,8 @@
+import type { PerspectiveCamera } from 'three';
 import { animateOpponentCue, cuePresentation, freezeShot, type SelectedShot, type CuePhase } from './opponentCue';
-import { Tutorial } from './tutorial';
+import { Tutorial, type TutorialAction } from './tutorial';
+import { practiceTable } from './tutorialPractice';
+import { framePose } from '../render/cameraRig';
 import { AccountPanel, type Account } from './account';
 import { cueStyle } from '../render/ballTextures';
 import { advancePlayback } from './playback';
@@ -78,6 +81,7 @@ export class Game {
   opponentGeneration=0;
   opponentAction:{controller:AbortController;shot:Readonly<SelectedShot>|null;elapsed:number;phase:CuePhase;reduced:boolean}|null=null;
   humanPower=50;
+  private restorePractice:(()=>void)|null=null;
   sfx = new Sfx();
   lastSpeed = new Map<number, number>();
   lastPotted = 0;
@@ -140,9 +144,74 @@ export class Game {
       if (localStorage.getItem('pool:seen')) document.getElementById('hint')?.classList.add('gone');
     } catch { /* private mode */ }
     this.hud();
+    this.tutorial.bind({begin:()=>this.beginPractice(),stage:action=>this.stagePractice(action),
+      end:()=>{this.restorePractice?.();this.restorePractice=null;},frame:()=>this.framePractice()});
+  }
+
+  beginPractice():boolean {
+    if(this.room||this.jevGame||this.jevRequest||this.opponentAction||this.mode==='rolling'||this.pulling||this.pendingNetwork.length){
+      this.el.msg.textContent='Practice is available at an idle local table. Finish this shot or leave the online/Jev game first.';return false;
+    }
+    const saved={gs:this.gs,mode:this.mode,angle:this.angle,targetAngle:this.targetAngle,power:this.power,
+      tipX:this.tipX,tipY:this.tipY,calledBall:this.calledBall,calledPocket:this.calledPocket,
+      cpuOpponent:this.cpuOpponent,jevOpponent:this.jevOpponent,placeX:this.placeX,placeY:this.placeY,
+      humanPower:this.humanPower,cameraMode:this.cameraMode,autoCamera:this.options.autoCamera};
+    const camera=this.scene.controls.object,position=camera.position.clone(),target=this.scene.controls.target.clone();
+    this.cancelOpponent();this.cpuOpponent=false;this.jevOpponent=false;this.options.autoCamera=false;
+    this.cameraMode=false;this.scene.cameraRig.setMode(false);this.scene.cameraRig.setFlyInput(0,0);
+    this.restorePractice=()=>{
+      this.cancelOpponent();this.pendingNetwork=[];
+      const {autoCamera,...fields}=saved;Object.assign(this,fields);this.options.autoCamera=autoCamera;
+      this.ev=freshEv();this.contact={v:false};this.lastSpeed.clear();this.lastPotted=this.gs.balls.filter(b=>b.potted).length;
+      this.scene.cameraRig.cancel();this.scene.cameraRig.setFlyInput(0,0);this.scene.cameraRig.setMode(saved.cameraMode);
+      const damping=this.scene.controls.enableDamping;this.scene.controls.enableDamping=false;this.scene.controls.update();this.scene.controls.enableDamping=damping;
+      camera.position.copy(position);this.scene.controls.target.copy(target);camera.lookAt(target);this.scene.controls.update();
+      document.getElementById('cameramode')!.textContent=saved.cameraMode?'Aim cue':'Move camera';
+      document.getElementById('cameramode')!.setAttribute('aria-pressed',String(saved.cameraMode));
+      this.setSpin(saved.tipX,saved.tipY,true);
+      const slider=document.getElementById('touchpower') as HTMLInputElement;slider.value=String(saved.humanPower);
+      document.getElementById('touchpowerlabel')!.textContent=`Power ${saved.humanPower}%`;
+      this.cameraShotPending=false;this.options.write(this.gs.rules);this.hud();
+    };
+    return true;
+  }
+
+  stagePractice(_action:TutorialAction):void {
+    this.cancelOpponent();this.gs=practiceTable();this.mode='aim';this.pendingNetwork=[];
+    this.ev=freshEv();this.contact={v:false};this.cameraShotPending=false;this.lastSpeed.clear();
+    this.lastPotted=this.gs.balls.filter(b=>b.potted).length;
+    this.angle=this.targetAngle=Math.atan2(-.27,-.45);this.power=.4;this.humanPower=40;
+    this.calledBall=1;this.calledPocket=0;this.setSpin(0,0,true);
+    const slider=document.getElementById('touchpower') as HTMLInputElement;slider.value='40';
+    document.getElementById('touchpowerlabel')!.textContent='Power 40%';
+    this.cameraMode=false;this.scene.cameraRig.setMode(false);this.scene.cameraRig.setFlyInput(0,0);
+    document.getElementById('cameramode')!.textContent='Move camera';
+    document.getElementById('cameramode')!.setAttribute('aria-pressed','false');
+    this.lastTutorialCameraRevision=this.scene.cameraRig.revision;this.hud();
+  }
+
+  framePractice():void {
+    if(!this.tutorial.active)return;
+    const coach=document.getElementById('tutorial')!.getBoundingClientRect();
+    const tray=document.querySelector('.control-tray')!.getBoundingClientRect();
+    const hud=document.getElementById('camera-fly-hud')?.getBoundingClientRect();
+    const top=coach.bottom+12;
+    const bottom=Math.max(top+40,Math.min(innerHeight-65,tray.height?tray.top-10:Infinity,
+      this.tutorial.action==='camera'&&hud?.height?hud.top-10:Infinity));
+    const camera=this.scene.controls.object as PerspectiveCamera;
+    const damping=this.scene.controls.enableDamping;this.scene.controls.enableDamping=false;this.scene.controls.update();this.scene.controls.enableDamping=damping;
+    // Start each drill from a stable elevated view; manual camera input remains free afterward.
+    camera.position.set(-1,2,1.6);this.scene.controls.target.set(-.8,0,-.25);camera.lookAt(this.scene.controls.target);
+    const points=[{x:0,y:0},{x:.9,y:.54},{x:.45,y:.27}];
+    const safe={left:-.8,right:.8,top:1-2*top/innerHeight,bottom:1-2*bottom/innerHeight};
+    const pose=framePose(camera,this.scene.controls.target,points,safe);
+    this.scene.cameraRig.cancel();this.scene.controls.target.copy(pose.target);camera.position.copy(pose.position);camera.lookAt(pose.target);this.scene.controls.update();
+    this.lastTutorialCameraRevision=this.scene.cameraRig.revision;
+    this.practiceCameraPose=[...camera.position.toArray(),...this.scene.controls.target.toArray()];
   }
 
   reset(rules: MatchConfig = this.gs.rules): void {
+    if(this.tutorial.active)this.tutorial.close();
     if (this.room) return;
     this.cancelOpponent();this.pendingNetwork=[];
     this.jevRequest?.abort(); this.jevRequest = null;
@@ -469,7 +538,7 @@ export class Game {
       else this.reset();
     });
     this.el.cpubtn.addEventListener('click', () => {
-      if (this.room) return;
+      if (this.room||this.tutorial.active) return;
       this.cpuOpponent = this.jevOpponent || !this.cpuOpponent;
       this.jevOpponent = false;
       this.el.jevbtn.classList.remove('on');
@@ -491,6 +560,7 @@ export class Game {
   }
 
   async startJev(fresh=false): Promise<void> {
+    if(this.tutorial.active)return;
     if(fresh){this.cancelOpponent();this.jevRequest?.abort();this.jevRequest=null;}
     if(this.jevRequest)return;
     this.cancelOpponent();
@@ -564,7 +634,7 @@ export class Game {
   }
 
   fire(power: number, vmax = this.gs.breakShot ? this.gs.rules.breakMax : this.gs.rules.normalMax, authoritativeElevation?:number): void {
-    if (!this.canShoot()) return;
+    if (!this.canShoot() || (this.tutorial.active&&this.tutorial.action!=='shot')) return;
     document.querySelector('.hint')?.classList.add('gone');
     try { localStorage.setItem('pool:seen', '1'); } catch { /* private mode */ }
     const c = this.cue();
@@ -614,9 +684,14 @@ export class Game {
     } finally {if(this.opponentAction===action)this.opponentAction=null;}
   }
 
+  private practiceCameraPose:number[]=[];
   lastTutorialCameraRevision = 0;
   frame(): void {
-    if(this.scene.cameraRig.revision!==this.lastTutorialCameraRevision){this.lastTutorialCameraRevision=this.scene.cameraRig.revision;this.tutorial.record('camera');}
+    if(this.scene.cameraRig.revision!==this.lastTutorialCameraRevision){
+      this.lastTutorialCameraRevision=this.scene.cameraRig.revision;
+      const pose=[...this.scene.controls.object.position.toArray(),...this.scene.controls.target.toArray()];
+      if(pose.some((v,i)=>Math.abs(v-this.practiceCameraPose[i])>.002))this.tutorial.record('camera');
+    }
     const fnow = performance.now();
     const fdt = this.lastFrame ? Math.min((fnow - this.lastFrame) / 1000, 0.1) : 0.016;
     this.lastFrame = fnow;
@@ -868,7 +943,7 @@ export class Game {
   }
 
   connectRoom(create: boolean): void {
-    if(this.room)return;
+    if(this.room||this.tutorial.active)return;
     const name = ((this.el.pname as HTMLInputElement).value || 'Player').slice(0, 24);
     const code = (this.el.rcode as HTMLInputElement).value.trim().toUpperCase();
     if (!create && !/^[A-Z2-9]{8}$/.test(code)) {

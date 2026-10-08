@@ -1,0 +1,20 @@
+body.tutorial-practice .topbar,body.tutorial-practice #scorecard,body.tutorial-practice #hint,body.tutorial-practice #shotextras,body.tutorial-practice #morecontrols{display:none!important}
+body.tutorial-practice #tutorial{position:fixed;top:8px;left:50%;right:auto;bottom:auto;transform:translateX(-50%);width:min(520px,calc(100vw - 16px));max-height:none;overflow:visible;padding:8px 12px;border-radius:12px;line-height:1.3;font-size:14px;box-shadow:0 4px 16px #0004}
+body.tutorial-practice #tutorial header{min-height:32px;gap:8px}
+body.tutorial-practice #tutorialtitle{font-size:15px;font-weight:650}
+body.tutorial-practice #tutorialclose{width:36px;min-height:36px;height:36px;font-size:25px;flex-shrink:0}
+body.tutorial-practice #tutorialbody{margin:3px 0 6px;max-width:65ch}
+body.tutorial-practice #tutorial footer{display:flex;gap:8px;align-items:center;justify-content:space-between}
+body.tutorial-practice #tutorial footer button{min-height:36px;padding:0 12px;font-size:13px}
+body.tutorial-practice #tutorialprogress{font-size:11px;text-align:center;color:#bdd8a7;margin:0}
+body.tutorial-practice .control-tray{left:50%;right:auto;transform:translateX(-50%);width:max-content;max-width:calc(100vw - 16px);padding:8px 12px;box-sizing:border-box;gap:8px}
+body.tutorial-practice .control-help,body.tutorial-practice .control-label{display:none}
+body.tutorial-practice .power-control,body.tutorial-practice .touch-shot,body.tutorial-practice #spincontrols{display:none!important}
+body.tutorial-practice[data-tutorial-step=aim] .control-tray,body.tutorial-practice[data-tutorial-step=camera] .control-tray{display:none!important}
+body.tutorial-practice[data-tutorial-step=spin] #spincontrols{display:flex!important}
+body.tutorial-practice[data-tutorial-step=shot] .touch-shot{display:grid!important;width:min(290px,calc(100vw - 48px))}
+body.tutorial-practice:not([data-tutorial-step=camera]) #camera-fly-hud{display:none!important}
+body.tutorial-practice[data-tutorial-step=camera] #camera-fly-hud{bottom:56px}
+body.tutorial-practice #callpanel,body.tutorial-practice #kitchenlabel{display:none!important}
+@media(max-width:420px){body.tutorial-practice #tutorial{font-size:13px;padding:6px 9px}body.tutorial-practice #tutorialtitle{font-size:14px}}
+@media(max-height:500px){body.tutorial-practice #tutorial{font-size:12px;padding:4px 8px;max-width:540px}body.tutorial-practice #tutorial header,body.tutorial-practice #tutorialclose{min-height:28px;height:28px}body.tutorial-practice #tutorial footer button{min-height:28px;height:28px}body.tutorial-practice #tutorialbody{margin:1px 0 3px}body.tutorial-practice .control-tray{padding:4px 8px}}
