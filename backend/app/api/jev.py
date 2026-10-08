@@ -9,6 +9,7 @@ import random
 import secrets
 import time
 from dataclasses import asdict, dataclass
+from typing import Literal
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -22,6 +23,7 @@ from app.net.rooms import Room
 from app.services.auth import current_account, digest, mutation_guard, rate_limit
 from app.services.matches import ensure_jev_match, record_shot_in_session
 from app.sim import opening
+from app.sim.config import match_config
 from app.sim.cue import cue_elevation
 from app.sim.physics import Ball, simulate_shot, strike
 from app.sim.planner import plan_shots
@@ -72,9 +74,23 @@ class Turn(BaseModel):
     shot: HumanShot | None = None
 
 
+class RuleSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    preset: Literal["bar", "tournament", "custom"] = "bar"
+    scratch: Literal["kitchen", "anywhere"] = "kitchen"
+    calls: Literal["none", "eight", "all"] = "eight"
+    eightOnBreak: Literal["win", "spot"] = "win"
+    scratchOnEightLoss: bool = True
+    assignOnBreak: bool = True
+    strictBreak: bool = False
+    normalMax: float = Field(default=3.5, ge=1, le=8.5, allow_inf_nan=False)
+    breakMax: float = Field(default=8.5, ge=1, le=12, allow_inf_nan=False)
+
+
 class StartGame(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     new_game: bool = False
+    rules: RuleSettings | None = None
 
 
 def require_account(request: Request) -> dict:
@@ -196,7 +212,10 @@ async def start_game(
         count = db.scalar(select(func.count()).select_from(JevGame).where(JevGame.day == day))
         if not premium and count >= 100:
             raise HTTPException(429, "Today's Jev capacity is full. CPU remains available.")
-        state = new_game(secrets.randbelow(2**30))
+        state = new_game(
+            secrets.randbelow(2**30),
+            payload.rules.model_dump() if payload and payload.rules else None,
+        )
         state.current = opening.choose_breaker()
         state.message = f"Player {state.current + 1} breaks — coin toss"
         game = JevGame(
@@ -230,6 +249,26 @@ def decision_context(gs: GameState) -> dict:
         "ball_in_hand": gs.ball_in_hand,
         "placement_zone": gs.placement,
         "called_shot_rule": gs.rules["calls"],
+        "rules": match_config(gs.rules),
+        "call_required": call_required(gs),
+        "on_eight": not gs.open and gs.groups[gs.current] is not None and legal_targets(gs) == [8],
+        "kitchen_shot": gs.kitchen_shot,
+        "kitchen_first_contact": "cue must leave kitchen before contacting a target inside it"
+        if gs.kitchen_shot
+        else "no kitchen restriction",
+        "break_scratch_placement": "kitchen",
+        "illegal_break_result": (
+            "rerack for opponent if no pot and fewer than four object balls reach rails; "
+            "tournament off-table breaks instead give opponent kitchen placement"
+        )
+        if gs.rules["strictBreak"]
+        else "normal foul and turn rules",
+        "off_table_policy": (
+            "tournament: ordinary balls stay down; eight off on break is spotted with foul; "
+            "eight off after break loses rack"
+        )
+        if gs.rules["preset"] == "tournament"
+        else "house: object balls are spotted; eight off loses rack",
         "opponent_remaining": sum(
             1
             for b in gs.balls
@@ -308,7 +347,9 @@ async def evaluate(payload: Selection, key: str) -> Evaluation:
     families = list(dict.fromkeys(plan["family"] for plan in ordered))
     instructions = (
         "Choose the offered executable pool plan that best advances winning this rack. "
-        "Use the supplied preview consequences. Prefer winning, legal shots and useful "
+        "Respect the supplied canonical rules and current kitchen/eight-ball state; "
+        "server preview consequences determine shot legality. "
+        "Prefer winning, legal shots and useful "
         "continuations; consider defense when an attack leaves the opponent an easy reply. "
         "A settled preview is one deterministic outcome, not a success probability. "
         "No direct option found does not prove a snooker. Geometry-only plans are unverified. "
