@@ -10,7 +10,7 @@ Flow: work on `develop`, PR to `main` (protected: PR + `ci` check), merge to shi
   management and audits, Jev usage/cost dashboard, authorization regressions.
 - [x] 0.8.0: Accessible draggable Settings, View and Online panels.
 - [x] 0.8.0: WASD camera movement and mobile HUD arrow controls.
-- [x] 0.8.0: Browser/integration checks, version bump and develop → main PR #26 (merged; CI deployment in progress).
+- [x] 0.8.0: Browser/integration checks, version bump and develop → main PR #26 (merged; CI deployment verified live).
 - [x] 0.9.0: Research Jev decision representation and CPU planning.
 - [x] 0.9.0: Bounded physics previews and diverse tactical shot candidates.
 - [x] 0.9.0: Semantic Jev decisions and complete usage accounting.
@@ -18,7 +18,9 @@ Flow: work on `develop`, PR to `main` (protected: PR + `ci` check), merge to shi
   placement followed by an actual shot without skipping the AI turn.
 - [x] 0.9.0: Offline comparative evaluation, 118 backend and 89 frontend tests,
   real browser CPU placement/shot regression and version bump.
-- [ ] 0.9.0: develop → main PR and CI checks.
+- [x] 0.9.0: develop → main PR #27; CI checks running.
+- [ ] 0.9.1: Research desktop trackpad controls, visible input mode toggle,
+  camera height/rotation controls, regression checks and separate PR.
 
 ## Stack (locked)
 - Frontend: Vite + TS + Three.js (WebGL2 baseline, WebGPU path later), custom 2D+spin sim

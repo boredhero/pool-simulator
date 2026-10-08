@@ -593,7 +593,8 @@ test('optional interactive tutorial responds to controls and stays dismissed',as
 
 test('offline CPU places behind the head string and actually fires its turn', async ({page})=>{
   await openGame(page);
-  const result=await page.evaluate(async()=>{
+  const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
+  await page.evaluate(()=>{
     const g=(window as any).__pool;
     g.cpuOpponent=true;g.jevGame=null;g.room=null;
     for(const b of g.gs.balls) b.potted=true;
@@ -602,13 +603,15 @@ test('offline CPU places behind the head string and actually fires its turn', as
     Object.assign(g.gs.balls[2],{potted:false,asleep:true,n:8,x:2.1,y:1.1});
     Object.assign(g.gs,{current:1,groups:['stripe','solid'],open:false,breakShot:false,
       ballInHand:true,placement:'kitchen',kitchenShot:true,winner:null});
-    g.mode='place';
-    const canvas=document.getElementById('game-canvas')!;
-    const originalPick=g.scene.pickFelt;
+    g.mode='place';g.cpuTimer=-1000;
+    (window as any).__originalPick=g.scene.pickFelt;
     g.scene.pickFelt=()=>[.2,.4];
-    canvas.dispatchEvent(new PointerEvent('pointerdown',{pointerId:42,pointerType:'mouse',button:0,clientX:100,clientY:100,bubbles:true}));
-    canvas.dispatchEvent(new PointerEvent('pointerup',{pointerId:42,pointerType:'mouse',button:0,clientX:100,clientY:100,bubbles:true}));
-    g.scene.pickFelt=originalPick;
+  });
+  const box=(await page.locator('#game-canvas').boundingBox())!;
+  await page.mouse.click(box.x+box.width/2,box.y+box.height/2);
+  const result=await page.evaluate(async()=>{
+    const g=(window as any).__pool;
+    g.scene.pickFelt=(window as any).__originalPick;
     const humanCouldPlace=!g.gs.ballInHand;
     await g.cpuMove();
     const fired={mode:g.mode,x:g.gs.balls[0].x,hand:g.gs.ballInHand,potted:g.gs.balls[0].potted};
@@ -619,7 +622,7 @@ test('offline CPU places behind the head string and actually fires its turn', as
       asleep:g.gs.balls.every((b:any)=>b.asleep||b.potted)};
   });
   expect(result.fired.mode).toBe('rolling');expect(result.fired.x).toBeLessThan(2.54/4);
-  expect(result.humanCouldPlace).toBe(false);
+  expect(result.humanCouldPlace).toBe(false);expect(errors).toEqual([]);
   expect(result.fired.hand).toBe(false);expect(result.fired.potted).toBe(false);
   expect(result.mode).not.toBe('rolling');expect(result.firstContact).toBe(1);
   expect(result.asleep).toBe(true);expect(result.message).not.toContain('Foul');
