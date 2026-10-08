@@ -163,3 +163,66 @@ port publicly or widen forwarded-header trust.
 References: [OWASP WebSocket security](https://cheatsheetseries.owasp.org/cheatsheets/WebSocket_Security_Cheat_Sheet.html),
 [Chrome HPKP removal](https://developer.chrome.com/blog/chrome-72-deps-rems/),
 and [HSTS](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Strict-Transport-Security).
+
+## Jev AI, privacy, and daily games (0.7.0)
+
+CPU stays offline and account-free. Jev AI requires a signed-in adult account and
+explicit acceptance of the current Terms. It offers **one server-owned game per
+account and per source network per UTC day**. IPv6 /64 addresses share an allowance.
+An unfinished game resumes after reload, even across server restarts. A new local
+rack does not reset the free game. Server simulation owns turn progression, legal
+shots and the winner; clients cannot supply Jev prompts, candidate sets or costs.
+
+Jev 1.13 selects among at most 12 server-calculated direct-pot candidates. Geometry
+owns aim and physics. Standard breaks and positions without multiple clear pots
+use geometry; provider failures or the emergency paid-call budget use a visible
+CPU fallback. This experimental opponent is not established to outperform CPU.
+Jev games do not count toward online account win/loss statistics.
+
+Set `JEV_API_KEY` only in the backend process environment or deployment folder's
+ignored `.env` (mode `0600`). Both Compose configurations pass it to the API. Never
+use a `VITE_` key or commit a credential. Missing configuration leaves other modes
+working. The production pool nginx proxy must **replace** `X-Forwarded-For` with
+`$remote_addr`, not append arbitrary client headers; only the loopback-published
+backend should be reachable. This is required for trustworthy network allowances.
+
+`jev_games` stores private game state, revisions, request counts, provider input
+and output tokens, estimated cost in nano-USD, and unmetered failures. The pinned
+model price is recorded per game (42 nano-USD per input token as researched); this
+is an estimate, not an invoice. Failed or incomplete provider responses can leave
+actual charges unknown, explicitly counted as unmetered. These records have no
+public reporting endpoint. Account/game ownership checks protect resume endpoints.
+`jev_usage` retains lifetime attempt/completion counters. Global admission is capped
+at 100 daily games, paid calls at 1,000 per rolling 24-hour window, concurrent Jev
+game turns at four, and turn requests at 30/minute/account. The call cap falls back
+to CPU instead of ending the rack. Network and account identity are not proof of a
+unique human; the global caps bound abuse even across accounts and VPNs.
+
+Terms and Privacy are served at `/terms.html` and `/privacy.html`, with operator
+Noah Martino, Pennsylvania, and personal.boredhero@gmail.com. Registration requires
+an 18+ affirmation and records Terms version/time; existing users accept updated
+Terms in Account before Jev use. These documents need qualified legal review for
+the operator's actual audience and practices; they do not certify legal compliance.
+
+Optional first-party feature analytics is off until separate adult opt-in. Privacy
+choices offers withdrawal and honors GPC/DNT. `visitor_sessions` and `feature_events`
+store random session identifiers, broad input type, times and fixed feature names;
+no account link, IP, URL, raw user agent, text input, or session replay. There are no
+analytics read endpoints. Consent uses an HttpOnly one-day cookie; withdrawal
+removes that session and its events. Older unlinked sessions expire through retention.
+Essential sign-in, security limits and Jev billing/allowance records are independent
+of analytics consent. Terms acceptance never implies analytics consent.
+
+Hourly maintenance removes analytics inactive for 30 days and detailed Jev games
+inactive for 90 days. Preserve the existing `pool_data` volume. New tables are
+additive. Account access/export/deletion requests go to the public contact address;
+verify ownership without asking for a password or recovery code. Production host
+logs and backup rotation must be managed separately from application retention.
+See [Jev integration notes](docs/jev.md) for research and evaluation limitations.
+
+The Help panel includes an optional interactive tutorial. It observes real aiming,
+spin, camera and shot actions, supports skipping/back/close, and does not reset the
+current rack. Its shot step uses the current game rather than a separate practice
+simulation. The panel stays centered in the space between scores and controls.
+On compact screens, tap either scorecard (or use Enter/Space when focused) to show
+or hide ball details; there is no floating Show balls button.

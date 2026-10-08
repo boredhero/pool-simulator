@@ -15,6 +15,12 @@ export class AccountPanel {
     for(const mode of ['login','register','recover'] as const)el('account-'+mode).addEventListener('click',()=>this.setMode(mode));
     el('accountform').addEventListener('submit',e=>{e.preventDefault();void this.submit();});
     el('accountlogout').addEventListener('click',()=>void this.logout());
+    el('acceptterms').addEventListener('click',()=>{
+      if(!el<HTMLInputElement>('termsadult').checked){this.status('Confirm you are 18 or older and accept the Terms.');return;}
+      void fetch('/api/privacy/terms',{method:'POST',headers:{'Content-Type':'application/json','X-Pool-Request':'1'},body:JSON.stringify({version:'2026-10-08',adult:true})})
+        .then(r=>{if(!r.ok)throw new Error();this.status('Terms accepted. You can now start your daily Jev game.');void this.refreshJevUsage();})
+        .catch(()=>this.status('Could not save acceptance. Please try again.'));
+    });
     el('accountrefresh').addEventListener('click',()=>void this.refresh());
     el('recoverycopy').addEventListener('click',()=>void navigator.clipboard.writeText(el<HTMLInputElement>('recoveryvalue').value).then(()=>this.status('Recovery code copied. Keep it somewhere safe.')).catch(()=>this.status('Select and copy the recovery code above.')));
     el('recoverysaved').addEventListener('click',()=>{
@@ -42,6 +48,8 @@ export class AccountPanel {
     this.mode=mode;
     for(const name of ['login','register','recover'])el('account-'+name).setAttribute('aria-pressed',String(name===mode));
     el('accountrecoverylabel').hidden=mode!=='recover';
+    el('registerterms').hidden=mode!=='register';
+    el<HTMLInputElement>('registeradult').required=mode==='register';
     const recovery=el<HTMLInputElement>('accountrecovery');recovery.required=mode==='recover';recovery.disabled=mode!=='recover';
     el<HTMLInputElement>('accountpassword').autocomplete=mode==='login'?'current-password':'new-password';
     el('accountsubmit').textContent=mode==='register'?'Create account':mode==='recover'?'Reset password':'Sign in';
@@ -54,6 +62,7 @@ export class AccountPanel {
     el('accountprofile').hidden=!this.account||this.recoveryPending;
     if(this.account){
       el('accountname').textContent=this.account.username;
+      void this.refreshJevUsage();
       el('accountsince').textContent=`Joined ${new Date(this.account.createdAt*1000).toLocaleDateString()}`;
     }
     if(stats){
@@ -67,13 +76,29 @@ export class AccountPanel {
     el<HTMLButtonElement>('accountlogout').disabled=this.playing();
     el('accountplaying').hidden=!this.playing();
   }
+  private async refreshJevUsage() {
+    const accountId=this.account?.id;
+    try {
+      const response=await fetch('/api/opponents/jev',{cache:'no-store'});
+      if (!response.ok) throw new Error();
+      const data=await response.json();
+      if(this.account?.id!==accountId)return;
+      const u=data.usage;
+      el('accountjev').textContent=data.available
+        ? `Jev AI: ${u.gamesRemaining} free game available today (one per account and network). ${data.game?.status==='active'?'Your current game can be resumed. ':''}Resets ${new Date(u.resetsAt*1000).toLocaleString()}.`
+        : 'Jev AI is not configured on this server.';
+    } catch {
+      if(this.account?.id===accountId)el('accountjev').textContent='Jev AI usage is unavailable.';
+    }
+  }
   private async submit() {
     if(this.playing()){this.status('Leave your current room before changing accounts.');return;}
     if(this.busy)return;
+    if(this.mode==='register'&&!el<HTMLInputElement>('registeradult').checked){this.status('Accounts require age 18+ and acceptance of the Terms.');return;}
     this.busy=true;el<HTMLButtonElement>('accountsubmit').disabled=true;el<HTMLButtonElement>('accountclose').disabled=true;
     const password=el<HTMLInputElement>('accountpassword'),recovery=el<HTMLInputElement>('accountrecovery');
     try {
-      const data=await this.request('/'+this.mode,{username:el<HTMLInputElement>('accountusername').value.trim(),password:password.value,...(this.mode==='recover'?{recovery:recovery.value}:{})});
+      const data=await this.request('/'+this.mode,{username:el<HTMLInputElement>('accountusername').value.trim(),password:password.value,...(this.mode==='register'?{terms_version:'2026-10-08',adult:el<HTMLInputElement>('registeradult').checked}:{}),...(this.mode==='recover'?{recovery:recovery.value}:{})});
       this.account=data.account??null;this.changed(this.account);this.status('');
       if(data.recovery){this.recoveryPending=true;el<HTMLInputElement>('recoveryvalue').value=data.recovery;el('recoverypanel').hidden=false;}
       this.render();

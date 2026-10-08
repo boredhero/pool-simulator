@@ -10,7 +10,7 @@ async function open(page:Page,path='/'){
 async function account(page:Page){await page.locator('#onlinebtn').click();await page.locator('#accountbtn').click();}
 
 test('optional account creation, recovery, session reset, and mobile profile',async({page})=>{
-  await open(page);await account(page);await page.locator('#account-register').click();
+  await open(page);await account(page);await page.locator('#account-register').click();await page.locator('#registeradult').check();
   const name='Player_'+Date.now().toString(36),password='a long pool password for testing';
   await page.locator('#accountusername').fill(name);await page.locator('#accountpassword').fill(password);
   await page.locator('#accountsubmit').click();await expect(page.locator('#recoverypanel')).toBeVisible();
@@ -33,7 +33,7 @@ test('optional account creation, recovery, session reset, and mobile profile',as
 });
 
 test('registered host shares a guest invite and both receive server results',async({browser,page})=>{
-  await open(page);await account(page);await page.locator('#account-register').click();
+  await open(page);await account(page);await page.locator('#account-register').click();await page.locator('#registeradult').check();
   const name='Host_'+Date.now().toString(36);
   await page.locator('#accountusername').fill(name);await page.locator('#accountpassword').fill('a long secret password for host');
   await page.locator('#accountsubmit').click();await expect(page.locator('#recoverypanel')).toBeVisible();
@@ -62,11 +62,40 @@ test('registered host shares a guest invite and both receive server results',asy
 });
 
 test('development proxy supports same-origin account requests and WebSocket rooms',async({page})=>{
-  await open(page,'http://127.0.0.1:4174/');await account(page);await page.locator('#account-register').click();
+  await open(page,'http://127.0.0.1:4174/');await account(page);await page.locator('#account-register').click();await page.locator('#registeradult').check();
   await page.locator('#accountusername').fill('Proxy_'+Date.now().toString(36));
   await page.locator('#accountpassword').fill('a sufficiently long proxy password');
   await page.locator('#accountsubmit').click();await expect(page.locator('#recoverypanel')).toBeVisible();
   await page.locator('#recoverysaved').click();await page.locator('#accountclose').click();
   await page.locator('#createbtn').click();await expect(page.locator('#roomlink')).toHaveValue(/^http:\/\/127\.0\.0\.1:4174\/#join=/);
   await page.locator('#leaveroom').click();
+});
+
+test('daily Jev game uses server state and survives a page reload',async({page})=>{
+  const response=await page.request.post('/api/account/register',{headers:{'X-Pool-Request':'1'},data:{
+    username:'Jev_'+Date.now().toString(36),password:'a long daily game test password',adult:true,terms_version:'2026-10-08',
+  }});
+  expect(response.ok()).toBe(true);
+  await page.addInitScript(()=>{
+    const raf=requestAnimationFrame.bind(window);
+    window.requestAnimationFrame=fn=>raf(t=>{const g=(window as any).__pool;if(g)g.cpuTimer=-1000;fn(t);});
+  });
+  await open(page);
+  await page.locator('#jevbtn').click();
+  await expect.poll(()=>page.evaluate(()=>(window as any).__pool.jevGame?.revision)).toBe(0);
+  const id=await page.evaluate(()=>(window as any).__pool.jevGame.id);
+  await page.evaluate(()=>{const g=(window as any).__pool;g.angle=0;g.fire(.05);});
+  await expect.poll(async()=>{
+    const response=await page.request.get('/api/opponents/jev');
+    return (await response.json()).game?.state.revision;
+  }).toBe(1);
+  await page.reload();await page.waitForFunction(()=>!!(window as any).__draw);
+  await page.locator('#jevbtn').click();
+  await expect.poll(()=>page.evaluate(()=>(window as any).__pool.jevGame)).toEqual({id,revision:1});
+  const info=await page.request.get('/api/opponents/jev');
+  expect((await info.json()).usage.gamesRemaining).toBe(0);
+  await page.screenshot({path:'/tmp/pool-jev-desktop.png'});
+  await page.setViewportSize({width:390,height:844});
+  await page.locator('#morecontrols').click();
+  await page.screenshot({path:'/tmp/pool-jev-mobile.png'});
 });

@@ -111,7 +111,12 @@ def test_registered_identity_and_authoritative_lifetime_stats():
     response = client.post(
         "/api/account/register",
         headers={"X-Pool-Request": "1"},
-        json={"username": "ActualPlayer", "password": "long secure pool password"},
+        json={
+            "terms_version": "2026-10-08",
+            "adult": True,
+            "username": "ActualPlayer",
+            "password": "long secure pool password",
+        },
     )
     account = response.json()["account"]
     with client.websocket_connect("/ws") as ws:
@@ -206,7 +211,12 @@ def test_casual_forfeit_counts_loss_and_cannot_be_recorded_twice():
     response = client.post(
         "/api/account/register",
         headers={"X-Pool-Request": "1"},
-        json={"username": "ForfeitPlayer", "password": secrets.token_urlsafe(24)},
+        json={
+            "terms_version": "2026-10-08",
+            "adult": True,
+            "username": "ForfeitPlayer",
+            "password": secrets.token_urlsafe(24),
+        },
     )
     account = response.json()["account"]["id"]
     match = start_match(["Player", "Guest"], [account, None], {"preset": "custom"})

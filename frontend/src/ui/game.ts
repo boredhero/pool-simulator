@@ -1,3 +1,4 @@
+import { Tutorial } from './tutorial';
 import { AccountPanel, type Account } from './account';
 import { cueStyle } from '../render/ballTextures';
 import { advancePlayback } from './playback';
@@ -8,6 +9,7 @@ import { TableOptions } from './tableOptions';
 import { allAsleep, strike, type Ball, type ShotEvents } from '../sim/physics';
 import { applyShot, beginShot, callRequired, canPlace, legalTargets, newGame, placeCue, type GameState } from '../sim/rules';
 import { breakShot, chooseShot } from '../sim/cpu';
+import { jevRequest } from '../sim/jev';
 import { Sfx } from './sfx';
 import { POCKETS, TABLE_H, TABLE_W } from '../sim/table';
 import { init, type SceneHandle } from '../render/scene';
@@ -37,6 +39,7 @@ const freshEv = (): ShotEvents => ({
 });
 
 export class Game {
+  tutorial = new Tutorial();
   gs: GameState;
   options: TableOptions;
   calledBall: number | null = null;
@@ -64,6 +67,10 @@ export class Game {
   seat: number | null = null;
   whoShot: number | null = null;
   cpuOpponent = false;
+  jevOpponent = false;
+  jevRequest: AbortController | null = null;
+  jevGame: {id:string;revision:number} | null = null;
+  jevPlayback = false;
   account:Account|null=null;
   accountPanel:AccountPanel;
   cpuTimer = 0;
@@ -84,7 +91,7 @@ export class Game {
     this.gs = newGame(1);
     this.el = Object.fromEntries(
       ['msg', 'turn', 'version', 'onlinebtn', 'onlinepanel', 'pname', 'rcode', 'createbtn', 'joinbtn',
-        'roominfo', 'chargefill', 'spin', 'cpubtn', 'rack', 'settingsbtn', 'settingspanel',
+        'roominfo', 'chargefill', 'spin', 'cpubtn', 'jevbtn', 'opponentstatus', 'rack', 'settingsbtn', 'settingspanel',
         'feltsw', 'woodsw', 'feltcustom', 'woodcustom', 'scorecard'].map((id) => [id, document.getElementById(id)!]),
     );
     this.applyTheme(localStorage.getItem('pool:felt') ?? FELTS[0], localStorage.getItem('pool:wood') ?? WOODS[0], false);
@@ -93,6 +100,14 @@ export class Game {
     this.wire(canvas);
     this.accountPanel=new AccountPanel(()=>!!this.room,account=>{
       this.account=account;
+      if (!account && this.jevOpponent) {
+        this.jevRequest?.abort(); this.jevRequest=null;this.jevGame=null;
+        this.jevOpponent=false; this.cpuOpponent=true;
+        this.el.jevbtn.classList.remove('on');this.el.jevbtn.setAttribute('aria-pressed','false');
+        this.el.cpubtn.classList.add('on');this.el.cpubtn.setAttribute('aria-pressed','true');
+        this.el.cpubtn.textContent='CPU: on';
+        this.el.opponentstatus.textContent='Signed out · switched to CPU';
+      }
       const input=this.el.pname as HTMLInputElement;input.disabled=!!account;
       if(account)input.value=account.username;
       document.getElementById('onlineidentity')!.textContent=account?`Signed in as ${account.username}. Private matches count toward unranked casual stats.`:'Playing as a guest. Create an account to keep lifetime online stats.';
@@ -124,6 +139,14 @@ export class Game {
 
   reset(rules: MatchConfig = this.gs.rules): void {
     if (this.room) return;
+    this.jevRequest?.abort(); this.jevRequest = null;
+    if(this.jevGame){
+      this.jevGame=null;
+      if(this.jevOpponent)this.cpuOpponent=false;
+      this.jevOpponent=false;
+      this.el.jevbtn.classList.remove('on');this.el.jevbtn.setAttribute('aria-pressed','false');
+    }
+    this.el.opponentstatus.textContent = '';
     this.gs = newGame((Math.random() * 1e9) | 0, rules);
     this.cameraShotPending=false;this.scene.cameraRig.cancel();
     this.mode = 'aim'; this.pulling = false; this.pressPt = null;
@@ -188,7 +211,7 @@ export class Game {
 
   /** Human may act only on their own turn (CPU turns are driven by cpuMove). */
   humanTurn(): boolean {
-    if(this.cameraMode || this.cameraGesture)return false;
+    if(this.cameraMode || this.cameraGesture || this.jevRequest)return false;
     if (!this.canShoot()) return false;
     if (this.cpuOpponent && this.gs.current === 1) return false;
     return true;
@@ -214,6 +237,7 @@ export class Game {
   }
 
   setSpin(x: number, y: number): void {
+    if(!this.cpuOpponent||this.gs.current===0)this.tutorial.record('spin');
     const scale=Math.min(1,.55/(Math.hypot(x,y)||1));
     this.tipX=x*scale;this.tipY=y*scale;
     const spin=this.el.spin;
@@ -235,7 +259,7 @@ export class Game {
       if (this.mode !== 'aim' || this.cue().potted) return;
       const c = this.cue();
       const dx = cx - c.x, dy = cy - c.y;
-      if (Math.hypot(dx, dy) > 0.02) this.targetAngle = Math.atan2(dy, dx);
+      if (Math.hypot(dx, dy) > 0.02) {this.targetAngle = Math.atan2(dy, dx);this.tutorial.record('aim');}
     };
     const tryPlace = (cx: number, cy: number) => {
       if (this.room) {
@@ -276,7 +300,7 @@ export class Game {
       if (this.mode === 'aim' && !this.cue().potted) {
         const c = this.cue();
         const dx = p[0] - c.x, dy = p[1] - c.y;
-        if (Math.hypot(dx, dy) > 0.02) this.targetAngle = Math.atan2(dy, dx);
+        if (Math.hypot(dx, dy) > 0.02) {this.targetAngle = Math.atan2(dy, dx);this.tutorial.record('aim');}
       }
       if (e.pointerType !== 'mouse') {
         this.touchAim=this.humanTurn();
@@ -312,11 +336,16 @@ export class Game {
     document.getElementById('touchshoot')!.addEventListener('click',()=>{
       if(this.humanTurn()&&!this.pointers.size){this.angle=this.targetAngle;this.fire(touchPower.valueAsNumber/100);}
     });
-    document.getElementById('scoretoggle')!.addEventListener('click',()=>{
+    const toggleScores=()=>{
+      if(!matchMedia('(max-width:900px)').matches)return;
       this.scoresExpanded=!this.scoresExpanded;
       this.el.scorecard.classList.toggle('expanded',this.scoresExpanded);
-      document.getElementById('scoretoggle')!.setAttribute('aria-expanded',String(this.scoresExpanded));
-      document.getElementById('scoretoggle')!.textContent=this.scoresExpanded?'Hide balls':'Show balls';
+      for(const card of this.el.scorecard.querySelectorAll('.pcard'))card.setAttribute('aria-expanded',String(this.scoresExpanded));
+    };
+    matchMedia('(max-width:900px)').addEventListener('change',()=>this.renderScorecard());
+    this.el.scorecard.addEventListener('click',toggleScores);
+    this.el.scorecard.addEventListener('keydown',e=>{
+      if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();toggleScores();}
     });
     document.getElementById('morecontrols')!.addEventListener('click',()=>{
       const open=document.querySelector('.control-tray')!.classList.toggle('expanded');
@@ -392,11 +421,83 @@ export class Game {
     this.el.rack.addEventListener('click', () => this.reset());
     this.el.cpubtn.addEventListener('click', () => {
       if (this.room) return;
-      this.cpuOpponent = !this.cpuOpponent;
+      this.cpuOpponent = this.jevOpponent || !this.cpuOpponent;
+      this.jevOpponent = false;
+      this.el.jevbtn.classList.remove('on');
       this.el.cpubtn.textContent = this.cpuOpponent ? 'CPU: on' : 'Play vs CPU';
       this.el.cpubtn.classList.toggle('on', this.cpuOpponent);
+      this.el.cpubtn.setAttribute('aria-pressed', String(this.cpuOpponent));
+      this.el.jevbtn.setAttribute('aria-pressed', 'false');
       this.reset();
     });
+    this.el.jevbtn.addEventListener('click', () => {
+      if (this.room) return;
+      if (!this.account) {
+        this.el.opponentstatus.textContent='Sign in to play against Jev AI. CPU is available without an account.';
+        document.getElementById('accountbtn')!.click();
+        return;
+      }
+      void this.startJev();
+    });
+  }
+
+  async startJev(): Promise<void> {
+    if(this.jevRequest)return;
+    const controller=new AbortController();this.jevRequest=controller;
+    this.el.opponentstatus.textContent='Starting or resuming your daily Jev game…';
+    try {
+      const game=await jevRequest('/games',{},controller.signal);
+      if(controller.signal.aborted||this.room)return;
+      this.reset();
+      this.jevOpponent=true;this.cpuOpponent=true;
+      this.jevGame={id:game.id,revision:game.state.revision};
+      this.el.jevbtn.classList.add('on');this.el.jevbtn.setAttribute('aria-pressed','true');
+      this.el.cpubtn.classList.remove('on');this.el.cpubtn.setAttribute('aria-pressed','false');
+      this.el.cpubtn.textContent='Play vs CPU';
+      this.applyJevState(game.state);
+      this.el.opponentstatus.textContent='Daily Jev game · resets at midnight UTC · select Jev again to resume';
+    } catch(error) {
+      if(!controller.signal.aborted)this.el.opponentstatus.textContent=error instanceof Error?error.message:'Jev unavailable';
+    } finally {if(this.jevRequest===controller)this.jevRequest=null;}
+  }
+
+  applyJevState(state: RoomState): void {
+    this.applyServerState(state);this.roomNames=null;
+    this.mode=state.winner!==null?'over':state.ball_in_hand?'place':'aim';
+    if(this.jevGame)this.jevGame.revision=state.revision;
+    this.hud();
+  }
+
+  async playJevTurn(power?: number): Promise<void> {
+    if(!this.jevGame||this.jevRequest)return;
+    const game=this.jevGame,controller=new AbortController();this.jevRequest=controller;
+    const cue=this.cue();
+    const shot=power===undefined?undefined:{aim:this.angle,power,tipX:this.tipX,tipY:this.tipY,
+      calledBall:this.calledBall,calledPocket:this.calledPocket,x:cue.x,y:cue.y};
+    this.el.opponentstatus.textContent=shot?'Checking your shot…':'Jev AI is choosing a shot…';
+    try {
+      const result=await jevRequest(`/games/${game.id}/turn`,{revision:game.revision,shot},controller.signal);
+      if(controller.signal.aborted||this.jevGame!==game||this.room)return;
+      this.jevRequest=null;
+      Object.assign(cue,{x:result.placement.x,y:result.placement.y,potted:false});
+      this.gs.ballInHand=false;this.mode='aim';
+      this.angle=this.targetAngle=result.shot.aim;
+      this.calledBall=result.shot.calledBall;this.calledPocket=result.shot.calledPocket;
+      this.setSpin(result.shot.tipX,result.shot.tipY);
+      this.jevPlayback=true;
+      try {this.fire(result.shot.power,result.shot.vmax);} finally {this.jevPlayback=false;}
+      this.pendingNetwork.push(()=>{if(this.jevGame===game)this.applyJevState(result.state);});
+      this.el.opponentstatus.textContent=result.source==='jev'?'Jev AI selected this shot':
+        result.source==='cpu-fallback'?'Jev AI unavailable or capacity reached · CPU took this shot':
+        result.source==='geometry'?'Jev AI · geometry shot (no model choice needed)':'Daily Jev game';
+    } catch(error) {
+      if(!controller.signal.aborted){
+        // Do not retry an ambiguous paid turn automatically. The server persists
+        // completed turns; starting/resuming fetches its latest revision safely.
+        this.mode='wait';
+        this.el.opponentstatus.textContent=(error instanceof Error?error.message:'Connection lost')+' Select Jev AI to resume.';
+      }
+    } finally {if(this.jevRequest===controller)this.jevRequest=null;}
   }
 
   fire(power: number, vmax = this.gs.breakShot ? this.gs.rules.breakMax : this.gs.rules.normalMax): void {
@@ -408,10 +509,12 @@ export class Game {
     if (callRequired(this.gs) && (this.calledBall === null || this.calledPocket === null)) {
       this.el.msg.textContent = 'Choose a ball and tap its destination pocket before shooting'; return;
     }
+    if(this.jevGame && !this.jevPlayback){void this.playJevTurn(power);return;}
     this.power = power;
     const elevation = cueElevation(c.x, c.y, this.angle, 0, this.gs.balls);
     beginShot(this.gs, this.calledBall, this.calledPocket);
     const params = { aim: this.angle, power, tipX: this.tipX, tipY: this.tipY, vmax, elevation, calledBall: this.calledBall, calledPocket: this.calledPocket };
+    if(!this.cpuOpponent||this.gs.current===0)this.tutorial.record('shot');
     strike(c, Math.cos(this.angle), Math.sin(this.angle), power, this.tipX, this.tipY, vmax, elevation);
     this.ev = freshEv();
     this.contact = { v: false };
@@ -422,9 +525,11 @@ export class Game {
     this.hud();
   }
 
-  cpuMove(): void {
+  async cpuMove(): Promise<void> {
+    if (this.jevRequest) return;
     const cpuSeat = this.cpuOpponent ? 1 : -1;
     if (cpuSeat < 0 || this.gs.current !== cpuSeat) return;
+    if(this.jevGame){await this.playJevTurn();return;}
     if (this.gs.ballInHand) {
       let placed = false;
       for (let x = .15; x < TABLE_W && !placed; x += .1) for (let y = .15; y < TABLE_H && !placed; y += .1) placed = placeCue(this.gs, x, y);
@@ -442,7 +547,9 @@ export class Game {
     this.fire(shot.power);
   }
 
+  lastTutorialCameraRevision = 0;
   frame(): void {
+    if(this.scene.cameraRig.revision!==this.lastTutorialCameraRevision){this.lastTutorialCameraRevision=this.scene.cameraRig.revision;this.tutorial.record('camera');}
     const fnow = performance.now();
     const fdt = this.lastFrame ? Math.min((fnow - this.lastFrame) / 1000, 0.1) : 0.016;
     this.lastFrame = fnow;
@@ -463,7 +570,7 @@ export class Game {
       this.cpuTimer += 1 / 60;
       if (this.cpuTimer > 1.2) {
         this.cpuTimer = 0;
-        this.cpuMove();
+        void this.cpuMove();
       }
     } else {
       this.cpuTimer = 0;
@@ -545,7 +652,7 @@ export class Game {
   }
 
   playerName(seat:number): string {
-    return this.roomNames?.[seat] ?? (seat===1 && this.cpuOpponent && !this.room ? 'CPU' : `Player ${seat+1}`);
+    return this.roomNames?.[seat] ?? (seat===1 && this.cpuOpponent && !this.room ? (this.jevOpponent ? 'Jev AI' : 'CPU') : `Player ${seat+1}`);
   }
 
   hud(): void {
@@ -572,7 +679,7 @@ export class Game {
       select.replaceChildren(...targets.map(n => new Option(`Ball ${n}`, String(n), false, n === this.calledBall)));
       document.getElementById('callstatus')!.textContent = this.calledPocket === null ? 'Tap a pocket on the table' : `Pocket called · ready to shoot`;
     }
-    for (const id of ['rack', 'cpubtn']) (this.el[id] as HTMLButtonElement).disabled = !!this.room;
+    for (const id of ['rack', 'cpubtn', 'jevbtn']) (this.el[id] as HTMLButtonElement).disabled = !!this.room;
     this.renderScorecard();
   }
 
@@ -591,6 +698,7 @@ export class Game {
       const provisional=this.gs.groups[i]!==g;
       const card = document.createElement('div');
       card.setAttribute('aria-label',`${this.playerName(i)}${this.gs.current===i?' — current player':''}`);
+      if(matchMedia('(max-width:900px)').matches){card.setAttribute('role','button');card.tabIndex=0;card.setAttribute('aria-expanded',String(this.scoresExpanded));card.title='Tap to show or hide balls';}
       card.className = 'pcard' + (provisional ? ' provisional' : '') + (this.gs.current === i && this.gs.winner === null ? ' active' : '');
       const head = document.createElement('div');
       head.className = 'pname';
@@ -667,6 +775,8 @@ export class Game {
 
   leaveRoom(message:string):void {
     this.room?.close();this.room=null;this.seat=null;this.roomNames=null;this.pendingNetwork=[];
+    this.jevRequest?.abort();this.jevRequest=null;this.jevOpponent=false;this.el.jevbtn.classList.remove('on');
+    this.el.opponentstatus.textContent='';
     this.cpuOpponent=false;this.el.cpubtn.textContent='Play vs CPU';this.el.cpubtn.classList.remove('on');
     this.reset();this.el.roominfo.textContent=message;this.el.msg.textContent=message;
     void this.accountPanel.refresh();
@@ -680,6 +790,8 @@ export class Game {
       this.el.roominfo.textContent = 'Enter an 8-character room code to join.';
       return;
     }
+    this.jevRequest?.abort();this.jevRequest=null;this.jevGame=null;this.jevOpponent=false;
+    this.el.opponentstatus.textContent="";
     const rc = new RoomClient();
     this.room = rc;
     this.seat = null;

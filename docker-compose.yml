@@ -6,6 +6,7 @@ services:
     volumes:
       - pool_data:/srv/data
     environment:
+      JEV_API_KEY: ${JEV_API_KEY:-}
       DATABASE_URL: sqlite:////srv/data/pool.db
 
 volumes:

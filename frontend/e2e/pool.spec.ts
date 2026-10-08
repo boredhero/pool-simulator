@@ -436,9 +436,9 @@ test('compact mobile scores expand and trackpad shift-scroll orbits',async({page
   await page.evaluate(()=>{const g=(window as any).__pool;g.gs.groups=['solid','stripe'];g.gs.open=false;g.hud();});
   await expect(page.locator('.pcard')).toHaveCount(2);
   await expect(page.locator('.pcard .balls').first()).toBeHidden();
-  await page.locator('#scoretoggle').click();
+  await page.locator('.pcard').first().click();
   await expect(page.locator('.pcard .balls').first()).toBeVisible();
-  await page.locator('#scoretoggle').click();
+  await page.locator('.pcard').first().click();
   await expect(page.locator('#spin')).toBeVisible();
   await expect(page.locator('#resetspin')).toBeVisible();
   await expect(page.locator('#cpubtn')).toBeHidden();
@@ -451,4 +451,105 @@ test('compact mobile scores expand and trackpad shift-scroll orbits',async({page
   const after=await page.evaluate(()=>{const g=(window as any).__pool;return {theta:g.scene.controls.getAzimuthalAngle(),mode:g.mode};});
   expect(Math.abs(after.theta-before)).toBeGreaterThan(.01);expect(after.mode).toBe('aim');
   await page.screenshot({path:'/tmp/pool-060-mobile.png'});
+});
+
+test('Jev requires sign-in while CPU remains available to guests', async ({page}) => {
+  await openGame(page);
+  await page.locator('#jevbtn').click();
+  await expect(page.locator('#accountdialog')).toBeVisible();
+  expect(await page.evaluate(()=>(window as any).__pool.jevOpponent)).toBe(false);
+  await page.locator('#accountclose').click();
+  await page.locator('#cpubtn').click();
+  expect(await page.evaluate(()=>(window as any).__pool.cpuOpponent)).toBe(true);
+});
+
+test('Jev resumes its server-owned game and reset discards an in-flight turn', async ({page}) => {
+  await page.route('**/api/account',route=>route.fulfill({json:{account:{id:'jev-test',username:'Tester',createdAt:0},stats:null}}));
+  await page.route('**/api/opponents/jev',route=>route.fulfill({json:{available:true,usage:{gamesRemaining:1,resetsAt:2000000000}}}));
+  await openGame(page);
+  const state=await page.evaluate(()=>{
+    const g=(window as any).__pool;
+    return {balls:g.gs.balls,return_order:[],current:0,groups:[null,null],open:true,
+      ball_in_hand:false,break_shot:true,placement:'none',kitchen_shot:false,rules:g.gs.rules,
+      revision:0,winner:null,message:'Player 1 to break'};
+  });
+  await page.route('**/api/opponents/jev/games',route=>route.fulfill({json:{id:'daily-game',state,status:'active'}}));
+  let release:(()=>void)|undefined,requests=0;
+  await page.route('**/api/opponents/jev/games/daily-game/turn',async route=>{
+    requests++;
+    await new Promise<void>(resolve=>{release=resolve;});
+    await route.fulfill({status:409,json:{detail:'Resume game'}}).catch(()=>{});
+  });
+  await page.locator('#jevbtn').click();
+  await expect.poll(()=>page.evaluate(()=>(window as any).__pool.jevGame?.id)).toBe('daily-game');
+  await page.evaluate(()=>{const g=(window as any).__pool;g.fire(.4);});
+  await expect.poll(()=>requests).toBe(1);
+  await page.locator('#rack').click();
+  release!();
+  expect(await page.evaluate(()=>(window as any).__pool.jevGame)).toBeNull();
+  await page.locator('#jevbtn').click();
+  await expect.poll(()=>page.evaluate(()=>(window as any).__pool.jevGame?.id)).toBe('daily-game');
+});
+
+test('optional analytics waits for consent, withdraws, and leaves play available',async({page})=>{
+  let events=0;
+  await page.route('**/api/privacy/consent',route=>route.fulfill({json:{analytics:route.request().postDataJSON().allow}}));
+  await page.route('**/api/privacy/events',route=>{events++;return route.fulfill({status:204});});
+  await openGame(page);
+  await page.locator('#settingsbtn').click();
+  expect(events).toBe(0);
+  await page.locator('#closesettings').click();
+  await page.locator('#privacybtn').click();
+  await page.locator('#privacyaccept').click();
+  await expect.poll(()=>events).toBe(1);
+  await page.locator('#settingsbtn').click();
+  await expect.poll(()=>events).toBe(2);
+  await page.locator('#closesettings').click();
+  await page.locator('#privacybtn').click();await page.locator('#privacyreject').click();
+  await expect(page.locator('#privacychoices')).not.toBeVisible();
+  await page.locator('#settingsbtn').click();
+  expect(events).toBe(2);
+});
+
+test('optional interactive tutorial responds to controls and stays dismissed',async({page})=>{
+  await openGame(page);
+  await expect(page.locator('#tutorial')).toBeHidden();
+  if(!await page.locator('#helppanel').isVisible())await page.locator('#helpbtn').click();
+  await page.locator('#starttutorial').click();
+  await expect(page.locator('#tutorialtitle')).toContainText('Line up');
+  for(const width of [390,1280]){
+    await page.setViewportSize({width,height:844});
+    await expect.poll(async()=>page.evaluate(()=>{
+      const panel=document.getElementById('tutorial')!.getBoundingClientRect();
+      const scores=document.getElementById('scorecard')!.getBoundingClientRect();
+      const tray=document.querySelector('.control-tray')!.getBoundingClientRect();
+      return Math.abs((panel.left+panel.right)/2-innerWidth/2)<2 && panel.top>=scores.bottom && panel.bottom<=tray.top;
+    })).toBe(true);
+  }
+
+  const point=await page.evaluate(()=>{
+    const g=(window as any).__pool;
+    for(let y=200;y<innerHeight-120;y+=20)for(let x=20;x<innerWidth-20;x+=20){
+      if(document.elementFromPoint(x,y)?.id==='game-canvas' && g.scene.pickFelt(x,y))return {x,y};
+    }
+    throw new Error('No exposed felt for tutorial aiming');
+  });
+  await page.mouse.move(point.x,point.y);
+  await expect(page.locator('#tutorialnext')).toHaveText('Next');
+  await page.locator('#tutorialnext').click();
+  await page.locator('#spin').focus();await page.keyboard.press('ArrowRight');
+  await expect(page.locator('#tutorialprogress')).toContainText('worked');
+  await page.locator('#resetspin').click();
+  await page.locator('#tutorialnext').click();
+  await page.mouse.move(point.x,point.y);await page.keyboard.down('Shift');await page.mouse.wheel(100,0);await page.keyboard.up('Shift');
+  await expect(page.locator('#tutorialprogress')).toContainText('worked');
+  await page.locator('#tutorialnext').click();
+  await expect(page.locator('#tutorialbody')).toContainText('real shot');
+  await page.locator('#tutorialclose').click();
+  await openGame(page,true);
+  await expect(page.locator('#tutorial')).toBeHidden();
+  await page.setViewportSize({width:390,height:844});
+  await expect(page.locator('#scoretoggle')).toHaveCount(0);
+  await page.locator('.pcard').first().focus();await page.keyboard.press('Enter');
+  await expect(page.locator('.pcard').first()).toHaveAttribute('aria-expanded','true');
 });

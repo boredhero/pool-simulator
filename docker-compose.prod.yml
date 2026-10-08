@@ -8,6 +8,7 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
     environment:
+      JEV_API_KEY: ${JEV_API_KEY:-}
       DATABASE_URL: sqlite:////srv/data/pool.db
       COOKIE_SECURE: "true"
       # Only the host reverse proxy can reach this loopback-published service.

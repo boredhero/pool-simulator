@@ -1,5 +1,19 @@
 [
   {
+    "version": "0.7.0",
+    "date": "2026-10-08",
+    "title": "Daily Jev AI games and privacy controls",
+    "changes": [
+      "Added Jev AI alongside the offline CPU. Signed-in adults can start or resume one free Jev game per account and network per UTC day, with server-owned turns and physics.",
+      "Added private per-game provider token counts and estimated costs, durable daily game limits, and visible CPU fallback for provider outages or capacity limits.",
+      "Added Terms and Privacy notices, explicit adult account/Terms acceptance, and independent opt-in analytics with easy withdrawal and GPC/DNT support.",
+      "Optional first-party feature sessions are disabled by default and have no public reporting API. Scheduled retention removes old session events and detailed Jev game records.",
+      "Jev credentials remain backend-only. Daily-game revisions reject replayed turns, and the production proxy now replaces untrusted client-IP forwarding headers.",
+      "Removed the floating mobile Show balls button; tap either compact scorecard to expand or collapse ball details.",
+      "Added an optional interactive Help tutorial for aiming, spin, camera movement and shooting, with action feedback, skippable steps and easy dismissal. The tutorial is centered between scorecards and shot controls."
+    ]
+  },
+  {
     "version": "0.6.2",
     "date": "2026-10-08",
     "title": "CPU opponent terminology",
