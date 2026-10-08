@@ -255,7 +255,7 @@ test('spin resets both axes and supports keyboard adjustments on desktop and mob
   await spin.focus();await page.keyboard.press('ArrowLeft');await page.keyboard.press('Shift+ArrowDown');
   expect(await page.evaluate(()=>{const g=(window as any).__pool;return[g.tipX,g.tipY];})).toEqual([-.025,-.005]);
   await page.keyboard.press('Home');await expect(reset).toBeDisabled();
-  await page.setViewportSize({width:390,height:844});await expect(reset).toBeVisible();
+  await page.setViewportSize({width:390,height:844});await page.locator('#morecontrols').click();await expect(reset).toBeVisible();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
 
@@ -392,4 +392,60 @@ test('settings title and close button stay visible while scrolling on desktop an
     await expect(page.locator('#settingspanel')).not.toBeVisible();
     await expect(page.locator('#settingsbtn')).toBeFocused();
   }
+});
+
+test('touch drag aims and pinch followed by parallel drag orbits without firing',async({page,context})=>{
+  await page.setViewportSize({width:390,height:844});
+  await openGame(page);
+  const cdp=await context.newCDPSession(page);
+  await cdp.send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:5});
+  const send=(type:'touchStart'|'touchMove'|'touchEnd',touchPoints:{x:number;y:number;id:number}[])=>cdp.send('Input.dispatchTouchEvent',{type,touchPoints});
+  const state=()=>page.evaluate(()=>{const g=(window as any).__pool,c=g.scene.controls;return {theta:c.getAzimuthalAngle(),distance:c.getDistance(),aim:g.targetAngle,mode:g.mode,pointers:g.pointers.size};});
+  await send('touchStart',[{x:160,y:450,id:1}]);
+  const aimed=await state();
+  await send('touchMove',[{x:240,y:460,id:1}]);
+  expect(Math.abs((await state()).aim-aimed.aim)).toBeGreaterThan(.01);
+  await send('touchEnd',[]);
+  expect((await state()).mode).toBe('aim');
+  await expect(page.locator('#touchshoot')).toBeVisible();
+  const initial=await state();
+  await send('touchStart',[{x:135,y:450,id:1},{x:255,y:450,id:2}]);
+  await send('touchMove',[{x:100,y:450,id:1},{x:290,y:450,id:2}]);
+  const zoomed=await state();
+  expect(zoomed.distance).toBeLessThan(initial.distance);
+  await send('touchMove',[{x:140,y:470,id:1},{x:330,y:470,id:2}]);
+  await expect.poll(async()=>Math.abs((await state()).theta-zoomed.theta)).toBeGreaterThan(.05);
+  await send('touchEnd',[{x:140,y:470,id:1}]);
+  const held=await state();
+  await send('touchMove',[{x:180,y:480,id:1}]);
+  expect((await state()).aim).toBe(held.aim);
+  await send('touchEnd',[]);
+  expect((await state()).mode).toBe('aim');
+  expect((await state()).pointers).toBe(0);
+  await expect(page.locator('#touchshoot')).toBeEnabled();
+  await page.evaluate(()=>{const w=window as any,r=w.__pool.scene.renderer;r.render=(...args:any[])=>{w.__draw(...args);r.render=()=>{};};});
+  await page.screenshot({path:'/tmp/pool-060-touch.png'});
+  const button=(await page.locator('#touchshoot').boundingBox())!;
+  await send('touchStart',[{x:button.x+button.width/2,y:button.y+button.height/2,id:1}]);
+  await send('touchEnd',[]);
+  expect((await state()).mode).toBe('rolling');
+});
+
+test('compact mobile scores expand and trackpad shift-scroll orbits',async({page})=>{
+  await page.setViewportSize({width:390,height:844});await openGame(page);
+  await page.evaluate(()=>{const g=(window as any).__pool;g.gs.groups=['solid','stripe'];g.gs.open=false;g.hud();});
+  await expect(page.locator('.pcard')).toHaveCount(2);
+  await expect(page.locator('.pcard .balls').first()).toBeHidden();
+  await page.locator('#scoretoggle').click();
+  await expect(page.locator('.pcard .balls').first()).toBeVisible();
+  await page.locator('#scoretoggle').click();
+  await expect(page.locator('#spin')).toBeHidden();
+  await page.locator('#morecontrols').click();
+  await expect(page.locator('#spin')).toBeVisible();
+  await page.locator('#morecontrols').click();
+  const before=await page.evaluate(()=>(window as any).__pool.scene.controls.getAzimuthalAngle());
+  await page.locator('#game-canvas').dispatchEvent('wheel',{deltaY:80,shiftKey:true,bubbles:true,cancelable:true});
+  const after=await page.evaluate(()=>{const g=(window as any).__pool;return {theta:g.scene.controls.getAzimuthalAngle(),mode:g.mode};});
+  expect(Math.abs(after.theta-before)).toBeGreaterThan(.01);expect(after.mode).toBe('aim');
+  await page.screenshot({path:'/tmp/pool-060-mobile.png'});
 });

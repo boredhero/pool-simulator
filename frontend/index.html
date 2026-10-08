@@ -92,6 +92,25 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
 .pball.eight-ball{margin-left:5px;outline:1px solid #ae9a73;outline-offset:2px}.pball.eight-ball.ready{outline:3px solid #e9cc81;box-shadow:0 0 12px #e9cc8160}
 #settingspanel{padding:0;overflow:hidden;gap:0}.settings-header{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-shrink:0;padding:12px 20px;background:#211d18;border-bottom:1px solid #75634a}.settings-header h2{margin:0}#closesettings{font-size:28px;line-height:1;width:44px;height:44px;padding:0;flex-shrink:0}.settings-body{display:flex;flex-direction:column;gap:12px;padding:20px;overflow-y:auto;min-height:0;overscroll-behavior:contain}.settings-body>*{flex-shrink:0}@media(min-width:900px){.settings-header{padding:14px 26px}.settings-body{padding:26px;gap:14px}}
 #onlinepanel{padding:0;overflow:hidden;gap:0;width:min(480px,calc(100vw - 48px))}#onlinepanel .settings-body{gap:14px}#roomentry{display:grid;gap:10px}#roomsharing:not([hidden]){display:grid;gap:10px}#onlinepanel input,#accountdialog input{box-sizing:border-box;width:100%;min-width:0;min-height:44px;font:inherit;color:#f4ead8;background:#16130f;border:1px solid #75634a;border-radius:8px;padding:10px}#accountdialog{width:min(680px,94vw);max-height:90dvh;padding:0;background:#211d18;color:#eee5d6;border:1px solid #75634a;border-radius:16px}#accountdialog[open]{display:flex;flex-direction:column}#accountdialog::backdrop{background:#000b;backdrop-filter:blur(4px)}.account-body{overflow:auto;padding:22px;min-height:0;font-size:17px;line-height:1.5}.account-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}.account-tabs [aria-pressed=true]{border-color:#b3cf97;background:#30402d}#accountform{display:grid;gap:10px}#accountstats{display:grid;grid-template-columns:1fr 1fr;gap:12px}#accountstats div{padding:12px;border:1px solid #75634a;border-radius:10px}#accountstats dt{font-size:15px}#accountstats dd{margin:0;font-size:26px;font-weight:700}#accountstatus:empty{display:none}#accountstatus{color:#efcf91}#recoveryvalue{font-family:monospace!important;font-size:16px!important}#accountclose,#closeonline{width:44px;height:44px;padding:0;font-size:28px;flex-shrink:0}@media(max-width:600px){#onlinepanel{width:auto}.account-body{padding:16px}.account-tabs button{font-size:15px;padding:0 10px}}
+
+/* Compact play surface: scores remain visible; details and secondary actions expand. */
+.touch-shot,#morecontrols,#scoretoggle{display:none}
+.touch-input .touch-shot{display:grid;grid-template-columns:1fr auto;gap:4px 12px;flex:1;min-width:0;align-items:center}
+.touch-shot label{font-size:15px;font-weight:600}.touch-shot input{grid-column:1;width:100%;min-width:0;height:44px;accent-color:#bad3a1}.touch-shot button{grid-column:2;grid-row:1 / 3;background:#496340}
+.touch-input .power-control{display:none}
+@media(max-width:900px){
+ .topbar{top:max(8px,env(safe-area-inset-top));left:10px;right:10px;padding:10px 12px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+ .status{display:contents}.status-meta{order:0;margin:0;flex:1}#turn{display:none}#version{font-size:12px;min-height:30px;padding:2px 6px}
+ .toolbar{order:1;gap:4px}.toolbar button{min-height:44px;padding:0 9px;font-size:14px}#msg{order:2;flex-basis:100%;font-size:16px;line-height:1.3}
+ #scorecard{top:var(--below-header,120px);left:10px;right:10px;width:auto;display:flex;gap:6px;flex-direction:row}
+ .pcard{min-width:0;flex:1;padding:7px 10px;border-radius:10px}.pcard .pname{font-size:15px}.pcard .pname>span:first-child{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pcard .grp{font-size:12px}.pcard .balls,.pcard .live-pots{display:none}
+ #scorecard.expanded .balls{display:flex;flex-wrap:wrap}#scorecard.expanded .live-pots{display:block;font-size:12px}.pcard.active{border-left-width:4px}
+ #scoretoggle{display:block;position:fixed;z-index:5;right:12px;top:var(--below-scores,185px);min-height:44px;padding:0 10px;font-size:12px;background:#211d18ed}
+ .control-tray{bottom:max(8px,env(safe-area-inset-bottom));left:10px;right:10px;padding:8px 10px;display:flex;flex-wrap:wrap;gap:8px}
+ .power-control{flex:1}.control-help{font-size:12px}.control-tray .spin-control,.control-tray .actions{display:none}.control-tray.expanded .spin-control,.control-tray.expanded .actions{display:flex;flex:1 0 100%;padding:0;border:0}
+ #morecontrols{display:block;padding:0 12px;min-height:44px;font-size:14px}.touch-shot{flex:1}#hint{display:none}#callpanel{bottom:110px;max-width:calc(100vw - 24px)}
+ #settingspanel,#onlinepanel,#helppanel,#viewpanel{top:var(--below-header,120px);max-height:calc(100dvh - var(--below-header,120px) - 16px);overflow-y:auto;z-index:10}
+}
 </style>
 </head>
 <body>
@@ -111,20 +130,22 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
   </div>
   <div class="hint" id="hint">Aim on the felt · pull back and release to shoot · right-drag to orbit</div>
   <div class="control-tray">
+    <div class="touch-shot"><label id="touchpowerlabel" for="touchpower">Power 50%</label><input id="touchpower" type="range" min="4" max="100" value="50" aria-label="Shot power"><button id="touchshoot">Shoot</button></div>
+    <button id="morecontrols" aria-expanded="false" aria-controls="spincontrols shotextras">More</button>
     <div class="power-control"><span class="control-label">Shot power <span id="playbackstate" role="status"></span></span><div id="chargebar"><div id="chargefill"></div></div><div class="control-help">Pull farther for a stronger shot</div></div>
-    <div class="spin-control"><span class="control-label">Spin</span><div id="spin" tabindex="0" role="group" title="Drag to set spin. Arrow keys adjust; Shift makes smaller adjustments. Home resets." aria-label="Cue ball spin control: centered"></div><button id="resetspin" type="button" aria-label="Reset spin to center" disabled>Reset</button></div>
-    <div class="row actions"><button id="aibtn">Play vs AI</button><button id="rack">New rack</button></div>
+    <div id="spincontrols" class="spin-control"><span class="control-label">Spin</span><div id="spin" tabindex="0" role="group" title="Drag to set spin. Arrow keys adjust; Shift makes smaller adjustments. Home resets." aria-label="Cue ball spin control: centered"></div><button id="resetspin" type="button" aria-label="Reset spin to center" disabled>Reset</button></div>
+    <div id="shotextras" class="row actions"><button id="aibtn">Play vs AI</button><button id="rack">New rack</button></div>
   </div>
 </div>
-<div id="scorecard"></div>
+<div id="scorecard"></div><button id="scoretoggle" aria-expanded="false" aria-controls="scorecard">Show balls</button>
 <aside id="helppanel" aria-label="How to play">
   <div class="guide-heading"><span class="eyebrow">YOUR NEXT SHOT</span><button id="closehelp" aria-label="Close controls guide">×</button></div>
   <h2>Aim. Pull. Release.</h2>
 
-  <dl id="mouseguide"><dt>01 · Line it up</dt><dd>Move over the felt to aim.</dd><dt>02 · Take the shot</dt><dd>Press, drag back to build power, then release. Your aim locks while pulling.</dd><dt>03 · Find your view</dt><dd>Right-drag to orbit. Scroll to zoom.</dd></dl>
-  <dl id="touchguide" hidden><dt>01 · Line it up</dt><dd>Touch the felt in the direction you want to aim.</dd><dt>02 · Take the shot</dt><dd>Keep your finger down, pull back, then release. A longer pull means more power.</dd><dt>03 · Find your view</dt><dd>Tap View → Move camera for one-finger orbit and two-finger pinch/pan. Return to play when ready. Two-finger orbit/pinch also works during play and cancels a shot pull.</dd></dl>
+  <dl id="mouseguide"><dt>01 · Line it up</dt><dd>Move over the felt to aim.</dd><dt>02 · Take the shot</dt><dd>Press, drag back to build power, then release. Your aim locks while pulling.</dd><dt>03 · Find your view</dt><dd>Right-drag to orbit. Scroll or trackpad pinch to zoom. Shift-scroll to orbit without a right mouse button; View → Move camera also lets you drag with one finger or the left button.</dd></dl>
+  <dl id="touchguide" hidden><dt>01 · Line it up</dt><dd>Touch the felt to aim. Keep holding and swing your finger sideways to turn the cue.</dd><dt>02 · Take the shot</dt><dd>Lift your finger when lined up. Set the power slider, then tap Shoot. Lifting your aiming finger never fires.</dd><dt>03 · Find your view</dt><dd>Tap View → Move camera for one-finger orbit and two-finger pinch/pan. Return to play when ready. During play, drag two fingers together to orbit, even after pinching to zoom. Lift both fingers before aiming again.</dd></dl>
   <p class="guide-note"><strong>Add spin</strong> · Drag the blue dot on the cue ball below. Reset returns it to center. Arrow keys adjust a focused spin control; hold Shift for finer steps. Cue elevation is assisted around obstacles and changes the shot.</p>
-  <p class="guide-note"><strong>After a foul</strong> · Tap or click a green legal spot to place the cue ball. The outline shows your placement area.</p>
+  <p class="guide-note"><strong>After a foul</strong> · Tap or click a legal spot inside the tinted outline to place the cue ball. The outline shows your placement area.</p>
   <p class="guide-note"><strong>Call a shot</strong> · When prompted, choose your ball, then tap its destination pocket on the table.</p>
   <p id="kitchenhelp" class="guide-note"><strong>Head string &amp; kitchen</strong> · After a scratch, place the cue ball in the shaded area behind the dashed line. It must leave the kitchen before contacting a ball inside it.</p>
   <div id="rulesummary" class="rules-summary"></div>

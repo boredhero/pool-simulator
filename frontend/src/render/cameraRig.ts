@@ -64,10 +64,22 @@ export class CameraRig {
   revision=0;
   private motion?:{time:number;target:Vector3;end:Vector3;orbit:Spherical;endOrbit:Spherical};
   constructor(private camera:PerspectiveCamera,private controls:OrbitControls,private canvas:HTMLCanvasElement) {
-    controls.maxDistance=8;controls.enablePan=false;controls.zoomSpeed=.8;controls.rotateSpeed=matchMedia('(pointer: coarse)').matches ? .65 : 1;
+    controls.maxDistance=8;controls.enablePan=false;controls.zoomSpeed=.8;controls.rotateSpeed=1;controls.dampingFactor=.12;
     controls.addEventListener('start',()=>this.cancel(true));
     canvas.addEventListener('pointerdown',()=>this.cancel(),{capture:true});
-    canvas.addEventListener('wheel',()=>this.cancel(),{passive:true});
+    canvas.addEventListener('wheel',e=>{
+      this.cancel(true);
+      // Shift + two-finger scroll gives trackpads an orbit gesture without a secondary click.
+      // Pinch arrives as ctrl+wheel and remains handled by OrbitControls' zoom path.
+      if(e.shiftKey&&!e.ctrlKey){
+        e.preventDefault();e.stopImmediatePropagation();
+        controls.dispatchEvent({type:'start'});
+        const unit=e.deltaMode===1?16:e.deltaMode===2?canvas.clientHeight:1;
+        controls.rotateLeft((e.deltaX||e.deltaY)*unit*.004);
+        if(e.deltaX)controls.rotateUp(e.deltaY*unit*.004);
+        controls.update();controls.dispatchEvent({type:'end'});
+      }
+    },{capture:true,passive:false});
   }
   get moving(){return !!this.motion;}
   cancel(manual=false){this.motion=undefined;if(manual)this.revision++;}

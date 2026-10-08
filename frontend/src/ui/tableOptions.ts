@@ -29,6 +29,9 @@ export class TableOptions {
     el('closehelp').addEventListener('click', () => show(false, true));
     for (const id of ['settingsbtn', 'onlinebtn']) el(id).addEventListener('click', () => show(false, true));
     const tab = (touch: boolean) => {
+      document.documentElement.classList.toggle('touch-input',touch);
+      el('hint').textContent=touch?'Drag to aim · set power · tap Shoot · two fingers move the camera':'Aim on the felt · pull back and release · right-drag or Shift-scroll to orbit';
+      el('helppanel').querySelector('h2')!.textContent=touch?'Aim. Set power. Shoot.':'Aim. Pull. Release.';
       el('touchguide').hidden = !touch; el('mouseguide').hidden = touch;
 
     };

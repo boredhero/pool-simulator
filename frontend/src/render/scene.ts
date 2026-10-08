@@ -1,3 +1,4 @@
+import { guideColor } from './guideColor';
 import { PocketDrops } from './pocketDrop';
 import { CameraRig } from './cameraRig';
 import { ballTexture, type CueStyle } from './ballTextures';
@@ -234,6 +235,7 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
   );
   zoneLine.visible = false;
   scene.add(zoneLine);
+  let guide=guideColor('#0a6c2f');
   const ringMat = new THREE.MeshBasicMaterial({ color: 0x4caf50, transparent: true, opacity: 0.8 });
   const ring = new THREE.Mesh(new THREE.RingGeometry(BALL_R * 0.9, BALL_R * 1.25, 32), ringMat);
   ring.rotation.x = -Math.PI / 2;
@@ -392,6 +394,11 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
       }
     },
     setTheme(felt, wood) {
+      guide=guideColor(felt);
+      zoneLine.material.color.copy(guide);zoneLine.material.opacity=.85;
+      ringMat.color.copy(guide);boundary.material.color.copy(guide);
+      kitchenShade.material.color.copy(guide);
+      callRings.forEach(ring=>ring.material.color.copy(guide));
       const oldMap = feltMat.map, oldBump = feltMat.bumpMap;
       feltTex = feltTextures(felt,surfaceAnisotropy);
       feltMat.sheenColor.set(felt).lerp(new THREE.Color('white'),.15);
@@ -429,7 +436,7 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
       if (!visible) return;
       const [rx, rz] = toRender(x, y);
       ring.position.set(rx, 0.004, rz);
-      ringMat.color.set(legal ? 0x4caf50 : 0xf44336);
+      ringMat.color.copy(legal ? guide : new THREE.Color(0xf44336));
     },
     setCue(visible, cx, cy, angle, pull, tipX = 0, tipY = 0) {
       cueGroup.visible = visible;
