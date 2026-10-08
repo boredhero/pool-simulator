@@ -7,69 +7,81 @@
 <link rel="icon" href="/icon.svg" type="image/svg+xml" />
 <title>Play Pool</title>
 <style>
-html,body{margin:0;height:100%;overscroll-behavior:none;background:#0b1020;color:#eee;font-family:system-ui}
-#game-canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;user-select:none;-webkit-user-select:none;cursor:crosshair}
-.hud{position:fixed;inset:0;pointer-events:none;padding:calc(8px + env(safe-area-inset-top)) calc(8px + env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-left));display:flex;flex-direction:column;justify-content:space-between}
-.row{display:flex;gap:8px;align-items:center}
-.row>*{pointer-events:auto}
-.chip{background:rgba(12,16,30,.62);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.14);padding:6px 12px;border-radius:999px;font-size:13px;white-space:nowrap}
-#msg{flex:1;overflow:hidden;text-overflow:ellipsis}
-#turn{font-weight:600}
-#turn.me{border-color:#4caf50}
-button{min-height:44px;min-width:44px;touch-action:manipulation;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:rgba(20,28,52,.78);backdrop-filter:blur(8px);color:#fff;font-size:14px;padding:0 12px}
-button.on{background:#2c5a2c;border-color:#4caf50}
-#version{font-size:11px;opacity:.6;pointer-events:none}
-#scorecard{position:fixed;top:calc(60px + env(safe-area-inset-top));right:calc(8px + env(safe-area-inset-right));display:flex;flex-direction:column;gap:8px;pointer-events:none;z-index:4}
-.pcard{background:rgba(12,16,30,.66);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:8px 10px;min-width:118px}
-.pcard.active{border-color:#4caf50}
-.pcard .pname{font-size:12px;font-weight:600;margin-bottom:6px;display:flex;justify-content:space-between;gap:6px}
-.pcard .pname .grp{opacity:.75;font-weight:400}
-.pcard .balls{display:flex;flex-wrap:wrap;gap:4px;max-width:132px}
-.pcard .count{font-size:11px;opacity:.8}
-#scorecard.mini .pcard .balls{display:none}
-.pball{width:20px;height:20px;border-radius:50%;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;color:#111;background:#f8f8f8}
-.pball.out{opacity:.28;filter:saturate(.4)}
-.pball.eight{background:#111;color:#f8f8f8}
-#settingspanel{position:fixed;top:calc(60px + env(safe-area-inset-top));left:calc(8px + env(safe-area-inset-left));background:rgba(10,14,28,.95);border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:12px;display:none;flex-direction:column;gap:10px;pointer-events:auto;z-index:5;max-width:230px}
-#settingspanel.open{display:flex}
-#settingspanel .swatches{display:flex;gap:6px;flex-wrap:wrap}
-.swatch{width:34px;height:34px;border-radius:50%;border:2px solid transparent;cursor:pointer}
-.swatch.sel{border-color:#fff}
-#settingspanel label{font-size:12px;opacity:.8}
-#settingspanel input[type=color]{width:100%;height:40px;border:none;background:none;padding:0}
-#onlinepanel{position:fixed;top:calc(60px + env(safe-area-inset-top));right:calc(8px + env(safe-area-inset-right));background:rgba(10,14,28,.95);border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:12px;display:none;flex-direction:column;gap:8px;pointer-events:auto;z-index:5}
-#onlinepanel.open{display:flex}
-#onlinepanel input{min-height:44px;border-radius:8px;border:1px solid #555;background:#111;color:#fff;padding:0 10px;width:150px}
-#roominfo{font-size:12px;opacity:.8}
-#onlinepanel.has-score{top:calc(210px + env(safe-area-inset-top))}
-#chargebar{height:6px;border-radius:3px;background:rgba(255,255,255,.15);flex:1;max-width:280px;overflow:hidden}
-#chargefill{height:100%;width:0%;border-radius:3px;background:linear-gradient(90deg,#4caf50,#ffc107,#f44336)}
-#spin{width:48px;height:48px;border-radius:50%;background:radial-gradient(circle at center,#f8f8f8 18%,#c33 19%,#c33 26%,#eee 27%);position:relative;touch-action:none;flex:none}
-#spin::after{content:'';position:absolute;left:50%;top:50%;width:8px;height:8px;margin:-4px;border-radius:50%;background:#2244aa;transform:translate(var(--tx,0px),var(--ty,0px))}
-.spacer{flex:1;pointer-events:none}
+:root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#f5f1e9;background:#100e0c;font-synthesis:none}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overscroll-behavior:none}
+button,input{font:inherit}
+button{min-height:48px;padding:0 18px;border:1px solid #6d6254;border-radius:12px;background:#302b24;color:#fff8ed;font-size:16px;font-weight:600;cursor:pointer;touch-action:manipulation;transition:background .15s,border-color .15s}
+button:hover{background:#484033;border-color:#d2b782}
+button:focus-visible,input:focus-visible,.swatch:focus-visible{outline:3px solid #e7c384;outline-offset:3px}
+button.on{background:#264e38;border-color:#88ba91}
 #app{height:100dvh}
-.hint{font-size:12px;opacity:.65;text-align:center;pointer-events:none;transition:opacity .8s}
+#game-canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;user-select:none;-webkit-user-select:none;cursor:crosshair}
+.hud{position:fixed;inset:0;pointer-events:none;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+.topbar{position:absolute;top:20px;left:24px;right:24px;max-width:1180px;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:24px;background:rgba(27,24,20,.96);border:1px solid #635747;border-radius:18px;padding:16px 20px;box-shadow:0 8px 28px #0004;pointer-events:auto}
+.status{min-width:0;flex:1}
+.status-meta{display:flex;gap:12px;align-items:center;margin-bottom:7px}
+#turn{font-size:14px;letter-spacing:.06em;text-transform:uppercase;font-weight:750;color:#e2cfaa}
+#turn.me{color:#acd2ad}
+#version{font-size:12px;color:#b5ac9e}
+#msg{font-size:clamp(18px,1.4vw,23px);font-weight:650;line-height:1.35;overflow-wrap:anywhere}
+.toolbar,.row{display:flex;align-items:center;gap:10px}
+#scorecard{position:fixed;top:126px;left:24px;display:flex;flex-direction:column;gap:12px;width:248px;pointer-events:none;z-index:2}
+.pcard{background:rgba(27,24,20,.94);border:1px solid #635747;border-left:4px solid #635747;border-radius:14px;padding:16px;box-shadow:0 6px 22px #0003}
+.pcard.active{border-color:#96bb8f;border-left-color:#b9dea9;background:rgba(32,46,33,.96)}
+.pcard .pname{display:flex;flex-direction:column;gap:5px;font-size:19px;font-weight:700;line-height:1.2}
+.pcard .grp{font-size:14px;font-weight:500;color:#ddd3c3}
+.pcard .balls{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.pcard .balls:empty{display:none}
+.pball{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#111;box-shadow:inset 0 0 0 1px #ffffff80}
+.pball span{display:flex;align-items:center;justify-content:center;border-radius:50%;width:15px;height:15px;background:#fff8ee;color:#181511;font-size:10px}
+.pball.potted{opacity:.3}
+.control-tray{position:absolute;bottom:20px;left:24px;right:24px;margin:auto;max-width:940px;display:flex;align-items:center;gap:24px;padding:14px 20px;border:1px solid #635747;border-radius:18px;background:rgba(27,24,20,.96);box-shadow:0 8px 28px #0004;pointer-events:auto}
+.power-control{flex:1;min-width:100px}
+.control-label{display:block;font-size:13px;text-transform:uppercase;letter-spacing:.08em;font-weight:650;color:#e2cfaa;margin-bottom:8px}
+#chargebar{height:14px;border-radius:7px;background:#62584b;overflow:hidden}
+#chargefill{height:100%;width:0%;border-radius:7px;background:linear-gradient(90deg,#80b58b,#e6bd71,#dd765c)}
+.control-help{font-size:13px;color:#c7bdad;margin-top:6px}
+.spin-control{display:flex;align-items:center;gap:12px;border-left:1px solid #635747;padding-left:24px}
+.spin-control .control-label{margin:0}
+#spin{width:56px;height:56px;border-radius:50%;background:radial-gradient(circle at center,#f7f1e3 17%,#995748 18%,#995748 24%,#f7f1e3 25%);position:relative;touch-action:none;flex:none;cursor:crosshair;box-shadow:inset -3px -4px 8px #0003}
+#spin::after{content:'';position:absolute;left:50%;top:50%;width:9px;height:9px;margin:-4.5px;border-radius:50%;background:#244c73;transform:translate(var(--tx,0px),var(--ty,0px))}
+.hint{position:absolute;bottom:132px;left:20px;right:20px;text-align:center;font-size:15px;line-height:1.5;color:#eee4d0;text-shadow:0 2px 5px #000;transition:opacity .5s;pointer-events:none}
 .hint.gone{opacity:0}
-@media (pointer:coarse){button{font-size:15px}.pcard{min-width:96px}.pcard .balls{max-width:108px}}
+#settingspanel,#onlinepanel{position:fixed;top:122px;right:24px;width:300px;max-height:calc(100dvh - 150px);overflow:auto;background:#211d18;border:1px solid #8d795c;border-radius:16px;padding:20px;display:none;flex-direction:column;gap:12px;z-index:5;box-shadow:0 12px 48px #0008}
+#settingspanel.open,#onlinepanel.open{display:flex}
+#settingspanel label,#onlinepanel label{font-size:15px;font-weight:650;color:#e2cfaa}
+.swatches{display:flex;gap:8px;flex-wrap:wrap}
+.swatch{width:36px;height:36px;min-height:36px;padding:0;border-radius:50%;border:2px solid #ffffff30}
+.swatch.sel{border-color:#ffe4af;box-shadow:0 0 0 2px #ffe4af50}
+#settingspanel input[type=color]{width:100%;height:44px;border:1px solid #6d6254;border-radius:8px;background:none;padding:3px}
+#onlinepanel input{width:100%;min-height:48px;border-radius:10px;border:1px solid #80705c;background:#151310;color:#fff;padding:0 12px;font-size:17px}
+#onlinepanel .row>button{flex:1;padding:0 10px}
+#roominfo{font-size:14px;color:#d7c9b4}
+@media(min-width:1800px){.topbar{top:28px}.control-tray{bottom:28px}#scorecard{top:148px;left:32px;width:280px}.pcard .pname{font-size:22px}.pcard .grp{font-size:16px}.pball{width:30px;height:30px}}
+@media(max-width:900px){#scorecard{top:124px;left:24px;right:24px;width:auto;flex-direction:row}.pcard{flex:1;padding:12px 14px}.pcard .pname{font-size:17px}.pcard .grp{font-size:13px}.pcard .balls{gap:4px;margin-top:8px}.pball{width:23px;height:23px}.topbar{gap:12px}.control-tray{gap:16px}.spin-control{padding-left:16px}}
+@media(max-width:600px){.topbar{top:12px;left:12px;right:12px;padding:12px;display:grid;grid-template-columns:1fr auto;gap:10px;border-radius:14px}.status{display:contents}.status-meta{grid-column:1;grid-row:1;margin:0;gap:8px}#turn{font-size:12px}#version{font-size:10px}.toolbar{grid-column:2;grid-row:1;gap:6px}.toolbar button{font-size:13px;padding:0 10px;min-height:44px}#msg{grid-column:1 / -1;grid-row:2;font-size:17px;line-height:1.3}#scorecard{top:136px;left:12px;right:12px;gap:8px}.pcard{padding:10px;border-radius:12px}.pcard .pname{font-size:16px}.pcard .grp{font-size:12px}.pball{width:21px;height:21px}.control-tray{bottom:12px;left:12px;right:12px;padding:12px;display:grid;grid-template-columns:1fr auto;gap:12px;border-radius:14px}.control-tray .actions{grid-column:1 / -1}.actions button{flex:1}.control-help{font-size:12px}.spin-control{padding-left:12px;gap:8px}.spin-control .control-label{font-size:11px}#spin{width:48px;height:48px}.hint{bottom:184px;font-size:13px}#settingspanel,#onlinepanel{top:126px;right:12px;left:12px;width:auto;max-height:calc(100dvh - 150px)}}
+@media(max-height:600px) and (min-width:601px){.topbar{top:8px;padding:8px 14px}#scorecard{top:90px;width:190px;flex-direction:column}.pcard{padding:10px}.pcard .balls{display:none}.control-tray{bottom:8px;padding:8px 14px}.control-help{display:none}.hint{bottom:96px}}
 </style>
 </head>
 <body>
 <div id="app"><canvas id="game-canvas"></canvas>
 <div class="hud">
-  <div class="row">
-    <div class="chip" id="msg">…</div>
-    <div class="chip" id="turn">…</div>
-    <span id="version"></span>
-    <button id="settingsbtn" title="Table settings">⚙</button>
-    <button id="onlinebtn">Online</button>
+  <div class="topbar">
+    <div class="status">
+      <div class="status-meta"><span id="turn">Player 1</span><span id="version"></span></div>
+      <div id="msg" role="status" aria-live="polite">Player 1 to break</div>
+    </div>
+    <div class="toolbar">
+      <button id="settingsbtn" title="Table settings">Table</button>
+      <button id="onlinebtn">Online</button>
+    </div>
   </div>
-  <div class="hint" id="hint">drag to aim · pull back to charge · release to shoot · right-drag to orbit</div>
-  <div class="row">
-    <div id="chargebar"><div id="chargefill"></div></div>
-    <div id="spin" title="Tip offset (english)"></div>
-    <div class="spacer"></div>
-    <button id="aibtn">vs AI</button>
-    <button id="rack">Rack</button>
+  <div class="hint" id="hint">Aim on the felt · pull back and release to shoot · right-drag to orbit</div>
+  <div class="control-tray">
+    <div class="power-control"><span class="control-label">Shot power</span><div id="chargebar"><div id="chargefill"></div></div><div class="control-help">Pull farther for a stronger shot</div></div>
+    <div class="spin-control"><span class="control-label">Spin</span><div id="spin" title="Tip offset (english)" aria-label="Cue ball spin control"></div></div>
+    <div class="row actions"><button id="aibtn">Play vs AI</button><button id="rack">New rack</button></div>
   </div>
 </div>
 <div id="scorecard"></div>
@@ -84,7 +96,9 @@ button.on{background:#2c5a2c;border-color:#4caf50}
   <input type="color" id="woodcustom" value="#4a2c14" />
 </div>
 <div id="onlinepanel">
+  <label for="pname">Your name</label>
   <input id="pname" placeholder="your name" maxlength="24" />
+  <label for="rcode">Room code</label>
   <input id="rcode" placeholder="room code" maxlength="4" style="text-transform:uppercase" />
   <div class="row"><button id="createbtn">Create room</button><button id="joinbtn">Join</button></div>
   <span id="roominfo">solo table</span>

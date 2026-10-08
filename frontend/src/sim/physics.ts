@@ -137,22 +137,20 @@ function earliestContact(balls: Ball[], dt: number): Contact | null {
   // Ball-ball swept TOI.
   for (let i = 0; i < live.length; i++) {
     const A = live[i];
-    if (A.asleep && Math.hypot(A.vx, A.vy) === 0) continue;
     for (let j = i + 1; j < live.length; j++) {
       const B = live[j];
       const dx = A.x - B.x, dy = A.y - B.y;
       const dvx = A.vx - B.vx, dvy = A.vy - B.vy;
       const a = dvx * dvx + dvy * dvy;
-      if (a < 1e-12) continue;
       const bq = 2 * (dx * dvx + dy * dvy);
       const c = dx * dx + dy * dy - R2 * R2;
       if (c < 0) {
         // Overlapping: resolve now along line of centers.
-        const d = Math.hypot(dx, dy) || 1e-9;
-        best = { t: 0, kind: 'bb', a: A.id, b: B.id, nx: dx / d, ny: dy / d };
+        const d = Math.hypot(dx, dy);
+        best = { t: 0, kind: 'bb', a: A.id, b: B.id, nx: d > 1e-9 ? dx / d : 1, ny: d > 1e-9 ? dy / d : 0 };
         continue;
       }
-      if (bq >= 0) continue; // separating
+      if (a < 1e-12 || bq >= 0) continue; // stationary or separating
       const disc = bq * bq - 4 * a * c;
       if (disc < 0) continue;
       const t = (-bq - Math.sqrt(disc)) / (2 * a);
@@ -199,6 +197,7 @@ function earliestContact(balls: Ball[], dt: number): Contact | null {
       const bq = 2 * (dx * A.vx + dy * A.vy);
       const c = dx * dx + dy * dy - rr * rr;
       if (c < 0) {
+        if (bq >= 0) continue; // already leaving the jaw
         const d = Math.hypot(dx, dy) || 1e-9;
         if (!best || 0 < best.t) best = { t: 0, kind: 'jaw', a: A.id, b: -1, nx: dx / d, ny: dy / d };
         continue;
@@ -239,13 +238,14 @@ function resolveBallBall(A: Ball, B: Ball, nx: number, ny: number, ev: ShotEvent
       const other = A.id === cueId ? B : A;
       ev.firstContact = other.n;
     }
-  } else {
-    // Resting overlap: positional split (no energy).
-    const ox = (A.x - B.x), oy = (A.y - B.y);
-    const d = Math.hypot(ox, oy) || 1e-9;
-    const push = ((BALL_R * 2 - d) / 2 + 1e-6);
-    A.x += (ox / d) * push; A.y += (oy / d) * push;
-    B.x -= (ox / d) * push; B.y -= (oy / d) * push;
+  }
+  // Repair penetration even when an impact impulse was just applied. This
+  // changes positions only, so resting contacts cannot gain kinetic energy.
+  const distance = Math.hypot(A.x - B.x, A.y - B.y);
+  if (distance < BALL_R * 2) {
+    const push = (BALL_R * 2 - distance) / 2 + 1e-8;
+    A.x += nx * push; A.y += ny * push;
+    B.x -= nx * push; B.y -= ny * push;
   }
 }
 
@@ -282,7 +282,7 @@ export function step(balls: Ball[], dt: number, ev: ShotEvents, cueId: number, c
     friction(b, dt);
   }
   let remaining = dt;
-  for (let iter = 0; iter < 6 && remaining > 1e-9; iter++) {
+  for (let iter = 0; iter < 64 && remaining > 1e-9; iter++) {
     const c = earliestContact(balls, remaining);
     if (!c) break;
     const adv = Math.min(c.t, remaining);
@@ -295,7 +295,6 @@ export function step(balls: Ball[], dt: number, ev: ShotEvents, cueId: number, c
     const byId = (id: number) => balls.find((b) => b.id === id)!;
     if (c.kind === 'bb') resolveBallBall(byId(c.a), byId(c.b), c.nx, c.ny, ev, cueId);
     else resolveRail(byId(c.a), c.nx, c.ny, ev, contactMade);
-    if (c.t === 0 && iter > 2) break;
   }
   if (remaining > 1e-9) {
     for (const b of balls) {

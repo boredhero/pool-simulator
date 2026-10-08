@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
+import { cueElevation, CUE_LENGTH } from './cuePose';
 import { RAIL_W, CUSHION_W, bedGeometry, surroundGeometry } from './tableGeometry';
 import { BALL_R, POCKETS, TABLE_H, TABLE_W, cushions, jaws } from '../sim/table';
 
@@ -61,17 +63,18 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, isCoarse ? 1.5 : 2));
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0b1020);
+  scene.background = new THREE.Color(0x100e0c);
   const pmrem = new THREE.PMREMGenerator(renderer);
   const environment = new RoomEnvironment();
   scene.environment = pmrem.fromScene(environment, 0.04).texture;
+  scene.environmentIntensity = 0.45;
   environment.dispose();
   pmrem.dispose();
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMappingExposure = 1.0;
 
   const camera = new THREE.PerspectiveCamera(50, 1, 0.05, 50);
   camera.position.set(-1.8, 2.5, 2.0);
@@ -93,15 +96,30 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
   };
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x223311, 0.5));
-  const sun = new THREE.DirectionalLight(0xffffff, 1.6);
-  sun.position.set(-1.5, 3, 1.2);
-  sun.castShadow = true;
-  sun.shadow.mapSize.setScalar(isCoarse ? 1024 : 2048);
-  sun.shadow.normalBias = 0.001;
-  sun.shadow.bias = -0.00005;
-  Object.assign(sun.shadow.camera, { left: -1.8, right: 1.8, top: 1.8, bottom: -1.8, far: 8 });
-  scene.add(sun);
+  // Broad amber overhead illumination, like a shaded billiard lamp. The
+  // low room fill preserves contrast without turning the ball colors orange.
+  scene.add(new THREE.HemisphereLight(0xffe8ce, 0x24170f, 0.35));
+  RectAreaLightUniformsLib.init();
+  const lamp = new THREE.RectAreaLight(0xffd6a0, 2, 1.9, 0.75);
+  lamp.position.set(0, 1.65, 0);
+  lamp.lookAt(0, 0, 0);
+  scene.add(lamp);
+  // Two bulbs inside the same shade footprint cast overlapping, soft-edged
+  // shadow maps. Distance falloff and feathered cones concentrate light on
+  // the cloth, instead of lighting the scene like an outdoor sun.
+  for (const x of [-0.55, 0.55]) {
+    const bulb = new THREE.SpotLight(0xffdfaf, 3.5, 6, 0.9, 0.65, 2);
+    bulb.position.set(x, 1.65, 0);
+    bulb.target.position.set(x, 0, 0);
+    bulb.castShadow = true;
+    bulb.shadow.mapSize.setScalar(isCoarse ? 1024 : 2048);
+    bulb.shadow.camera.near = 0.1;
+    bulb.shadow.camera.far = 6;
+    bulb.shadow.radius = 2;
+    bulb.shadow.normalBias = 0.0002;
+    bulb.shadow.bias = -0.00005;
+    scene.add(bulb, bulb.target);
+  }
 
   // --- Procedural textures: felt nap + wood grain (no downloads). ---
   const shade = (hex: string, f: number): string => {
@@ -202,18 +220,17 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
   scene.add(feltHit);
 
   let woodTex = woodTexture('#4a2c14');
-  const woodMat = new THREE.MeshStandardMaterial({
-    color: 0xffffff, map: woodTex, roughness: 0.42, envMapIntensity: 0.7,
+  const woodMat = new THREE.MeshPhysicalMaterial({
+    color: 0xffffff, map: woodTex, roughness: 0.7, envMapIntensity: 0.2, specularIntensity: 0.3,
   });
-  const rails: THREE.Mesh[] = [];
   const surroundGeo = surroundGeometry();
   const frameMesh = new THREE.Mesh(surroundGeo, woodMat);
   frameMesh.castShadow = frameMesh.receiveShadow = true;
   scene.add(frameMesh);
-  rails.push(frameMesh);
 
   // Cushion noses use the collision segments, so all six mouths line up.
-  const cushionMat = new THREE.MeshStandardMaterial({ color: '#0a6c2f', roughness: 0.95 });
+  // The bed and cushion cloth share textures, finish, and theme updates.
+  const cushionMat = feltMat;
   for (const { x1, y1, x2, y2 } of cushions()) {
     const alongX = y1 === y2;
     const [ax, az] = toRender(x1, y1);
@@ -230,6 +247,15 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
     profile.lineTo(0.008, 0.012);
     profile.closePath();
     const geo = new THREE.ExtrudeGeometry(profile, { depth: len, bevelEnabled: false });
+    // Use meters for cloth UVs, as on the bed, rather than stretching one
+    // texture across the length of each cushion.
+    const positions = geo.getAttribute('position');
+    const clothUV = geo.getAttribute('uv');
+    for (let i = 0; i < positions.count; i++) {
+      const along = positions.getZ(i);
+      const across = positions.getX(i) + positions.getY(i);
+      clothUV.setXY(i, alongX ? along : across, alongX ? across : along);
+    }
     const rail = new THREE.Mesh(geo, cushionMat);
     const tangent = new THREE.Vector3(-nz, 0, nx);
     rail.setRotationFromMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3(nx, 0, nz), new THREE.Vector3(0, 1, 0), tangent));
@@ -237,10 +263,12 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
     rail.position.set(tangent.x + tangent.z > 0 ? ax : bx, 0, tangent.x + tangent.z > 0 ? az : bz);
     rail.castShadow = rail.receiveShadow = true;
     scene.add(rail);
-    rails.push(rail);
   }
   const jawList = jaws();
-  const jawMesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1, 1, 32), cushionMat, jawList.length);
+  const jawGeo = new THREE.CylinderGeometry(1, 1, 1, 32);
+  const jawUV = jawGeo.getAttribute('uv');
+  for (let i = 0; i < jawUV.count; i++) jawUV.setXY(i, jawUV.getX(i) * 2 * Math.PI * 0.021, jawUV.getY(i) * 0.025);
+  const jawMesh = new THREE.InstancedMesh(jawGeo, cushionMat, jawList.length);
   const jawMatrix = new THREE.Matrix4();
   jawList.forEach((jaw, i) => {
     const [x, z] = toRender(jaw.x, jaw.y);
@@ -250,7 +278,6 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
   jawMesh.instanceMatrix.needsUpdate = true;
   jawMesh.castShadow = jawMesh.receiveShadow = true;
   scene.add(jawMesh);
-  rails.push(jawMesh);
   // Diamond sights: mother-of-pearl dots at 1/8th points, skipping pockets.
   // One InstancedMesh for all 18 (single draw call).
   {
@@ -270,13 +297,13 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
     }
     const dia = new THREE.InstancedMesh(
       new THREE.CircleGeometry(0.008, 12),
-      new THREE.MeshStandardMaterial({ color: 0xe8e4da, roughness: 0.3, envMapIntensity: 1.2 }),
+      new THREE.MeshStandardMaterial({ color: 0xe8e4da, roughness: 0.65, envMapIntensity: 0.35 }),
       spots.length,
     );
     const m4 = new THREE.Matrix4();
     const rot = new THREE.Matrix4().makeRotationX(-Math.PI / 2);
     spots.forEach(([x, z], i) => {
-      m4.copy(rot).setPosition(x, 0.051, z);
+      m4.copy(rot).setPosition(x, 0.054, z);
       dia.setMatrixAt(i, m4);
     });
     dia.instanceMatrix.needsUpdate = true;
@@ -333,9 +360,9 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
     let m = meshes.get(key);
     if (!m) {
       const mat = n === null
-        ? new THREE.MeshStandardMaterial({ color: 0xf8f8f8, roughness: 0.3 })
-        : new THREE.MeshStandardMaterial({ map: ballTexture(n), roughness: 0.3 });
-      mat.envMapIntensity = 0.5;
+        ? new THREE.MeshPhysicalMaterial({ color: 0xf8f8f8, roughness: 0.45, specularIntensity: 0.4 })
+        : new THREE.MeshPhysicalMaterial({ map: ballTexture(n), roughness: 0.45, specularIntensity: 0.4 });
+      mat.envMapIntensity = 0.25;
       m = new THREE.Mesh(ballGeo, mat);
       m.castShadow = true;
       m.receiveShadow = true;
@@ -369,8 +396,8 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
   ring.visible = false;
   scene.add(ring);
 
-  // Cue stick. Shaft rescales to avoid clipping rails/balls behind the cue ball.
-  const SHAFT_LEN = 1.1;
+  // Full-length cue, automatically elevated over obstacles.
+  const SHAFT_LEN = CUE_LENGTH;
   const SHAFT_Z0 = BALL_R + 0.014;
   const cueGroup = new THREE.Group();
   const shaft = new THREE.Mesh(
@@ -379,6 +406,7 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
   );
   shaft.rotation.x = Math.PI / 2;
   shaft.position.z = SHAFT_Z0 + SHAFT_LEN / 2;
+  shaft.castShadow = true;
   cueGroup.add(shaft);
   const tip = new THREE.Mesh(
     new THREE.CylinderGeometry(0.0062, 0.0062, 0.012, 12),
@@ -386,6 +414,7 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
   );
   tip.rotation.x = Math.PI / 2;
   tip.position.z = BALL_R + 0.008;
+  tip.castShadow = true;
   cueGroup.add(tip);
   cueGroup.position.y = BALL_R;
   scene.add(cueGroup);
@@ -451,10 +480,12 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
   };
   frame();
 
+  let cueObstacles: Parameters<typeof cueElevation>[4] = [];
   return {
     renderer,
     controls,
     setBalls(list, dt) {
+      cueObstacles = list;
       const axis = new THREE.Vector3();
       for (const b of list) {
         const m = getMesh(b.n);
@@ -480,7 +511,6 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
       }
     },
     setTheme(felt, wood) {
-      cushionMat.color.set(felt);
       const oldMap = feltMat.map, oldBump = feltMat.bumpMap;
       feltTex = feltTextures(felt);
       feltMat.map = feltTex.map;
@@ -507,26 +537,11 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
       if (!visible) return;
       const [rx, rz] = toRender(cx, cy);
       const dx = Math.cos(angle), dy = Math.sin(angle);
-      // Stick extends local +z; point it back along -aim, shifted by pull-back.
-      cueGroup.rotation.y = Math.atan2(-dx, -dy);
-      cueGroup.position.set(rx - dx * pull, BALL_R, rz - dy * pull);
-      // Clip the shaft at the first rail/ball behind the cue ball.
-      ray.set(
-        new THREE.Vector3(rx, BALL_R, rz),
-        new THREE.Vector3(-dx, 0, -dy).normalize(),
-      );
-      const colliders: THREE.Object3D[] = [...rails];
-      for (const m of meshes.values()) if (m.visible && m !== meshes.get('cue')) colliders.push(m);
-      let len = SHAFT_LEN;
-      const hits = ray.intersectObjects(colliders, false);
-      for (const h of hits) {
-        if (h.distance > 0.06) {
-          len = Math.max(0.28, Math.min(SHAFT_LEN, h.distance - 0.05 - pull));
-          break;
-        }
-      }
-      shaft.scale.y = len / SHAFT_LEN;
-      shaft.position.z = SHAFT_Z0 + len / 2;
+      const elevation = cueElevation(cx, cy, angle, pull, cueObstacles);
+      // Local +z is the butt. Tilt up around the ball, then yaw along -aim.
+      cueGroup.rotation.set(-elevation, Math.atan2(-dx, -dy), 0, 'YXZ');
+      const setback = pull * Math.cos(elevation);
+      cueGroup.position.set(rx - dx * setback, BALL_R + pull * Math.sin(elevation), rz - dy * setback);
     },
     pickFelt,
     onFrame(cb) { cbs.push(cb); },

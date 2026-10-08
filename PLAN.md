@@ -25,6 +25,11 @@ Flow: work on `develop`, PR to `main` (protected: PR + `ci` check), merge to shi
   and recessed wells, leather facings, sloped cushions and instanced jaws tied
   to sim geometry, softer materials/shadows, desktop/portrait camera fitting.
   Geometry ray tests cover clear pockets and continuous outside rails.
+- Shared bed/cushion felt, reduced wood/ball glare, warm overhead area light
+  with two shadow-casting bulbs and inverse-square falloff.
+- Ball collisions check every pair regardless of array order/sleep state;
+  penetration correction and a larger contact budget are mirrored in Python.
+  Regressions cover sleeping targets, coincident balls, and every frame of breaks.
 
 ## Open / known gaps
 - Pocket forgiveness for casual play (strict-pro now); cloth-speed setting

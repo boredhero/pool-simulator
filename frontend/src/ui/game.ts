@@ -86,7 +86,8 @@ export class Game {
       const box = this.el[id];
       box.innerHTML = '';
       for (const c of list) {
-        const d = document.createElement('div');
+        const d = document.createElement('button');
+        d.setAttribute('aria-label', `${id === 'feltsw' ? 'Felt' : 'Rails'} ${c}`);
         d.className = 'swatch' + (c.toLowerCase() === cur.toLowerCase() ? ' sel' : '');
         d.style.background = c;
         d.addEventListener('click', () => {
@@ -233,7 +234,7 @@ export class Game {
     });
     this.el.aibtn.addEventListener('click', () => {
       this.aiOpponent = !this.aiOpponent;
-      (this.el.aibtn as HTMLButtonElement).textContent = this.aiOpponent ? 'AI: on' : 'vs AI';
+      (this.el.aibtn as HTMLButtonElement).textContent = this.aiOpponent ? 'AI: on' : 'Play vs AI';
       (this.el.aibtn as HTMLButtonElement).classList.toggle('on', this.aiOpponent);
       this.gs = newGame((Math.random() * 1e9) | 0);
       this.mode = 'aim';
@@ -380,20 +381,18 @@ export class Game {
 
   renderScorecard(): void {
     const box = this.el.scorecard;
-    if (innerWidth < 700) box.classList.add('mini');
     box.innerHTML = '';
     const names = this.roomNames ?? [
-      'Player 1' + (this.aiOpponent ? '' : ''),
+      'Player 1',
       this.aiOpponent ? 'AI' : 'Player 2',
     ];
     for (const i of [0, 1]) {
       const g = this.gs.groups[i];
       const card = document.createElement('div');
       card.className = 'pcard' + (this.gs.current === i && this.gs.winner === null ? ' active' : '');
-      card.addEventListener('click', () => box.classList.toggle('mini'));
       const head = document.createElement('div');
       head.className = 'pname';
-      const label = g === null ? (this.gs.open ? 'open' : '?') : g;
+      const label = g === 'solid' ? 'Solids' : 'Stripes';
       head.innerHTML = '';
       const nm = document.createElement('span');
       nm.textContent = names[i] ?? `Player ${i + 1}`;
@@ -405,20 +404,21 @@ export class Game {
       );
       if (onEight) nums.push(8);
       const left = nums.filter((n) => !this.gs.balls.find((q) => q.n === n)?.potted).length;
-      gr.textContent = `${label} ${left}/${nums.length}`;
+      gr.textContent = g === null ? 'Open table · groups unassigned' : onEight ? 'On the 8-ball' : `${label} · ${left} remaining`;
       head.appendChild(nm);
       head.appendChild(gr);
       card.appendChild(head);
       const row = document.createElement('div');
       row.className = 'balls';
-      if (onEight) nums.push(8);
       for (const n of nums) {
         const b = this.gs.balls.find((q) => q.n === n);
         const d = document.createElement('div');
-        d.className = 'pball' + (n === 8 ? ' eight' : '') + (b?.potted ? '' : ' out');
-        d.style.background = b?.potted ? ballCss(n) : '';
-        d.textContent = String(n);
-        if (!b?.potted) d.style.border = '1px solid rgba(255,255,255,.4)';
+        d.className = 'pball' + (b?.potted ? ' potted' : '');
+        d.style.background = ballCss(n);
+        d.title = `Ball ${n}${b?.potted ? ' · pocketed' : ' · remaining'}`;
+        const number = document.createElement('span');
+        number.textContent = String(n);
+        d.appendChild(number);
         row.appendChild(d);
       }
       card.appendChild(row);
