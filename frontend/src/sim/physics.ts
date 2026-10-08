@@ -19,7 +19,7 @@ const SLEEP_W = 0.5;
 const TIP_C = 2.5; // SRF = 2.5*(b/R): exact impulse model (TP A.12)
 const TIP_MAX = 0.55; // miscue limit (fraction of R)
 const SQUIRT_K = (5.7 * Math.PI) / 180; // aim deflect per unit side offset (normal cue)
-export const VMAX_NORMAL = 4.5;
+export const VMAX_NORMAL = 3.5;
 export const VMAX_BREAK = 8.5;
 const VMIN = 0.55; // nothing dies short
 
