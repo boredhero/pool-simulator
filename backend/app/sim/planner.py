@@ -14,7 +14,7 @@ import time
 
 from app.sim.cpu import candidates, clear, fallback
 from app.sim.cue import cue_elevation
-from app.sim.physics import DT, ShotEvents, all_asleep, step, strike
+from app.sim.physics import DT, VMIN, ShotEvents, all_asleep, shoot_speed, step, strike
 from app.sim.rules import (
     GameState,
     apply_shot,
@@ -73,6 +73,82 @@ def _shot(cue, point, target, pocket, family, power=0.4, score=0.0):
         "family": family,
         "score": score,
     }
+
+
+def _power_for_speed(speed, vmax):
+    return min(1.0, max(0.0, (speed - VMIN) / (vmax - VMIN))) ** (1 / 1.55)
+
+
+def _firm_variant(shot, gs):
+    """Sample an extra 0.65 m/s, not an arbitrary percentage of nonlinear power."""
+    vmax = gs.rules["breakMax" if gs.break_shot else "normalMax"]
+    power = _power_for_speed(shoot_speed(shot["power"], vmax) + 0.65, vmax)
+    return {**shot, "power": power, "pace": "firm"}
+
+
+def _features(gs, numbers):
+    """Local congestion and distinct object-ball pocket routes, independent of cue leave."""
+    live = [b for b in gs.balls if b.n is not None and not b.potted]
+    pairs = {
+        (min(a.id, b.id), max(a.id, b.id))
+        for i, a in enumerate(live)
+        for b in live[i + 1 :]
+        if (a.n in numbers or b.n in numbers)
+        and math.hypot(a.x - b.x, a.y - b.y) < 2 * BALL_R + 0.055
+    }
+    open_balls = {
+        b.n
+        for b in live
+        if b.n in numbers and any(clear(b.x, b.y, *p[:2], gs.balls, [0, b.id]) for p in POCKETS)
+    }
+    return pairs, open_balls
+
+
+def _development_seeds(gs):
+    if gs.break_shot:
+        return []
+    cue = gs.balls[0]
+    options = []
+    for ball in gs.balls:
+        if (
+            ball.potted
+            or ball.n not in legal_targets(gs)
+            or ball.n == 8
+            or gs.kitchen_shot
+            and ball.x < TABLE_W / 4
+        ):
+            continue
+        neighbors = sum(
+            not other.potted
+            and other.id not in (0, ball.id)
+            and math.hypot(ball.x - other.x, ball.y - other.y) < 2 * BALL_R + 0.055
+            for other in gs.balls
+        )
+        distance = math.hypot(ball.x - cue.x, ball.y - cue.y)
+        if not neighbors or distance <= 2 * BALL_R:
+            continue
+        # Cue stops at first contact, not at the object's center. Checking all the
+        # way to its center falsely rejects reachable faces of tightly packed balls.
+        gx = ball.x - 2 * BALL_R * (ball.x - cue.x) / distance
+        gy = ball.y - 2 * BALL_R * (ball.y - cue.y) / distance
+        if not _inside(gx, gy) or not clear(cue.x, cue.y, gx, gy, gs.balls, [0, ball.id]):
+            continue
+        pocket = min(range(6), key=lambda i: math.dist((ball.x, ball.y), POCKETS[i][:2]))
+        # Add energy for travel before cluster impact; the preview decides usefulness.
+        for speed in (2.05, 2.85):
+            launch = math.sqrt(speed * speed + 2 * 0.01 * 9.81 * max(0, distance - 0.75))
+            shot = _shot(
+                cue,
+                (ball.x, ball.y),
+                ball,
+                pocket,
+                "development",
+                _power_for_speed(launch, gs.rules["normalMax"]),
+                neighbors - distance,
+            )
+            shot["pace"] = "controlled firm" if speed == 2.05 else "strong"
+            options.append(shot)
+    return sorted(options, key=lambda s: -s["score"])[:4]
 
 
 def _geometry(gs):
@@ -172,7 +248,8 @@ def _geometry(gs):
     seeds.extend(direct[3:6])
     for family in ("kick", "safety", "bank", "combination"):
         seeds.extend(special[family][1:3])
-    return seeds
+    development = _development_seeds(gs)
+    return seeds[:1] + development[:2] + seeds[1:] + development[2:]
 
 
 def _placements(gs):
@@ -268,8 +345,28 @@ def _preview(gs, shot, deadline):
     # Cheap positional evaluation, always from the original shooter's perspective.
     state.current = me
     own = candidates(state) if state.winner is None else []
+    comparison = copy.copy(gs)
+    comparison.current, comparison.groups, comparison.open = me, state.groups, state.open
+    own_numbers = legal_targets(comparison)
+    before_pairs, before_routes = _features(comparison, own_numbers)
+    after_pairs, after_routes = _features(state, own_numbers)
+    before_targets = {s["calledBall"] for s in candidates(comparison)}
+    next_targets = {s["calledBall"] for s in own}
+    # Pots already receive a separate reward: only surviving pairs count as opened.
+    live_ids = {b.id for b in state.balls if not b.potted}
+    opened = sum(a in live_ids and b in live_ids for a, b in before_pairs - after_pairs)
+    new_routes = len(after_routes - before_routes)
+    new_targets = len(next_targets - before_targets)
     state.current = 1 - me
     opponent = candidates(state) if state.winner is None else []
+    comparison.current = 1 - me
+    opponent_numbers = legal_targets(comparison)
+    opponent_before, opponent_routes_before = _features(comparison, opponent_numbers)
+    opponent_after, opponent_routes_after = _features(state, opponent_numbers)
+    opponent_opened = sum(
+        a in live_ids and b in live_ids for a, b in opponent_before - opponent_after
+    )
+    opponent_routes = len(opponent_routes_after - opponent_routes_before)
     mobility = sum(max(0, s["score"]) * w for s, w in zip(own, (1, 0.3, 0.1)))
     danger = sum(max(0, s["score"]) * w for s, w in zip(opponent, (1, 0.3, 0.1)))
     called = any(
@@ -279,6 +376,12 @@ def _preview(gs, shot, deadline):
     score += (30 if legal else -500) + (50 if continues else 0) + (15 if called else 0)
     score += 6 * mobility if continues else -5 * danger
     score -= 100 if events.cue_potted else 0
+    if legal and before_pairs:
+        # Development matters even when handing over the table, but do not reward
+        # scattering indiscriminately or outweigh a verified pot/retained turn.
+        score += min(20, min(6, 0.5 * opened) + min(4, 2 * new_routes) + min(12, 6 * new_targets))
+        score -= min(15, 0.8 * opponent_opened + 4 * opponent_routes)
+    score -= 0.2 * shot["power"]  # Prefer controlled energy when outcomes tie.
     target = next(b for b in state.balls if b.n == shot["calledBall"])
     miss = math.dist((target.x, target.y), POCKETS[shot["calledPocket"]][:2])
     return {
@@ -303,6 +406,14 @@ def _preview(gs, shot, deadline):
             "firstContact": events.first_contact,
             "railAfterContact": events.rail_after_contact,
             "leftKitchen": events.cue_left_kitchen,
+            "launchSpeed": shoot_speed(
+                shot["power"], gs.rules["breakMax" if gs.break_shot else "normalMax"]
+            ),
+            "clusterLinksOpened": opened,
+            "newObjectRoutes": new_routes,
+            "newTargetsAvailable": new_targets,
+            "opponentClusterLinksOpened": opponent_opened,
+            "opponentNewObjectRoutes": opponent_routes,
         },
     }
 
@@ -336,7 +447,12 @@ def plan_shots(gs: GameState, *, max_trials=16, budget_seconds=2.0):
     seeds = [backup] if state.break_shot else _seeds(gs)
     # Power and follow/draw variants produce different cue leaves. Side spin is
     # deliberately not guessed: it would require matching squirt compensation.
-    queue = list(seeds[:8])
+    # Reserve early coverage for energy/development before aim refinements consume
+    # the deadline. Always retain the original controlled option as a comparison.
+    queue = list(seeds[:1])
+    if seeds and not state.break_shot:
+        queue.append(_firm_variant(seeds[0], state))
+    queue.extend(s for s in seeds[1:8])
     # Cushion friction/restitution make the ideal mirror only a starting point.
     # Reserve a small correction sweep for a bank, without unbounded angle search.
     bank = next((s for s in seeds if s["family"] == "bank"), None)
@@ -372,7 +488,9 @@ def plan_shots(gs: GameState, *, max_trials=16, budget_seconds=2.0):
             and evidence["targetMiss"] < 0.22
         ):
             for offset in (-0.012, 0.012):
-                queue.insert(0, {**shot, "aim": shot["aim"] + offset, "refined": True})
+                queue.insert(
+                    min(4, len(queue)), {**shot, "aim": shot["aim"] + offset, "refined": True}
+                )
     safe = [s for s in completed if s["evidence"]["legal"] and not s["evidence"]["lost"]]
     winners = [s for s in safe if s["evidence"]["won"]]
     choices = winners or safe or [s for s in completed if not s["evidence"]["lost"]] or [backup]

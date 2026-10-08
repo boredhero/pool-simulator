@@ -268,6 +268,27 @@ def describe_plan(plan: dict) -> dict:
         if ev.get("opponentShots", 0) == 1
         else "no direct option found",
         "cue_region": ev.get("cueRegion", "unknown"),
+        "pace": plan.get("pace", "controlled"),
+        "development_result": "congestion opened with new direct shot options"
+        if ev.get("clusterLinksOpened", 0) and ev.get("newTargetsAvailable", 0)
+        else "nearby balls separated, without new direct shot options"
+        if ev.get("clusterLinksOpened", 0)
+        else "no measured cluster opening"
+        if ev.get("verified")
+        else "unknown",
+        "cluster_development": {
+            "separated_nearby_pairs": ev.get("clusterLinksOpened", 0),
+            "new_clear_object_ball_routes": ev.get("newObjectRoutes", 0),
+            "new_shootable_targets": ev.get("newTargetsAvailable", 0),
+        }
+        if ev.get("verified")
+        else "unknown",
+        "opponent_development": {
+            "separated_nearby_pairs": ev.get("opponentClusterLinksOpened", 0),
+            "new_clear_object_ball_routes": ev.get("opponentNewObjectRoutes", 0),
+        }
+        if ev.get("verified")
+        else "unknown",
     }
 
 

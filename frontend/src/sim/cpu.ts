@@ -1,7 +1,7 @@
 // Offline CPU: geometry seeds and bounded previews using the live physics/rules.
 // Legacy difficulty helpers remain available to existing callers.
 import { BALL_R, POCKETS, TABLE_H, TABLE_W, cushions } from './table';
-import { allAsleep, DT, step, strike, type Ball, type ShotEvents } from './physics';
+import { allAsleep, DT, shootSpeed, step, strike, type Ball, type ShotEvents } from './physics';
 import { cueElevation } from './cue';
 import { applyShot, beginShot, canPlace, groupOf, legalTargets as ruleTargets, placeCue, type GameState } from './rules';
 
@@ -96,10 +96,49 @@ export function legalTargets(balls: Ball[], group: string | null, open: boolean)
 
 export interface CpuPlan extends CpuShot {
   ball: number; pocket: number;
-  family: 'direct' | 'bank' | 'kick' | 'safety' | 'break';
+  family: 'direct' | 'bank' | 'kick' | 'safety' | 'break' | 'development';
   placement?: { x: number; y: number };
   verified: boolean;
   score: number;
+  evidence?: { clusterLinksOpened: number; newObjectRoutes: number; newTargetsAvailable: number;
+    opponentClusterLinksOpened: number; opponentNewObjectRoutes: number; nextShots: number; opponentShots: number };
+}
+
+function powerForSpeed(speed: number, vmax: number): number {
+  const minimum=shootSpeed(0,vmax);
+  return Math.min(1,Math.max(0,(speed-minimum)/(vmax-minimum)))**(1/1.55);
+}
+
+function layoutFeatures(gs:GameState,numbers:number[]) {
+  const live=gs.balls.filter(b=>b.n!==null&&!b.potted),pairs=new Map<string,[number,number]>();
+  for(let i=0;i<live.length;i++) for(const b of live.slice(i+1)) {
+    const a=live[i];
+    if((numbers.includes(a.n!)||numbers.includes(b.n!)) && Math.hypot(a.x-b.x,a.y-b.y)<2*BALL_R+.055) {
+      const ids:[number,number]=[Math.min(a.id,b.id),Math.max(a.id,b.id)];pairs.set(ids.join(':'),ids);
+    }
+  }
+  const routes=new Set(live.filter(b=>numbers.includes(b.n!)&&POCKETS.some(p=>segClear(b.x,b.y,p.x,p.y,gs.balls,[0,b.id]))).map(b=>b.n!));
+  return {pairs,routes};
+}
+
+function developmentPlans(gs:GameState):CpuPlan[] {
+  if(gs.breakShot)return [];
+  const cue=gs.balls[0],targets=ruleTargets(gs),plans:CpuPlan[]=[];
+  for(const ball of gs.balls) {
+    if(ball.potted||ball.n===null||ball.n===8||!targets.includes(ball.n)||(gs.kitchenShot&&ball.x<TABLE_W/4))continue;
+    const neighbors=gs.balls.filter(b=>!b.potted&&b.id!==0&&b.id!==ball.id&&Math.hypot(ball.x-b.x,ball.y-b.y)<2*BALL_R+.055).length;
+    const distance=Math.hypot(ball.x-cue.x,ball.y-cue.y);
+    if(!neighbors||distance<=2*BALL_R)continue;
+    const gx=ball.x-2*BALL_R*(ball.x-cue.x)/distance,gy=ball.y-2*BALL_R*(ball.y-cue.y)/distance;
+    if(gx<BALL_R||gx>TABLE_W-BALL_R||gy<BALL_R||gy>TABLE_H-BALL_R||!segClear(cue.x,cue.y,gx,gy,gs.balls,[0,ball.id]))continue;
+    const pocket=POCKETS.reduce((best,p,i)=>Math.hypot(p.x-ball.x,p.y-ball.y)<Math.hypot(POCKETS[best].x-ball.x,POCKETS[best].y-ball.y)?i:best,0);
+    for(const speed of [2.05,2.85]) {
+      const launch=Math.sqrt(speed*speed+2*.01*9.81*Math.max(0,distance-.75));
+      plans.push({angle:Math.atan2(ball.y-cue.y,ball.x-cue.x),power:powerForSpeed(launch,gs.rules.normalMax),tipX:0,tipY:0,
+        ball:ball.n,pocket,family:'development',score:neighbors-distance,verified:false});
+    }
+  }
+  return plans.sort((a,b)=>b.score-a.score).slice(0,4);
 }
 
 /** Mirror seeds use real cushion segments, avoiding the pocket mouths. */
@@ -169,7 +208,10 @@ function geometryPlans(gs: GameState): CpuPlan[] {
   // Diversify before previewing so difficult layouts receive an escape trial.
   const options=[direct[0], safeties[0], kicks[0], banks[0], ...direct.slice(1,5), ...kicks.slice(1), ...safeties.slice(1), ...banks.slice(1)]
     .filter((s): s is CpuPlan => !!s);
-  if(options.length) return options;
+  const development=developmentPlans(gs);
+  if(options.length||development.length) {
+    return [...options.slice(0,1),...development.slice(0,2),...options.slice(1),...development.slice(2)];
+  }
   const target=gs.balls.find(b=>!b.potted && b.n!==null && targets.includes(b.n));
   if(!target) return [];
   // A fully obstructed layout must still take a turn, rather than freezing.
@@ -216,7 +258,9 @@ export function planCpuTurn(gs: GameState, maxTrials = 12, budgetMs = 120): CpuP
   const deadline=performance.now()+budgetMs;
   const seeds=placementSeeds(gs);
   if(!seeds.length) return null;
-  const queue=[...seeds.slice(0,8),...seeds.slice(0,2).flatMap(s=>[
+  const vmax=gs.rules[gs.breakShot?'breakMax':'normalMax'];
+  const firm={...seeds[0],power:powerForSpeed(shootSpeed(seeds[0].power,vmax)+.65,vmax)};
+  const queue=[...seeds.slice(0,1),...(gs.breakShot?[]:[firm]),...seeds.slice(1,8),...seeds.slice(0,2).flatMap(s=>[
     {...s,power:Math.max(.12,s.power*.7),tipY:.18}, {...s,tipY:-.22},
   ])];
   let best: CpuPlan|null=null;
@@ -238,11 +282,26 @@ export function planCpuTurn(gs: GameState, maxTrials = 12, budgetMs = 120): CpuP
     if(state.winner===1-me || state.ballInHand || state.message.startsWith('Illegal break')) continue;
     const continues=state.current===me;
     state.current=me;
-    const own=shotCandidates(state.balls,ruleTargets(state)).length;
+    const own=shotCandidates(state.balls,ruleTargets(state));
+    const comparison={...gs,current:me,groups:state.groups,open:state.open};
+    const ownNumbers=ruleTargets(comparison),before=layoutFeatures(comparison,ownNumbers),after=layoutFeatures(state,ownNumbers);
+    const beforeTargets=new Set(shotCandidates(comparison.balls,ownNumbers).map(s=>s.ball));
+    const nextTargets=new Set(own.map(s=>s.ball));
+    const liveIds=new Set(state.balls.filter(b=>!b.potted).map(b=>b.id));
+    const opened=[...before.pairs].filter(([key,[a,b]])=>!after.pairs.has(key)&&liveIds.has(a)&&liveIds.has(b)).length;
+    const newRoutes=[...after.routes].filter(n=>!before.routes.has(n)).length;
+    const newTargets=[...nextTargets].filter(n=>!beforeTargets.has(n)).length;
     state.current=(1-me) as 0|1;
     const opponent=shotCandidates(state.balls,ruleTargets(state)).length;
-    const score=state.winner===me?10000:(continues?80+Math.min(own,5)*3:30-Math.min(opponent,5)*3);
-    const plan={...seed,score,verified:true};
+    comparison.current=state.current;
+    const opponentNumbers=ruleTargets(comparison),oppBefore=layoutFeatures(comparison,opponentNumbers),oppAfter=layoutFeatures(state,opponentNumbers);
+    const opponentOpened=[...oppBefore.pairs].filter(([key,[a,b]])=>!oppAfter.pairs.has(key)&&liveIds.has(a)&&liveIds.has(b)).length;
+    const opponentRoutes=[...oppAfter.routes].filter(n=>!oppBefore.routes.has(n)).length;
+    let score=state.winner===me?10000:(continues?80+Math.min(own.length,5)*3:30-Math.min(opponent,5)*3);
+    if(before.pairs.size) score+=Math.min(20,Math.min(6,.5*opened)+Math.min(4,2*newRoutes)+Math.min(12,6*newTargets))-Math.min(15,.8*opponentOpened+4*opponentRoutes);
+    score-=.2*seed.power;
+    const plan={...seed,score,verified:true,evidence:{clusterLinksOpened:opened,newObjectRoutes:newRoutes,newTargetsAvailable:newTargets,
+      opponentClusterLinksOpened:opponentOpened,opponentNewObjectRoutes:opponentRoutes,nextShots:own.length,opponentShots:opponent}};
     if(!best || score>best.score) best=plan;
     if(state.winner===me) break;
   }

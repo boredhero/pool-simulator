@@ -4,6 +4,7 @@ import { allAsleep, simulateShot, strike } from '../src/sim/physics';
 import { cueElevation } from '../src/sim/cue';
 import { applyShot, beginShot, newGame, placeCue, type GameState } from '../src/sim/rules';
 import { TABLE_W } from '../src/sim/table';
+import clusterFixtures from '../../backend/tests/cluster_fixtures.json';
 
 function fixture(): GameState {
   const gs=newGame(3);
@@ -27,6 +28,28 @@ function execute(gs:GameState, shot:CpuPlan) {
 }
 
 describe('offline CPU authoritative turn planning',()=>{
+  it.each(clusterFixtures)('uses measured controlled development for $name within four trials',testCase=>{
+    const gs=newGame(1);
+    gs.current=0;gs.groups=['solid','stripe'];gs.open=false;gs.breakShot=false;
+    const positions=new Map(testCase.balls.map(([n,x,y])=>[n,{x,y}]));
+    for(const b of gs.balls){const xy=positions.get(b.n??0);b.potted=!xy;if(xy)Object.assign(b,xy);}
+    const snapshot=structuredClone(gs);
+    const selected=planCpuTurn(gs,4,Infinity)!;
+    expect(selected.verified).toBe(true);expect(selected.family).toBe('development');
+    expect(selected.power).toBeGreaterThan(.6);expect(selected.power).toBeLessThan(1);
+    expect(selected.evidence!.newTargetsAvailable).toBeGreaterThan(0);
+    expect(selected.evidence!.nextShots).toBeGreaterThan(0);
+    expect(gs).toEqual(snapshot);
+    const ev=execute(gs,selected);
+    expect(ev.firstContact).toBe(1);expect(ev.cuePotted).toBe(false);
+    expect(gs.winner).toBeNull();expect(gs.ballInHand).toBe(false);
+    const softState=structuredClone(snapshot);
+    execute(softState,{...selected,power:.42});
+    expect(softState.ballInHand).toBe(false);
+    const pairCount=(state:GameState)=>state.balls.flatMap((a,i)=>state.balls.slice(i+1).filter(b=>
+      !a.potted&&!b.potted&&a.n!==null&&b.n!==null&&a.n<8&&b.n<8&&Math.hypot(a.x-b.x,a.y-b.y)<.11215)).length;
+    expect(pairCount(gs)).toBeLessThan(pairCount(softState));
+  });
   it('reproduces the old kitchen fallback foul and chooses a legal exit-return kick',()=>{
     const gs=fixture();gs.kitchenShot=true;
     const original=structuredClone(gs);

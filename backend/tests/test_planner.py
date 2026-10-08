@@ -8,10 +8,11 @@ import pytest
 
 from app.sim.cue import cue_elevation
 from app.sim.physics import all_asleep, simulate_shot, strike
-from app.sim.planner import _geometry, _preview, plan_shots
+from app.sim.planner import _development_seeds, _geometry, _preview, plan_shots
 from app.sim.rules import apply_shot, begin_shot, can_place, new_game, place_cue
 
 CASES = json.loads(Path(__file__).with_name("planner_fixtures.json").read_text())
+CLUSTERS = json.loads(Path(__file__).with_name("cluster_fixtures.json").read_text())
 
 
 def fixture_state(case):
@@ -107,3 +108,52 @@ def test_completed_game_has_no_shots():
     gs = fixture_state(CASES[0])
     gs.winner = 0
     assert plan_shots(gs) == []
+
+
+@pytest.mark.parametrize("case", CLUSTERS, ids=lambda c: c["name"])
+def test_dense_cluster_gets_useful_energy_within_four_trials(case):
+    gs = fixture_state(case)
+    original = asdict(gs)
+    seed = next(s for s in _geometry(gs) if s["family"] in ("safety", "development"))
+    soft = _preview(gs, {**seed, "power": 0.42}, None)
+    hardest = _preview(gs, {**seed, "power": 1.0}, None)
+    selected = plan_shots(gs, max_trials=4, budget_seconds=None)[0]
+    assert soft["evidence"]["legal"] and hardest["evidence"]["legal"]
+    assert selected["evidence"]["legal"] and selected["family"] == "development"
+    assert 0.6 < selected["power"] < 1
+    assert selected["evidence"]["clusterLinksOpened"] > soft["evidence"]["clusterLinksOpened"]
+    assert selected["evidence"]["nextShots"] > soft["evidence"]["nextShots"]
+    assert selected["score"] > hardest["score"]
+    replay, events = execute(gs, selected)
+    assert events.first_contact == 1 and not events.cue_potted
+    assert replay.winner is None and not replay.ball_in_hand
+    assert asdict(gs) == original
+
+
+def test_dangerous_development_does_not_concede_early_eight():
+    gs = fixture_state(
+        {"balls": [[0, 0.9, 0.8], [1, 0.34, 0.28], [8, 0.27, 0.22], [2, 1.8, 0.7], [9, 2.0, 0.5]]}
+    )
+    development = [_preview(gs, s, None) for s in _development_seeds(gs)]
+    assert any(s["evidence"]["lost"] for s in development)
+    plans = plan_shots(gs, max_trials=8, budget_seconds=None)
+    assert all(s["evidence"]["legal"] and not s["evidence"]["lost"] for s in plans)
+    result, ev = execute(gs, plans[0])
+    assert result.winner != 1 and not result.ball_in_hand and 8 not in ev.potted
+
+
+def test_unclustered_easy_pot_keeps_controlled_power():
+    selected = plan_shots(fixture_state(CASES[0]), budget_seconds=None)[0]
+    assert selected["evidence"]["calledPot"] and selected["evidence"]["legal"]
+    assert selected["power"] < 0.7
+
+
+def test_development_description_reports_outcomes_not_success_probabilities():
+    from app.api.jev import describe_plan
+
+    selected = plan_shots(fixture_state(CLUSTERS[0]), max_trials=4, budget_seconds=None)[0]
+    description = describe_plan(selected)
+    assert description["pace"] == "strong"
+    assert description["development_result"] == "congestion opened with new direct shot options"
+    assert description["cluster_development"]["new_shootable_targets"] > 0
+    assert description["opponent_development"]["new_clear_object_ball_routes"] == 0
