@@ -49,7 +49,7 @@ button.on{background:#264e38;border-color:#88ba91}
 .spin-control{display:flex;align-items:center;gap:12px;border-left:1px solid #635747;padding-left:24px}
 .spin-control .control-label{margin:0}
 #spin{width:56px;height:56px;border-radius:50%;background:radial-gradient(circle at center,#f7f1e3 17%,#995748 18%,#995748 24%,#f7f1e3 25%);position:relative;touch-action:none;flex:none;cursor:crosshair;box-shadow:inset -3px -4px 8px #0003}
-#spin::after{content:'';position:absolute;left:50%;top:50%;width:9px;height:9px;margin:-4.5px;border-radius:50%;background:#244c73;transform:translate(var(--tx,0px),var(--ty,0px))}
+#spin::after{content:'';position:absolute;left:calc(50% + var(--tx,0%));top:calc(50% + var(--ty,0%));width:9px;height:9px;margin:-4.5px;border-radius:50%;background:#244c73;}
 .hint{position:absolute;bottom:132px;left:20px;right:20px;text-align:center;font-size:15px;line-height:1.5;color:#eee4d0;text-shadow:0 2px 5px #000;transition:opacity .5s;pointer-events:none}
 .hint.gone{opacity:0}
 #settingspanel,#onlinepanel{position:fixed;top:122px;right:24px;width:300px;max-height:calc(100dvh - 150px);overflow:auto;background:#211d18;border:1px solid #8d795c;border-radius:16px;padding:20px;display:none;flex-direction:column;gap:12px;z-index:5;box-shadow:0 12px 48px #0008}
@@ -86,6 +86,7 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
 @media(max-width:600px){.kitchen-guide{max-width:235px;width:235px;padding:8px 12px}.kitchen-guide strong{font-size:18px}}
 #playbackstate{color:#acd2ad;font-size:14px;text-transform:none;letter-spacing:0;margin-left:8px}.live-pots{margin-top:10px;padding-top:8px;border-top:1px solid #70644d;color:#f4dcae;font-size:16px}.pcard.provisional .grp{color:#ffdda1}
 #dismissheadstring{pointer-events:auto;min-height:36px;margin-top:10px;font-size:14px;padding:4px 10px}
+.spin-control{display:grid;grid-template-columns:auto auto;grid-template-rows:auto auto;gap:2px 10px}.spin-control .control-label{grid-column:1;grid-row:1}#spin{grid-column:2;grid-row:1 / span 2}#spin:focus-visible{outline:3px solid #e7c384;outline-offset:4px}#resetspin{grid-column:1;grid-row:2;font-size:15px;min-height:36px;padding:0 8px}#resetspin:disabled{opacity:.45;cursor:default}@media(max-width:600px){#resetspin{min-height:44px}}
 </style>
 </head>
 <body>
@@ -105,7 +106,7 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
   <div class="hint" id="hint">Aim on the felt · pull back and release to shoot · right-drag to orbit</div>
   <div class="control-tray">
     <div class="power-control"><span class="control-label">Shot power <span id="playbackstate" role="status"></span></span><div id="chargebar"><div id="chargefill"></div></div><div class="control-help">Pull farther for a stronger shot</div></div>
-    <div class="spin-control"><span class="control-label">Spin</span><div id="spin" title="Tip offset (english)" aria-label="Cue ball spin control"></div></div>
+    <div class="spin-control"><span class="control-label">Spin</span><div id="spin" tabindex="0" role="group" title="Drag to set spin. Arrow keys adjust; Shift makes smaller adjustments. Home resets." aria-label="Cue ball spin control: centered"></div><button id="resetspin" type="button" aria-label="Reset spin to center" disabled>Reset</button></div>
     <div class="row actions"><button id="aibtn">Play vs AI</button><button id="rack">New rack</button></div>
   </div>
 </div>
@@ -116,7 +117,7 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
 
   <dl id="mouseguide"><dt>01 · Line it up</dt><dd>Move over the felt to aim.</dd><dt>02 · Take the shot</dt><dd>Press, drag back to build power, then release. Your aim locks while pulling.</dd><dt>03 · Find your view</dt><dd>Right-drag to orbit. Scroll to zoom.</dd></dl>
   <dl id="touchguide" hidden><dt>01 · Line it up</dt><dd>Touch the felt in the direction you want to aim.</dd><dt>02 · Take the shot</dt><dd>Keep your finger down, pull back, then release. A longer pull means more power.</dd><dt>03 · Find your view</dt><dd>Use two fingers to orbit and pinch to zoom. This cancels a shot pull.</dd></dl>
-  <p class="guide-note"><strong>Add spin</strong> · Drag the blue dot on the cue ball below. Center it for a straight hit. Cue elevation is assisted around obstacles and changes the shot.</p>
+  <p class="guide-note"><strong>Add spin</strong> · Drag the blue dot on the cue ball below. Reset returns it to center. Arrow keys adjust a focused spin control; hold Shift for finer steps. Cue elevation is assisted around obstacles and changes the shot.</p>
   <p class="guide-note"><strong>After a foul</strong> · Tap or click a green legal spot to place the cue ball. The outline shows your placement area.</p>
   <p class="guide-note"><strong>Call a shot</strong> · When prompted, choose your ball, then tap its destination pocket on the table.</p>
   <p id="kitchenhelp" class="guide-note"><strong>Head string &amp; kitchen</strong> · After a scratch, place the cue ball in the shaded area behind the dashed line. It must leave the kitchen before contacting a ball inside it.</p>

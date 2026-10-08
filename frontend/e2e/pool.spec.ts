@@ -239,3 +239,21 @@ test('head-string tip stays dismissed after reload while its tutorial remains av
   await expect(page.locator('#kitchenhelp')).toContainText('behind the dashed line');
   expect(await page.evaluate(()=>localStorage.getItem('pool:headstring-dismissed'))).toBe('1');
 });
+
+test('spin resets both axes and supports keyboard adjustments on desktop and mobile',async({page})=>{
+  await openGame(page);const spin=page.locator('#spin'),reset=page.locator('#resetspin');
+  await expect(reset).toBeDisabled();
+  const size=(await spin.boundingBox())!;
+  await spin.click({position:{x:size.width*.8,y:size.height*.25}});
+  await expect(reset).toBeEnabled();
+  const before=await page.evaluate(()=>{const g=(window as any).__pool;return[g.tipX,g.tipY];});
+  expect(before[0]).toBeGreaterThan(0);expect(before[1]).toBeGreaterThan(0);
+  await reset.click();
+  expect(await page.evaluate(()=>{const g=(window as any).__pool;return[g.tipX,g.tipY];})).toEqual([0,0]);
+  await expect(spin).toHaveAttribute('aria-label','Cue ball spin control: centered');
+  await spin.focus();await page.keyboard.press('ArrowLeft');await page.keyboard.press('Shift+ArrowDown');
+  expect(await page.evaluate(()=>{const g=(window as any).__pool;return[g.tipX,g.tipY];})).toEqual([-.025,-.005]);
+  await page.keyboard.press('Home');await expect(reset).toBeDisabled();
+  await page.setViewportSize({width:390,height:844});await expect(reset).toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});

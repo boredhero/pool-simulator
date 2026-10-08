@@ -232,3 +232,25 @@ Flow: work on `develop`, PR to `main` (protected: PR + `ci` check), merge to shi
 - The head-string callout has a permanent local dismissal. Its dashed boundary
   and shaded kitchen remain; the information panel retains the explanation
   whenever the active rules use kitchen placement (including Custom).
+
+## Spin input and execution research
+- Added Reset beside the spin pad. It clears both offsets and the marker without
+  altering balls already in motion. Arrow keys adjust a focused pad, Shift uses
+  smaller increments, and Home/0 resets. Pointer capture cleans up on release
+  or cancellation; markers fit the desktop/mobile control.
+- Keep deterministic impact physics by default. The existing sim already has
+  squirt, elevation effects and a 0.55-radius offset cap. Real inconsistency is
+  delivery error (contact point, direction, speed), not a random result from
+  identical clean impacts. No reliable population distribution of amateur tip
+  error was found, so no arbitrary random miss penalty was added.
+- A two-axis cue-ball selector is an established approach, not proven uniquely
+  optimal: [Miniclip's spin UI](https://support.miniclip.com/hc/en-us/articles/35451960569361-Advanced-Plays-Spins-8-Ball-Pool)
+  and [Virtual Pool's tip/stroke controls](https://vponline.celeris.com/support/quickstart).
+  [Dr. Dave on grip/miscues](https://drdavepoolinfo.com/faq/squirt/miscue-limit/)
+  and [contact accuracy](https://drdavepoolinfo.com/faq/sidespin/maximum/)
+  distinguish execution precision from repeatable contact physics. Roughly half
+  the ball radius is a practical contact guideline, not a universal threshold.
+- A possible future opt-in execution mode would map stroke gesture to bounded,
+  visible delivery deviation, showing the actual impact point. It needs play
+  testing. Resolve actual shot parameters once for server/replay consistency;
+  never add independent random errors inside the client and server simulators.
