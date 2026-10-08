@@ -397,27 +397,53 @@ test('settings title and close button stay visible while scrolling on desktop an
 test('touch drag aims and pinch followed by parallel drag orbits without firing',async({page,context})=>{
   await page.setViewportSize({width:390,height:844});
   await openGame(page);
+  // First-visit privacy UI can cover the felt: choose storage before touching the table.
+  if(await page.locator('#privacynotice').isVisible())await page.locator('#privacyessential').click();
+  await expect.poll(()=>page.evaluate(()=>(window as any).__pool.scene.cameraRig.moving)).toBe(false);
   const cdp=await context.newCDPSession(page);
   await cdp.send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:5});
   const send=(type:'touchStart'|'touchMove'|'touchEnd',touchPoints:{x:number;y:number;id:number}[])=>cdp.send('Input.dispatchTouchEvent',{type,touchPoints});
   const state=()=>page.evaluate(()=>{const g=(window as any).__pool,c=g.scene.controls;return {theta:c.getAzimuthalAngle(),distance:c.getDistance(),aim:g.targetAngle,mode:g.mode,pointers:g.pointers.size};});
-  await send('touchStart',[{x:160,y:450,id:1}]);
+  const points=await page.evaluate(()=>{
+    const g=(window as any).__pool,cue=g.cue();
+    const exposed=(x:number,y:number)=>document.elementFromPoint(x,y)?.id==='game-canvas';
+    const felt:Array<{x:number;y:number;angle:number}>=[];
+    for(let y=200;y<innerHeight-180;y+=20)for(let x=40;x<innerWidth-40;x+=20){
+      const p=g.scene.pickFelt(x,y);
+      if(exposed(x,y)&&p&&Math.hypot(p[0]-cue.x,p[1]-cue.y)>.08)
+        felt.push({x,y,angle:Math.atan2(p[1]-cue.y,p[0]-cue.x)});
+    }
+    for(const from of felt)for(const to of felt){
+      const delta=Math.abs(Math.atan2(Math.sin(to.angle-from.angle),Math.cos(to.angle-from.angle)));
+      if(Math.hypot(to.x-from.x,to.y-from.y)>60&&delta>.2&&delta<1.5)return {from,to};
+    }
+    throw new Error('No two unobscured felt points with distinct aiming directions');
+  });
+  await send('touchStart',[{x:points.from.x,y:points.from.y,id:1}]);
   const aimed=await state();
-  await send('touchMove',[{x:240,y:460,id:1}]);
+  await send('touchMove',[{x:points.to.x,y:points.to.y,id:1}]);
   expect(Math.abs((await state()).aim-aimed.aim)).toBeGreaterThan(.01);
   await send('touchEnd',[]);
   expect((await state()).mode).toBe('aim');
   await expect(page.locator('#touchshoot')).toBeVisible();
+  const center=await page.evaluate(()=>{
+    for(let y=260;y<innerHeight-220;y+=20)for(let x=130;x<innerWidth-130;x+=10){
+      const path=[[-60,0],[60,0],[-95,0],[95,0],[-55,20],[135,20],[-15,30]];
+      if(path.every(([dx,dy])=>document.elementFromPoint(x+dx,y+dy)?.id==='game-canvas'))return {x,y};
+    }
+    throw new Error('No exposed canvas region for a native pinch and parallel drag');
+  });
+  const finger=(dx:number,dy:number,id:number)=>({x:center.x+dx,y:center.y+dy,id});
   const initial=await state();
-  await send('touchStart',[{x:135,y:450,id:1},{x:255,y:450,id:2}]);
-  await send('touchMove',[{x:100,y:450,id:1},{x:290,y:450,id:2}]);
+  await send('touchStart',[finger(-60,0,1),finger(60,0,2)]);
+  await send('touchMove',[finger(-95,0,1),finger(95,0,2)]);
   const zoomed=await state();
   expect(zoomed.distance).toBeLessThan(initial.distance);
-  await send('touchMove',[{x:140,y:470,id:1},{x:330,y:470,id:2}]);
+  await send('touchMove',[finger(-55,20,1),finger(135,20,2)]);
   await expect.poll(async()=>Math.abs((await state()).theta-zoomed.theta)).toBeGreaterThan(.05);
-  await send('touchEnd',[{x:140,y:470,id:1}]);
+  await send('touchEnd',[finger(-55,20,1)]);
   const held=await state();
-  await send('touchMove',[{x:180,y:480,id:1}]);
+  await send('touchMove',[finger(-15,30,1)]);
   expect((await state()).aim).toBe(held.aim);
   await send('touchEnd',[]);
   expect((await state()).mode).toBe('aim');
