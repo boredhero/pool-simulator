@@ -5,6 +5,7 @@
     "title": "Rule-aware opponents and aligned camera controls",
     "changes": [
       "Desktop Camera now sits directly above the input-mode selector with matching gaps down to the legal links, and expands upward. Mobile placement is preserved.",
+      "Mobile close zoom preserves the viewing angle near rails instead of forcing an overhead view. An ongoing touch-aim drag can continue beyond the felt edge without taking a shot.",
       "New Jev games use your selected Bar, Tournament or Custom rules. Resumed games retain their original rules, and Jev receives the full authoritative rule context.",
       "Premium players can explicitly start a new Jev game with edited rules. Existing games never change rules mid-rack.",
       "CPU and Jev planner power respects custom speed caps; constrained server fallbacks call a legal target.",
