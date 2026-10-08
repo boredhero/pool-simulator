@@ -93,3 +93,27 @@ test('reset discards a late human response and preserves the fresh rack',async({
   await page.evaluate(()=>{(window as any).__pool.frame();});
   expect(await page.evaluate(()=>{const g=(window as any).__pool;return{state:JSON.stringify(g.gs),jev:g.jevGame,pending:g.pendingNetwork.length,mode:g.mode};})).toEqual({state:fresh,jev:null,pending:0,mode:'aim'});
 });
+
+for(const opponent of ['Jev','CPU'])test(`${opponent} stroke preserves the player's spin control`,async({page})=>{
+  const state=await setup(page);
+  await page.emulateMedia({reducedMotion:'reduce'});
+  if(opponent==='Jev')await page.route('**/api/opponents/jev/games/latency/turn',route=>route.fulfill({json:{
+    state,by:1,source:'jev',placement:{x:1,y:.6},
+    shot:{aim:.35,power:.3,tipX:-.3,tipY:.2,calledBall:null,calledPocket:null},
+  }}));
+  const before=await page.evaluate(opponent=>{
+    const g=(window as any).__pool;g.setSpin(.2,-.15,true);g.gs.current=1;
+    if(opponent==='CPU'){g.jevGame=null;g.jevOpponent=false;}
+    const fire=g.fire.bind(g);g.fire=(...args:any[])=>{fire(...args);g.__spinAtStrike={
+      tipX:g.tipX,tipY:g.tipY,style:document.getElementById('spin')!.getAttribute('style'),
+      shotSpin:args[3],speed:Math.hypot(g.cue().vx,g.cue().vy),
+    };};
+    const style=document.getElementById('spin')!.getAttribute('style');
+    void g.cpuMove();return style;
+  },opponent);
+  await expect.poll(()=>page.evaluate(()=>(window as any).__pool.__spinAtStrike??null)).not.toBeNull();
+  const actual=await page.evaluate(()=>(window as any).__pool.__spinAtStrike);
+  expect(actual.tipX).toBe(.2);expect(actual.tipY).toBe(-.15);expect(actual.style).toBe(before);
+  expect(actual.speed).toBeGreaterThan(0);
+  if(opponent==='Jev')expect(actual.shotSpin).toMatchObject({tipX:-.3,tipY:.2});
+});

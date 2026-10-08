@@ -39,12 +39,16 @@ jobs:
               - 'backend/**'
               - 'contracts/**'
               - 'info.yml'
+              - 'Dockerfile'
+              - 'scripts/**'
               - '.github/workflows/**'
             frontend:
               - 'frontend/**'
               - 'changelog.json'
               - 'contracts/**'
               - 'info.yml'
+              - 'Dockerfile'
+              - 'scripts/**'
               - '.github/workflows/**'
 
   lint:
@@ -60,6 +64,9 @@ jobs:
         with:
           version: "latest"
           enable-cache: true
+
+      - name: Deployment health-check regression
+        run: sh scripts/test-check-deploy.sh
 
       - name: Ruff check
         run: uvx ruff check backend/
@@ -87,11 +94,11 @@ jobs:
 
       - name: Install backend deps
         working-directory: backend
-        run: uv sync --frozen || uv sync
+        run: uv sync --frozen
 
       - name: Run backend tests
         working-directory: backend
-        run: uv run pytest tests/ -v --tb=short
+        run: uv run --no-sync pytest tests/ -v --tb=short
 
   frontend:
     name: frontend
@@ -123,9 +130,7 @@ jobs:
   docker:
     name: docker
     needs: changes
-    # PRs require lint, unit tests and typecheck/build; browsers are advisory.
-    # Container publishing is a release operation, not part of develop iteration.
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    # Validate the release container on PRs; publish only from main.
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -175,7 +180,7 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          source: "docker-compose.prod.yml"
+          source: "docker-compose.prod.yml,scripts/check-deploy.sh"
           target: /tmp/pool-simulator-deploy/
 
       - name: Deploy
@@ -200,10 +205,7 @@ jobs:
             docker pull "${IMAGE}:${DEPLOY_SHA}"
             docker tag "${IMAGE}:${DEPLOY_SHA}" "${IMAGE}:latest"
             cd ~/pool-simulator && docker compose up -d --force-recreate --remove-orphans && docker compose ps
-            for i in 1 2 3 4 5 6; do
-              curl -sf http://localhost:8000/healthz && echo " [deploy OK]" && break
-              sleep 10
-            done
+            sh /tmp/pool-simulator-deploy/scripts/check-deploy.sh
             rm -rf /tmp/pool-simulator-deploy
 
   ci:

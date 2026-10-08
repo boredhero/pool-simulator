@@ -31,6 +31,7 @@ class Agreement(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     version: str
     adult: Literal[True]
+    accountId: str | None = None
 
 
 @router.get("/terms")
@@ -43,7 +44,12 @@ def terms_status(request: Request, response: Response):
         with Session() as db:
             row = db.get(TermsAcceptance, account["id"])
             accepted = row is not None and row.version == version
-    return {"version": version, "accepted": accepted, "authenticated": account is not None}
+    return {
+        "version": version,
+        "accepted": accepted,
+        "authenticated": account is not None,
+        "accountId": account["id"] if account else None,
+    }
 
 
 @router.post("/terms", dependencies=[Depends(mutation_guard)])
@@ -51,6 +57,8 @@ def accept_terms(payload: Agreement, request: Request):
     account = current_account(request)
     if not account:
         raise HTTPException(401, "Sign in first.")
+    if payload.accountId is not None and payload.accountId != account["id"]:
+        raise HTTPException(409, "Account changed. Review the Terms for your current account.")
     version = terms_version()
     if payload.version != version:
         raise HTTPException(409, "Terms changed. Review and accept the current Terms.")

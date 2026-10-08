@@ -77,7 +77,7 @@ test('development proxy supports same-origin account requests and WebSocket room
 
 test('daily Jev game uses server state and survives a page reload',async({page})=>{
   const response=await page.request.post('/api/account/register',{headers:{'X-Pool-Request':'1'},data:{
-    username:'Jev_'+Date.now().toString(36),password:'a long daily game test password',adult:true,terms_version:'2026-10-08',
+    username:'Jev_'+Date.now().toString(36),password:'a long daily game test password',adult:true,terms_version:(await (await page.request.get('/api/privacy/terms')).json()).version,
   }});
   expect(response.ok()).toBe(true);
   await page.addInitScript(()=>{

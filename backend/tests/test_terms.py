@@ -64,7 +64,12 @@ def test_account_acceptance_tracks_actual_text_across_sessions(monkeypatch, tmp_
         initial = client.get("/api/privacy/terms")
         version = initial.json()["version"]
         assert initial.headers["cache-control"] == "no-store"
-        assert initial.json() == {"version": version, "accepted": False, "authenticated": False}
+        assert initial.json() == {
+            "version": version,
+            "accepted": False,
+            "authenticated": False,
+            "accountId": None,
+        }
         credentials = {
             "username": "TermReader",
             "password": "this is a long test password",
@@ -83,6 +88,7 @@ def test_account_acceptance_tracks_actual_text_across_sessions(monkeypatch, tmp_
         )
         assert registered.status_code == 200
         account = registered.json()["account"]
+        assert client.get("/api/privacy/terms").json()["accountId"] == account["id"]
         assert client.get("/api/privacy/terms").json()["accepted"] is True
         with Session.begin() as db:
             saved = db.get(TermsAcceptance, account["id"])
@@ -106,6 +112,15 @@ def test_account_acceptance_tracks_actual_text_across_sessions(monkeypatch, tmp_
             require_terms(account)
         assert (
             client.post(
+                "/api/privacy/terms",
+                headers=HEADERS,
+                json={"version": changed["version"], "adult": True, "accountId": "other-account"},
+            ).status_code
+            == 409
+        )
+        assert client.get("/api/privacy/terms").json()["accepted"] is False
+        assert (
+            client.post(
                 "/api/privacy/terms", headers=HEADERS, json={"version": version, "adult": True}
             ).status_code
             == 409
@@ -121,7 +136,7 @@ def test_account_acceptance_tracks_actual_text_across_sessions(monkeypatch, tmp_
         assert client.post(
             "/api/privacy/terms",
             headers=HEADERS,
-            json={"version": changed["version"], "adult": True},
+            json={"version": changed["version"], "adult": True, "accountId": account["id"]},
         ).json() == {"accepted": changed["version"]}
         assert client.get("/api/privacy/terms").json()["accepted"] is True
         require_terms(account)

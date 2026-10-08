@@ -1,21 +1,77 @@
-# pool-simulator
+# Pool Simulator
 
-GPU-accelerated browser pool (8-Ball extensible) + Python backend.
-Decisions (Socratic dialog 2026-10-06): online private rooms (anonymous), hybrid physics (client predicts / Python validates), realistic 3D adaptive quality, different controls per device, practice + simple CPU, dual sim (TS + Python) with shared golden tests.
+[Play in your browser](https://pool.martinospizza.dev) · [Controls](docs/camera-controls.md) · [Jev planner](docs/jev.md)
 
-## Layout
-- `backend/` FastAPI + uvicorn, SQLite WAL, serves `frontend/dist` in prod
-- `frontend/` Vite + TypeScript + Three.js r186 (WebGL2 baseline, WebGPU upgrade path)
-- `contracts/` shared shot/snapshot schemas
-- See `PLAN.md` for phased plan from research subagents.
+Browser-based 8-ball with a Three.js table, mouse/trackpad and touch controls,
+local two-player games, an offline CPU, private online rooms and Jev AI opponents.
+A guided practice tutorial teaches the selected input mode. Accounts provide
+persistent casual match statistics; private online games also support guests.
 
-## Dev quickstart
-- Backend: `cd backend && uv sync && uv run uvicorn app.main:app --reload --port 8000`
-- Frontend: `cd frontend && pnpm install && pnpm dev` (proxies `/api` + `/ws` → :8000)
-- Prod single container: `docker build -t pool-sim . && docker run -p 8000:8000 pool-sim`
+## Architecture
 
-## Physics contract
-- 2D circles + 3-axis spin (ωx,ωy,ωz), SI units, fixed dt=1/240, semi-implicit Euler + swept TOI, sleep thresholds. See `backend/app/sim/` and `frontend/src/sim/` — keep in sync via golden vectors in `contracts/golden/`.
+```mermaid
+flowchart LR
+    UI[TypeScript / Three.js] --> Local[Local and CPU simulation]
+    UI -->|HTTP: accounts and Jev| API[FastAPI]
+    UI <-->|WebSocket: private rooms| API
+    API --> Physics[Authoritative Python simulation]
+    API --> DB[(SQLite: accounts and match ledger)]
+    API --> Planner[Bounded shot planner]
+    Planner -->|Offered plan selection| Jev[Jev API]
+```
+
+The browser predicts player shots immediately. In online and Jev games, only the
+server resolves turns, fouls and results. Both simulators use shared golden vectors
+in `contracts/golden/`; this checks parity for those cases, not every possible
+trajectory. Ball flight, spin, cushions and pockets are approximations rather than
+a calibrated professional billiards model. See [planner evaluation and limitations](docs/planner-research.md).
+
+- `frontend/src/`: rendering, input, local simulation and interface.
+- `backend/app/`: FastAPI routes, authoritative simulation, rooms and persistence.
+- `contracts/`: shared fixtures and the bundled agreement-content hash.
+- `.github/workflows/`: required CI, advisory browser tests and main-branch deployment.
+
+## Local development
+
+Use Python 3.13, uv, and Node.js 22. Install the committed dependencies:
+
+```sh
+uv sync --project backend --frozen
+npm --prefix frontend ci
+```
+
+Run these in separate terminals:
+
+```sh
+uv run --project backend uvicorn app.main:app --app-dir backend --reload --port 8000
+npm --prefix frontend run dev
+```
+
+Vite proxies `/api` and `/ws` to port 8000. Jev requires a backend `JEV_API_KEY`;
+local and CPU games do not. Never put provider credentials in frontend variables.
+For a single-container build, run `docker build -t pool-sim .` and use the Compose
+configuration with a persistent database volume.
+
+## Verification and releases
+
+```sh
+uv run --project backend --no-sync pytest backend/tests -q
+uvx ruff check backend/
+uvx ruff format --check backend/
+npm --prefix frontend test
+npm --prefix frontend run build
+cd frontend
+npx playwright install chromium
+npm run test:e2e
+npm run test:online
+```
+
+The build includes TypeScript checking; `npm run typecheck` runs it separately.
+The online browser suite uses a temporary SQLite database, never production data.
+Required `ci` aggregates Ruff, backend tests, frontend tests/build and the container
+build. Browser checks run separately on development branches. Only pushes to
+`main` publish an image and deploy through CI/CD. A failed deployment health check
+fails the workflow. Live rooms are in memory: run **one API worker / instance**.
 
 ## Changelog maintenance
 
@@ -33,8 +89,9 @@ Open **Online → Create room**, then copy the invite link. The link carries an
 8-character room code in its fragment (`/#join=CODE`), so the code is not part of
 normal HTTP request/referrer logs. Opening it pre-fills the join form; guests need
 no account. Both players must join before shooting. Rooms close when a player
-leaves, refreshes, loses the connection, or is idle for 15 minutes. A completed
-match stays recorded; an unfinished disconnect does not award a win.
+leaves, refreshes, loses the connection, or is idle for 15 minutes. Completed
+matches stay recorded; after the first accepted shot, disconnects count as casual
+forfeits unless caused by server shutdown.
 
 Accounts are optional and usernames are 3–20 ASCII letters, digits, or underscores,
 unique without regard to case. Passwords are 15–128 characters. Passwords and
@@ -47,7 +104,7 @@ Only token hashes are stored in the database; credentials are not kept in browse
 storage. Auth mutations require a same-origin request and a custom request header.
 Account/IP attempt limits persist across server restarts.
 
-Account stats count server-simulated private online matches, not client-submitted results or local/CPU games. The ledger stores stable account IDs, guest/name
+Account stats count authoritative private online and Jev matches, with a breakdown by mode. Local/CPU games and client-submitted results do not contribute. The ledger stores stable account IDs, guest/name
 snapshots, opponents, rules/version, timestamps, outcomes, disconnects, and shot
 facts. This is the foundation for future lobbies/matchmaking; private games are
 currently unrated and there is no public matchmaking queue yet.
@@ -195,7 +252,7 @@ docker compose exec -T api uv run --directory backend python -m app.premium USER
 
 To enable all accounts that currently exist, use the same command with `--all-existing on` in place of `USERNAME on`. New registrations still default to free.
 
-The boolean defaults off. There is no public API for setting it. Existing sessions
+The boolean defaults off. Only the configured owner can toggle it through the admin API. Existing sessions
 see changes on their next account refresh or Jev request. Revocation prevents
 premium-only games from continuing and does not reset a consumed free allowance.
 Back up the existing database before upgrading; preserve the `pool_data` volume.
@@ -214,7 +271,7 @@ before returning to a target inside it. Deterministic regression fixtures improv
 legality and pots over the old geometry policy; this does not establish Jev's
 competitive win rate. See [planner research and benchmark](docs/planner-research.md)
 and [Jev decision design](docs/jev.md) for sources and limits.
-Jev games do not count toward online account win/loss statistics.
+Completed Jev games count toward account win/loss statistics. Results survive detailed-game retention. Retained historical completed games are backfilled; unavailable historical shot metrics are labeled incomplete rather than fabricated.
 
 Set `JEV_API_KEY` only in the backend process environment or deployment folder's
 ignored `.env` (mode `0600`). Both Compose configurations pass it to the API. Never
@@ -238,7 +295,10 @@ unique human; the global caps bound abuse even across accounts and VPNs.
 Terms and Privacy are served at `/terms.html` and `/privacy.html`, with operator
 Noah Martino, Pennsylvania, and personal.boredhero@gmail.com. Registration requires
 an 18+ affirmation and records Terms version/time; existing users accept updated
-Terms in Account before Jev use. These documents need qualified legal review for
+Terms in Account before Jev use. Acceptance is stored against a SHA-256 hash of
+the visible agreement text; unchanged text does not prompt again. When editing
+`frontend/public/terms.html`, update `contracts/terms.json` to the canonical hash
+from `app.services.terms.terms_version()`; backend tests enforce that contract. These documents need qualified legal review for
 the operator's actual audience and practices; they do not certify legal compliance.
 
 Optional first-party feature analytics is off until separate adult opt-in. Privacy
@@ -257,10 +317,10 @@ verify ownership without asking for a password or recovery code. Production host
 logs and backup rotation must be managed separately from application retention.
 See [Jev integration notes](docs/jev.md) for research and evaluation limitations.
 
-The Help panel includes an optional interactive tutorial. It observes real aiming,
-spin, camera and shot actions, supports skipping/back/close, and does not reset the
-current rack. Its shot step uses the current game rather than a separate practice
-simulation. The panel stays centered in the space between scores and controls.
+The Help panel includes an optional interactive tutorial using an isolated practice
+rack and staged camera views. Exiting restores the prior local game. Instructions
+follow touch, mouse or trackpad input, including the normal desktop pull-and-release
+power bar. Compact panels leave the active controls usable on mobile.
 On compact screens, tap either scorecard (or use Enter/Space when focused) to show
 or hide ball details; there is no floating Show balls button.
 
