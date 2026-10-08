@@ -15,7 +15,7 @@ it('fits a mobile shot closer than scattered legal balls while keeping cue, targ
   expect(focus.points).not.toContainEqual({x:2.3,y:1.05});
   for(const [width,height] of [[390,844],[844,390]]){
     const camera=new PerspectiveCamera(50,width/height,.05,50);camera.position.set(-2,3,2);
-    const safe=mobileSafeFrame(rect(0,0,width,height),[rect(8,8,width-16,100)],[rect(8,height-85,width-16,75)])!;
+    const safe=width>height?mobileSafeFrame(rect(0,0,width,height),[rect(8,8,160,height-16)],[rect(width-188,8,180,height-16)])!:mobileSafeFrame(rect(0,0,width,height),[rect(8,8,width-16,100)],[rect(8,height-85,width-16,75)])!;
     const selected=framePose(camera,new Vector3(),focus.points,safe,{cue:focus.cue,theta:focus.theta});
     const legal=gs.balls.filter(b=>!b.potted&&b.n!==null);
     const all=framePose(camera,new Vector3(),[gs.balls[0],...legal],safe,{cue:focus.cue,theta:majorityFacing(focus.cue,legal,0)});
@@ -46,4 +46,17 @@ it('uses canvas-relative HUD bounds, ignores hidden panels and refuses fully cov
   const canvas=rect(20,40,390,800),safe=mobileSafeFrame(canvas,[rect(20,40,390,150)],[rect(20,720,390,100),rect(280,670,110,44),rect(0,0,0,0)])!;
   expect(safe.top).toBeCloseTo(1-2*162/800);expect(safe.bottom).toBeCloseTo(1-2*618/800);
   expect(mobileSafeFrame(canvas,[rect(20,40,390,700)],[rect(20,730,390,100)])).toBeNull();
+});
+
+it('reserves landscape side panels and switches to the active camera tray',()=>{
+  const canvas=rect(20,40,844,390),left=rect(28,48,160,374),shot=rect(676,48,180,374);
+  const safe=mobileSafeFrame(canvas,[left,rect(28,220,160,90)],[shot,rect(0,0,0,0)])!;
+  expect(safe.left).toBeCloseTo(2*180/844-1);expect(safe.right).toBeCloseTo(2*644/844-1);
+  expect(safe.top).toBeCloseTo(1-24/390);expect(safe.bottom).toBeCloseTo(-1+24/390);
+  expect(mobileSafeFrame(canvas,[left],[rect(0,0,0,0),shot])).toEqual(safe);
+});
+it('keeps tutorial framing vertical when side panels are hidden in landscape',()=>{
+  const safe=mobileSafeFrame(rect(0,0,844,390),[rect(0,0,0,0)],[rect(300,320,240,60)])!;
+  expect(safe.left).toBeCloseTo(-1+32/844);expect(safe.right).toBeCloseTo(1-32/844);
+  expect(safe.top).toBeCloseTo(1-24/390);expect(safe.bottom).toBeCloseTo(1-2*308/390);
 });

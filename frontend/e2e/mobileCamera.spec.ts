@@ -24,11 +24,15 @@ for(const viewport of [{width:390,height:844},{width:844,height:390}])test(`mobi
       const p=camera.position.clone().set(x-2.54/2,.028575,y-1.27/2).project(camera);
       return{x:(p.x+1)*innerWidth/2,y:(1-p.y)*innerHeight/2};
     });
-    const boxes=['.topbar','#scorecard','.control-tray','#camera-fly-hud'].map(s=>{const r=document.querySelector(s)!.getBoundingClientRect();return{top:r.top,bottom:r.bottom};});
+    const boxes=['.topbar','#scorecard','.control-tray','#camera-fly-hud'].map(s=>{const r=document.querySelector(s)!.getBoundingClientRect();return{top:r.top,bottom:r.bottom,left:r.left,right:r.right,width:r.width,height:r.height};});
     return{distance:camera.position.distanceTo(g.scene.controls.target),points,boxes};
   });
-  const top=Math.max(focused.boxes[0].bottom,focused.boxes[1].bottom),bottom=Math.min(focused.boxes[2].top,focused.boxes[3].top);
-  for(const point of focused.points){expect(point.x).toBeGreaterThan(16);expect(point.x).toBeLessThan(viewport.width-16);expect(point.y).toBeGreaterThan(top+10);expect(point.y).toBeLessThan(bottom-10);}
+  const visible=focused.boxes.filter(b=>b.width>0&&b.height>0),landscape=viewport.width>viewport.height;
+  const top=landscape?0:Math.max(...focused.boxes.slice(0,2).filter(b=>b.height>0).map(b=>b.bottom));
+  const bottom=landscape?viewport.height:Math.min(...focused.boxes.slice(2).filter(b=>b.height>0).map(b=>b.top));
+  const left=landscape?Math.max(...visible.filter(b=>b.right<viewport.width/2).map(b=>b.right))+10:16;
+  const right=landscape?Math.min(...visible.filter(b=>b.left>viewport.width/2).map(b=>b.left))-10:viewport.width-16;
+  for(const point of focused.points){expect(point.x).toBeGreaterThan(left);expect(point.x).toBeLessThan(right);expect(point.y).toBeGreaterThan(top+10);expect(point.y).toBeLessThan(bottom-10);}
   await page.evaluate(async()=>{const g=(window as any).__pool;g.angle=g.targetAngle;g.__cameraShow=true;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));});
   await page.screenshot({path:`/tmp/pool-mobile-camera-${viewport.width}.png`});
   await page.evaluate(()=>{(window as any).__pool.__cameraShow=false;});
