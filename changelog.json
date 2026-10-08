@@ -4,7 +4,8 @@
     "date": "2026-10-08",
     "title": "A better view of the table",
     "changes": [
-      "Player cards always show the 8-Ball as the final objective, highlighted when your group is cleared.",
+      "Turn, foul, and result messages use the AI opponent\u2019s name consistently. Illegal-break reracks now explain the missing pocket and four-rail requirement.",
+      "Once groups are assigned, player cards show the 8-Ball after their group, highlighted when it becomes the final target.",
       "Desktop tables open from behind the cue, looking toward the fresh rack.",
       "Pocketed balls visibly fall into deeper pocket wells before entering the return, while scoring updates immediately.",
       "New camera controls: enter Move camera mode to orbit with one finger and pinch or pan with two. Focus balls, Whole table, and zoom buttons make adjusting the view easier.",

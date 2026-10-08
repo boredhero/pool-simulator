@@ -301,8 +301,10 @@ test('automatic framing waits for rest and yields to manual camera movement',asy
 
 test('cards retain the final 8-Ball objective before and after clearing a group',async({page})=>{
   await openGame(page);
-  await expect(page.locator('.pcard .eight-ball')).toHaveCount(2);
+  await expect(page.locator('.pcard .eight-ball')).toHaveCount(0);
   await page.evaluate(()=>{const g=(window as any).__pool;g.gs.open=false;g.gs.groups=['solid','stripe'];g.hud();});
+  await expect(page.locator('.pcard .eight-ball')).toHaveCount(2);
+  await expect(page.locator('.pcard').first().locator('.balls .pball').last()).toHaveText('8');
   await expect(page.locator('.pcard').first().locator('.grp')).toHaveText('Solids · 7 remaining');
   await expect(page.locator('.pcard').first().locator('.eight-ball')).not.toHaveClass(/ready/);
   await page.evaluate(()=>{const g=(window as any).__pool;for(const b of g.gs.balls)if(b.n>=1&&b.n<=7)b.potted=true;g.hud();});
@@ -331,4 +333,17 @@ test('desktop starts behind the cue facing the rack and renders a captured ball 
     return{start,falling,stored:mesh.position.y,visible:mesh.visible};
   });
   expect(drop.start).toBeGreaterThan(drop.falling);expect(drop.stored).toBeLessThan(-.1);expect(drop.visible).toBe(true);
+});
+
+
+test('AI name appears in turn, foul, rolling, and winner messages',async({page})=>{
+  await openGame(page);
+  for(const [mode,message,expected] of [
+    ['place','Foul: No contact · Player 2, place anywhere','Foul: No contact · AI, place anywhere'],
+    ['rolling','Player 2 to shoot','AI · shot in motion'],
+    ['over','Player 2 wins!','AI wins!'],
+  ]) {
+    const state=await page.evaluate(({mode,message})=>{const g=(window as any).__pool;g.aiOpponent=true;g.gs.current=1;g.gs.message=message;g.mode=mode;g.hud();return{turn:document.getElementById('turn')!.textContent,message:document.getElementById('msg')!.textContent};},{mode,message});
+    expect(state.turn).toBe('AI');expect(state.message).toContain(expected);expect(state.message).not.toContain('Player 2');
+  }
 });

@@ -486,14 +486,19 @@ export class Game {
     }
   }
 
+  playerName(seat:number): string {
+    return this.roomNames?.[seat] ?? (seat===1 && this.aiOpponent && !this.room ? 'AI' : `Player ${seat+1}`);
+  }
+
   hud(): void {
     let msg = this.gs.message;
     if (this.mode === 'place') msg += ' — tap a green spot to place the cue ball';
     else if (this.mode === 'rolling') msg = `Player ${this.gs.current + 1} · shot in motion`;
     else if (this.mode === 'wait' && this.room) msg += ' — waiting…';
     else if (this.room && this.seat !== null && this.seat !== this.gs.current && this.mode === 'aim') msg += ' — opponent aiming…';
-    this.el.msg.textContent = msg;
-    this.el.turn.textContent = this.gs.winner !== null ? 'Game over' : `Player ${this.gs.current + 1}`;
+    if(msg.startsWith('Illegal break'))msg += ' · no ball pocketed and fewer than four object balls reached a rail';
+    this.el.msg.textContent = msg.replace(/\bPlayer ([12])\b/g,(_,seat)=>this.playerName(Number(seat)-1));
+    this.el.turn.textContent = this.gs.winner !== null ? 'Game over' : this.playerName(this.gs.current);
     this.el.turn.classList.toggle('me', !this.room || this.seat === this.gs.current);
     this.el.roominfo.textContent = this.room ? `room ${this.room.code} · you P${(this.seat ?? 0) + 1}` : 'solo table';
     this.options.summary(this.gs.rules);
@@ -513,10 +518,6 @@ export class Game {
   renderScorecard(): void {
     const box = this.el.scorecard;
     box.innerHTML = '';
-    const names = this.roomNames ?? [
-      'Player 1',
-      this.aiOpponent ? 'AI' : 'Player 2',
-    ];
     const live=this.mode==='rolling' || this.mode==='wait';
     let displayedGroups=this.gs.groups;
     if(live && this.gs.open && this.gs.shot && this.ev.potted.length) {
@@ -534,7 +535,7 @@ export class Game {
       const label = g === 'solid' ? 'Solids' : 'Stripes';
       head.innerHTML = '';
       const nm = document.createElement('span');
-      nm.textContent = names[i] ?? `Player ${i + 1}`;
+      nm.textContent = this.playerName(i);
       const gr = document.createElement('span');
       gr.className = 'grp';
       const nums = g !== null && GROUP_BALLS[g] ? [...GROUP_BALLS[g]] : [];
@@ -545,7 +546,7 @@ export class Game {
       const left = nums.filter((n) => !this.gs.balls.find((q) => q.n === n)?.potted).length;
       gr.textContent = g === null ? 'Open table · groups unassigned' : onEight ? 'On the 8-Ball' : `${label} · ${left} remaining`;
       if(provisional)gr.textContent = `${label} · pending shot result`;
-      nums.push(8);
+      if(g!==null)nums.push(8);
       head.appendChild(nm);
       head.appendChild(gr);
       card.appendChild(head);
