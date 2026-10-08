@@ -94,9 +94,17 @@ def test_account_acceptance_tracks_actual_text_across_sessions(monkeypatch, tmp_
             saved = db.get(TermsAcceptance, account["id"])
             saved.version = terms.LEGACY_VERSION
             saved.accepted_at = 123
-        assert client.get("/api/privacy/terms").json()["accepted"] is True
+        assert client.get("/api/privacy/terms").json()["accepted"] is False
         with Session() as db:
             assert db.get(TermsAcceptance, account["id"]).accepted_at == 123
+        assert (
+            client.post(
+                "/api/privacy/terms",
+                headers=HEADERS,
+                json={"version": version, "adult": True, "accountId": account["id"]},
+            ).status_code
+            == 200
+        )
         client.cookies.clear()
         assert client.get("/api/privacy/terms").json()["accepted"] is False
         assert (

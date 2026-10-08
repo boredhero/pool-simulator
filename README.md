@@ -232,18 +232,12 @@ and [HSTS](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/S
 ## Jev AI, privacy, and daily games (0.7.0)
 
 CPU stays offline and account-free. Jev AI requires a signed-in adult account and
-explicit acceptance of the current Terms. It offers **one server-owned game per
-free account and per source network per UTC day**. IPv6 /64 addresses share an allowance.
-An unfinished game resumes after reload, even across server restarts. A new local
-rack does not reset the free game. Server simulation owns turn progression, legal
-shots and the winner; clients cannot supply Jev prompts, candidate sets or costs.
-
-Premium accounts show a badge in Settings and Account and have unlimited Jev
-games without a daily account/network allowance or midnight expiry. Select Jev
-to resume, or use **New rack** during Jev to abandon that rack and start another.
-Premium games do not consume the shared free network allowance. Terms acceptance,
-authentication, short request throttles, concurrent-turn limits and the global
-paid-call safeguard still apply; reaching that safeguard uses visible CPU fallback.
+explicit acceptance of the current Terms. Free accounts may start **five games per
+UTC day**. Resuming an unfinished game uses no additional start and games do not
+expire at midnight. Selecting Jev or New rack starts a fresh game. Premium has
+unlimited starts. The 1.0.2 migration preserves games and cost history while
+resetting prior allowance usage; it does not reset usage on subsequent restarts.
+Account ownership, Terms acceptance and concurrent-shot protections still apply.
 
 After deploying, toggle an existing account on this host (case-insensitive):
 
@@ -256,8 +250,7 @@ docker compose exec -T api uv run --directory backend python -m app.premium USER
 To enable all accounts that currently exist, use the same command with `--all-existing on` in place of `USERNAME on`. New registrations still default to free.
 
 The boolean defaults off. Only the configured owner can toggle it through the admin API. Existing sessions
-see changes on their next account refresh or Jev request. Revocation prevents
-premium-only games from continuing and does not reset a consumed free allowance.
+see changes on their next account refresh or Jev request. Revocation applies the free allowance to future starts without resetting consumed slots.
 Back up the existing database before upgrading; preserve the `pool_data` volume.
 
 Jev 1.13 chooses among up to 12 server-planned shots with semantic descriptions
@@ -265,7 +258,7 @@ of settled physics previews. A bounded planner proposes direct pots, banks,
 kicks, combinations and safeties, including cue placement when needed. One model
 request selects a tactical family and its corresponding offered plan. The server
 owns placement, aim, power, spin and all outcomes. Single-plan turns need no model
-call; provider failures or the emergency paid-call budget use a visible local
+call; provider failures use a visible local
 fallback. Reported usage is metered even when an answer is invalid.
 
 The offline CPU also previews a bounded set of legal-target shots and plans
@@ -281,7 +274,7 @@ ignored `.env` (mode `0600`). Both Compose configurations pass it to the API. Ne
 use a `VITE_` key or commit a credential. Missing configuration leaves other modes
 working. The production pool nginx proxy must **replace** `X-Forwarded-For` with
 `$remote_addr`, not append arbitrary client headers; only the loopback-published
-backend should be reachable. This is required for trustworthy network allowances.
+backend should be reachable. This is required for trustworthy account security throttles.
 
 `jev_games` stores private game state, revisions, request counts, provider input
 and output tokens, estimated cost in nano-USD, and unmetered failures. The pinned
@@ -289,11 +282,10 @@ model price is recorded per game (42 nano-USD per input token as researched); th
 is an estimate, not an invoice. Failed or incomplete provider responses can leave
 actual charges unknown, explicitly counted as unmetered. These records have no
 public reporting endpoint. Account/game ownership checks protect resume endpoints.
-`jev_usage` retains lifetime attempt/completion counters. Free-game admission is capped
-at 100 daily games, paid calls at 1,000 per 24-hour budget window, concurrent Jev
-game turns at four, and turn requests at 30/minute/account. The call cap falls back
-to CPU instead of ending the rack. Network and account identity are not proof of a
-unique human; the global caps bound abuse even across accounts and VPNs.
+`jev_usage` retains lifetime attempt/completion counters. The five-start daily allowance is per account, enforced with durable unique
+slots. Network-wide and global usage caps and Jev start/turn throttles are removed.
+Concurrent Jev turns remain bounded at four to protect simulation capacity.
+
 
 Terms and Privacy are served at `/terms.html` and `/privacy.html`, with operator
 Noah Martino, Pennsylvania, and personal.boredhero@gmail.com. Registration requires

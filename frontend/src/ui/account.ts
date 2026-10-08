@@ -134,7 +134,7 @@ export class AccountPanel {
       el('accountjev').textContent=data.available
         ? u.unlimited
           ? 'Premium · Unlimited Jev AI games. Resume your game or use New rack while playing Jev to start another.'
-          : `Jev AI: ${u.gamesRemaining} free game available today (one per account and network). ${data.game?.status==='active'?'Your current game can be resumed. ':''}Resets ${new Date(u.resetsAt*1000).toLocaleString()}.`
+          : `Jev AI: ${u.gamesRemaining} of 5 free games remaining today. ${data.game?.status==='active'?'Your current game can be resumed. ':''}Resets ${new Date(u.resetsAt*1000).toLocaleString()}.`
         : 'Jev AI is not configured on this server.';
     } catch {
       if(this.account?.id===accountId)el('accountjev').textContent='Jev AI usage is unavailable.';

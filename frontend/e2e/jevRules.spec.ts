@@ -12,13 +12,13 @@ async function state(page:Page,rules:MatchConfig){return page.evaluate(rules=>{c
 test('CPU and a new Jev game both use the selected tournament rules',async({page})=>{
  await page.locator('#settingsbtn').click();await page.locator('#rulespreset').selectOption('tournament');await page.locator('#applyrules').click();await page.locator('#cpubtn').click();
  expect(await page.evaluate(()=>(window as any).__pool.gs.rules)).toEqual(TOURNAMENT_RULES);expect(await page.evaluate(()=>(window as any).__pool.cpuOpponent)).toBe(true);
- const server=await state(page,TOURNAMENT_RULES);await page.route('**/api/opponents/jev/games',r=>{expect(r.request().postDataJSON()).toEqual({rules:TOURNAMENT_RULES});return r.fulfill({json:{id:'tournament',created:true,expiresAt:null,state:server}});});
+ const server=await state(page,TOURNAMENT_RULES);await page.route('**/api/opponents/jev/games',r=>{expect(r.request().postDataJSON()).toEqual({new_game:true,rules:TOURNAMENT_RULES});return r.fulfill({json:{id:'tournament',created:true,expiresAt:null,state:server}});});
  await page.locator('#jevbtn').click();await expect.poll(()=>page.evaluate(()=>(window as any).__pool.jevGame?.id)).toBe('tournament');expect(await page.evaluate(()=>(window as any).__pool.gs.rules)).toEqual(TOURNAMENT_RULES);
 });
 test('existing Jev game keeps server rules and explains a differing local selection',async({page})=>{
  await page.locator('#settingsbtn').click();await page.locator('#rulespreset').selectOption('tournament');await page.locator('#applyrules').click();const server=await state(page,BAR_RULES);
  await page.evaluate(()=>(window as any).__pool.account.premium=false);
- await page.route('**/api/opponents/jev/games',r=>r.fulfill({json:{id:'existing',created:false,expiresAt:9999999999,state:server}}));await page.locator('#jevbtn').click();await expect(page.locator('#opponentstatus')).toContainText('existing Jev game keeps its original rules');expect(await page.evaluate(()=>(window as any).__pool.gs.rules)).toEqual(BAR_RULES);
+ await page.route('**/api/opponents/jev/games',r=>r.fulfill({json:{id:'existing',created:false,expiresAt:9999999999,state:server}}));await page.evaluate(()=>(window as any).__pool.startJev());await expect(page.locator('#opponentstatus')).toContainText('existing Jev game keeps its original rules');expect(await page.evaluate(()=>(window as any).__pool.gs.rules)).toEqual(BAR_RULES);
  await page.locator('#settingsbtn').click();await expect(page.locator('#rulespreset')).toBeDisabled();await expect(page.locator('#applyrules')).toBeDisabled();await expect(page.locator('#rulesnotice')).toContainText('Jev game keeps its starting rules');
 });
 test('premium custom rules create a new Jev game only on explicit apply',async({page})=>{
@@ -28,4 +28,35 @@ test('premium custom rules create a new Jev game only on explicit apply',async({
  await page.locator('#settingsbtn').click();await page.locator('#rulespreset').selectOption('custom');await page.locator('#scratchrule').selectOption('anywhere');await page.locator('#callsrule').selectOption('all');await page.locator('#eightbreakrule').selectOption('spot');await page.locator('#strictbreakrule').check();await page.locator('#normalspeed').fill('5');await page.locator('#breakspeed').fill('10');
  expect(requests).toHaveLength(1);expect(await page.evaluate(()=>(window as any).__pool.gs.rules)).toEqual(BAR_RULES);await expect(page.locator('#applyrules')).toHaveText('Start new Jev game with these rules');
  await page.locator('#applyrules').click();await expect.poll(()=>page.evaluate(()=>(window as any).__pool.jevGame?.id)).toBe('custom');expect(requests[1]).toEqual({new_game:true,rules:{...BAR_RULES,preset:'custom',scratch:'anywhere',calls:'all',eightOnBreak:'spot',strictBreak:true,normalMax:5,breakMax:10}});expect(await page.evaluate(()=>(window as any).__pool.gs.rules)).toEqual(requests[1].rules);
+});
+
+for(const mobile of [false,true])test.describe(mobile?'mobile opponent switching':'desktop opponent switching',()=>{
+ test.use(mobile?{viewport:{width:390,height:844},hasTouch:true,isMobile:true,reducedMotion:'reduce'}:{reducedMotion:'reduce'});
+ test('switching opponents reracks and selecting Jev again replaces its game',async({page})=>{
+  const fresh=await state(page,TOURNAMENT_RULES);
+  const requests:any[]=[];
+  await page.route('**/api/opponents/jev/games',r=>{
+   const payload=r.request().postDataJSON();requests.push(payload);
+   return r.fulfill({json:{id:`rack-${requests.length}`,created:true,expiresAt:null,state:{...fresh,rules:payload.rules}}});
+  });
+  await page.evaluate(()=>(window as any).__pool.account.premium=false);
+  const selectOpponent=async(id:string)=>{
+   if(mobile){await page.getByRole('button',{name:'New Game',exact:true}).tap();await page.locator(id).tap();await expect(page.locator('#morecontrols')).toHaveAttribute('aria-expanded','false');}
+   else await page.locator(id).click();
+  };
+  const dirty=()=>page.evaluate(()=>{const g=(window as any).__pool;g.coin.cancel();g.gs.rules={...g.gs.rules,preset:'custom',calls:'none'};g.gs.balls[3].potted=true;g.gs.balls[0].x=.8;g.gs.breakShot=false;g.gs.current=0;g.calledBall=3;g.calledPocket=2;});
+  const rack=()=>page.evaluate(()=>{const g=(window as any).__pool;return{live:g.gs.balls.filter((b:any)=>!b.potted).length,breakShot:g.gs.breakShot,calledBall:g.calledBall,calledPocket:g.calledPocket,cpu:g.cpuOpponent,jev:g.jevOpponent,toss:g.coinPending()};});
+  await dirty();await selectOpponent('#cpubtn');
+  expect(await rack()).toMatchObject({live:16,breakShot:true,calledBall:null,calledPocket:null,cpu:true,jev:false,toss:true});
+  await dirty();await selectOpponent('#jevbtn');await expect.poll(()=>page.evaluate(()=>(window as any).__pool.jevGame?.id)).toBe('rack-1');
+  expect(await rack()).toMatchObject({live:16,breakShot:true,calledBall:null,calledPocket:null,jev:true});
+  await dirty();await selectOpponent('#cpubtn');
+  expect(await rack()).toMatchObject({live:16,breakShot:true,cpu:true,jev:false});
+  expect(await page.evaluate(()=>(window as any).__pool.jevGame)).toBeNull();
+  await dirty();await selectOpponent('#jevbtn');await expect.poll(()=>page.evaluate(()=>(window as any).__pool.jevGame?.id)).toBe('rack-2');
+  await dirty();await selectOpponent('#jevbtn');await expect.poll(()=>page.evaluate(()=>(window as any).__pool.jevGame?.id)).toBe('rack-3');
+  expect(await rack()).toMatchObject({live:16,breakShot:true,jev:true});
+  await dirty();await selectOpponent('#rack');await expect.poll(()=>page.evaluate(()=>(window as any).__pool.jevGame?.id)).toBe('rack-4');
+  expect(requests).toHaveLength(4);for(const request of requests){expect(request.new_game).toBe(true);expect(request.rules.calls).toBe('none');}
+ });
 });

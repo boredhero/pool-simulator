@@ -107,7 +107,7 @@ def test_premium_new_games_resume_midnight_and_do_not_consume_network_allowance(
     assert third["id"] not in (first["id"], second["id"])
     register(free, "FreePlayer")
     assert start(free).status_code == 200
-    assert start(free, fresh=True).status_code == 403
+    assert start(free, fresh=True).status_code == 200
     # Even after the network has a free game, premium can create another.
     assert start(client, fresh=True).status_code == 200
 
@@ -123,17 +123,17 @@ def test_revocation_rechecks_access_and_preserves_free_daily_limits(monkeypatch)
     premium_game = start(client).json()
     assert premium_game["id"] != free_game["id"]
     set_premium("PremiumPlayer", False)
-    assert client.get("/api/opponents/jev").json()["usage"]["gamesRemaining"] == 0
-    assert start(client).status_code == 429
-    assert start(client, fresh=True).status_code == 403
+    assert client.get("/api/opponents/jev").json()["usage"]["gamesRemaining"] == 4
+    assert start(client).json()["id"] == premium_game["id"]
     assert (
         client.post(
             f"/api/opponents/jev/games/{premium_game['id']}/turn",
             headers=HEADERS,
             json={"revision": 0, "shot": {"aim": 0.0, "power": 0.05}},
         ).status_code
-        == 409
+        == 200
     )
+    assert start(client, fresh=True).status_code == 200
 
 
 def test_premium_upgrades_expired_free_game_but_keeps_turn_and_ownership_guards(monkeypatch):

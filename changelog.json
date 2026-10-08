@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.0.2",
+    "date": "2026-10-08",
+    "title": "Fresh opponent games and five free Jev starts",
+    "changes": [
+      "Selecting Jev starts a fresh rack, just like switching to CPU, on desktop and mobile.",
+      "Free accounts can start five Jev games per UTC day; Premium remains unlimited. Resuming a game does not consume a start, and unfinished games do not expire at midnight.",
+      "The new allowance starts unused for existing accounts. Previous games and cost history are preserved; shared-network and global Jev usage limits are removed.",
+      "The mobile More button is now New Game, and its tray closes after selecting an opponent or New rack."
+    ]
+  },
+  {
     "version": "1.0.1",
     "date": "2026-10-08",
     "title": "Rule-aware opponents and a roomier mobile table",
