@@ -37,7 +37,11 @@ def upgrade_terms(connection) -> None:
                 "version", existing_type=String(32), type_=String(64), existing_nullable=False
             )
     current = terms_version()
-    if current == LEGACY_HASH:
+    if current == LEGACY_HASH and connection.scalar(
+        text("SELECT EXISTS (SELECT 1 FROM terms_acceptances WHERE version = :legacy)"),
+        {"legacy": LEGACY_VERSION},
+    ):
+        # SQLite takes a write lock even when an UPDATE would affect no rows.
         connection.execute(
             text("UPDATE terms_acceptances SET version = :current WHERE version = :legacy"),
             {"current": current, "legacy": LEGACY_VERSION},
