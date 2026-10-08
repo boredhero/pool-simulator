@@ -8,7 +8,6 @@ from pydantic import BaseModel, Field
 from sqlalchemy import delete, update
 from sqlalchemy.exc import IntegrityError
 
-from app.api.privacy import VERSION
 from app.models.db import Account, LoginSession, Session, TermsAcceptance, init_db
 from app.services.auth import (
     COOKIE,
@@ -26,6 +25,7 @@ from app.services.auth import (
     verify,
 )
 from app.services.matches import account_stats
+from app.services.terms import terms_version
 
 router = APIRouter(prefix="/account")
 
@@ -60,7 +60,8 @@ def me(request: Request, response: Response) -> dict:
 
 @router.post("/register", dependencies=[Depends(mutation_guard)])
 def register(payload: Credentials, request: Request, response: Response) -> dict:
-    if payload.terms_version != VERSION or payload.adult is not True:
+    version = terms_version()
+    if payload.terms_version != version or payload.adult is not True:
         raise HTTPException(400, "Accounts require age 18+ and acceptance of the current Terms.")
     key = attempts(request, payload.username)
     code = recovery_code()
@@ -77,7 +78,7 @@ def register(payload: Credentials, request: Request, response: Response) -> dict
             db.add(user)
             db.flush()
             db.add(
-                TermsAcceptance(account_id=user.id, version=VERSION, accepted_at=int(time.time()))
+                TermsAcceptance(account_id=user.id, version=version, accepted_at=int(time.time()))
             )
             set_session(db, response, request, user.id)
             result = public_account(user)

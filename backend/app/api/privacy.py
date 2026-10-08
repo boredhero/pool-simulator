@@ -11,6 +11,7 @@ from sqlalchemy import delete
 
 from app.models.db import FeatureEvent, JevGame, Session, TermsAcceptance, VisitorSession, init_db
 from app.services.auth import current_account, digest, mutation_guard, rate_limit
+from app.services.terms import terms_version
 
 router = APIRouter(prefix="/privacy")
 VERSION = "2026-10-08"
@@ -20,7 +21,7 @@ COOKIE = "pool_analytics"
 def require_terms(account):
     with Session() as db:
         accepted = db.get(TermsAcceptance, account["id"])
-        if not accepted or accepted.version != VERSION:
+        if not accepted or accepted.version != terms_version():
             raise HTTPException(
                 403, "Accept the current Terms in your Account panel before using Jev AI."
             )
@@ -28,8 +29,21 @@ def require_terms(account):
 
 class Agreement(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
-    version: Literal["2026-10-08"]
+    version: str
     adult: Literal[True]
+
+
+@router.get("/terms")
+def terms_status(request: Request, response: Response):
+    response.headers["Cache-Control"] = "no-store"
+    account = current_account(request)
+    version = terms_version()
+    accepted = False
+    if account:
+        with Session() as db:
+            row = db.get(TermsAcceptance, account["id"])
+            accepted = row is not None and row.version == version
+    return {"version": version, "accepted": accepted, "authenticated": account is not None}
 
 
 @router.post("/terms", dependencies=[Depends(mutation_guard)])
@@ -37,11 +51,14 @@ def accept_terms(payload: Agreement, request: Request):
     account = current_account(request)
     if not account:
         raise HTTPException(401, "Sign in first.")
+    version = terms_version()
+    if payload.version != version:
+        raise HTTPException(409, "Terms changed. Review and accept the current Terms.")
     with Session.begin() as db:
         db.merge(
-            TermsAcceptance(account_id=account["id"], version=VERSION, accepted_at=int(time.time()))
+            TermsAcceptance(account_id=account["id"], version=version, accepted_at=int(time.time()))
         )
-    return {"accepted": VERSION}
+    return {"accepted": version}
 
 
 def cleanup(db):

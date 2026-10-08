@@ -7,6 +7,7 @@ from app.main import app
 from app.models.db import Account, JevGame, Session
 from app.models.migrations import upgrade_premium
 from app.premium import set_premium
+from app.services.terms import terms_version
 
 HEADERS = {"X-Pool-Request": "1"}
 PASSWORD = "a long premium testing password"
@@ -34,7 +35,7 @@ def register(client, username="PremiumPlayer", **extra):
             "username": username,
             "password": PASSWORD,
             "adult": True,
-            "terms_version": "2026-10-08",
+            "terms_version": terms_version(),
             **extra,
         },
     )

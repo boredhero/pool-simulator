@@ -8,6 +8,7 @@ from app.main import app
 from app.models.db import GameMatch, MatchPlayer, MatchShot, Session
 from app.net.rooms import Room, lobby
 from app.services.matches import record_shot, start_match
+from app.services.terms import terms_version
 from app.sim.physics import ShotEvents
 from app.sim.rules import apply_shot, begin_shot, new_game
 
@@ -121,7 +122,7 @@ def test_registered_identity_and_authoritative_lifetime_stats():
         "/api/account/register",
         headers={"X-Pool-Request": "1"},
         json={
-            "terms_version": "2026-10-08",
+            "terms_version": terms_version(),
             "adult": True,
             "username": "ActualPlayer",
             "password": "long secure pool password",
@@ -221,7 +222,7 @@ def test_casual_forfeit_counts_loss_and_cannot_be_recorded_twice():
         "/api/account/register",
         headers={"X-Pool-Request": "1"},
         json={
-            "terms_version": "2026-10-08",
+            "terms_version": terms_version(),
             "adult": True,
             "username": "ForfeitPlayer",
             "password": secrets.token_urlsafe(24),

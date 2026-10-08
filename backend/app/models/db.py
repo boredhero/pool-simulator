@@ -53,10 +53,11 @@ def init_db() -> None:
         except FileExistsError:
             pass
     Base.metadata.create_all(engine)
-    from app.models.migrations import upgrade_premium
+    from app.models.migrations import upgrade_premium, upgrade_terms
 
     with engine.begin() as connection:
         upgrade_premium(connection)
+        upgrade_terms(connection)
 
 
 class Account(Base):
@@ -167,7 +168,7 @@ class JevGame(Base):
 class TermsAcceptance(Base):
     __tablename__ = "terms_acceptances"
     account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), primary_key=True)
-    version: Mapped[str] = mapped_column(String(32))
+    version: Mapped[str] = mapped_column(String(64))
     accepted_at: Mapped[int] = mapped_column(Integer)
 
 

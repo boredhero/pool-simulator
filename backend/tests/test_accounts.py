@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.models.db import Account, LoginSession, Session
 from app.services.auth import COOKIE
+from app.services.terms import terms_version
 
 HEADERS = {"X-Pool-Request": "1"}
 # Disposable credentials for the isolated test database, never shared accounts.
@@ -16,7 +17,12 @@ def signup(client, name="Pool_Player"):
     response = client.post(
         "/api/account/register",
         headers=HEADERS,
-        json={"terms_version": "2026-10-08", "adult": True, "username": name, "password": PASSWORD},
+        json={
+            "terms_version": terms_version(),
+            "adult": True,
+            "username": name,
+            "password": PASSWORD,
+        },
     )
     assert response.status_code == 200, response.text
     return response.json()
@@ -43,7 +49,7 @@ def test_register_hashes_credentials_and_uses_cookie_session(monkeypatch):
         "/api/account/login",
         headers=HEADERS,
         json={
-            "terms_version": "2026-10-08",
+            "terms_version": terms_version(),
             "adult": True,
             "username": "pool_player",
             "password": PASSWORD,
@@ -61,7 +67,7 @@ def test_unique_casefolded_names_and_validation_do_not_echo_passwords():
         "/api/account/register",
         headers=HEADERS,
         json={
-            "terms_version": "2026-10-08",
+            "terms_version": terms_version(),
             "adult": True,
             "username": "pool_player",
             "password": PASSWORD,
@@ -74,7 +80,7 @@ def test_unique_casefolded_names_and_validation_do_not_echo_passwords():
                 "/api/account/register",
                 headers=HEADERS,
                 json={
-                    "terms_version": "2026-10-08",
+                    "terms_version": terms_version(),
                     "adult": True,
                     "username": name,
                     "password": PASSWORD,
@@ -87,7 +93,7 @@ def test_unique_casefolded_names_and_validation_do_not_echo_passwords():
         "/api/account/register",
         headers=HEADERS,
         json={
-            "terms_version": "2026-10-08",
+            "terms_version": terms_version(),
             "adult": True,
             "username": "valid",
             "password": short_password,
@@ -105,7 +111,7 @@ def test_recovery_rotates_code_revokes_all_sessions_and_requires_new_login():
             "/api/account/login",
             headers=HEADERS,
             json={
-                "terms_version": "2026-10-08",
+                "terms_version": terms_version(),
                 "adult": True,
                 "username": "pool_player",
                 "password": PASSWORD,
@@ -130,7 +136,7 @@ def test_recovery_rotates_code_revokes_all_sessions_and_requires_new_login():
             "/api/account/login",
             headers=HEADERS,
             json={
-                "terms_version": "2026-10-08",
+                "terms_version": terms_version(),
                 "adult": True,
                 "username": "Pool_Player",
                 "password": PASSWORD,
@@ -143,7 +149,7 @@ def test_recovery_rotates_code_revokes_all_sessions_and_requires_new_login():
             "/api/account/login",
             headers=HEADERS,
             json={
-                "terms_version": "2026-10-08",
+                "terms_version": terms_version(),
                 "adult": True,
                 "username": "Pool_Player",
                 "password": new_password,

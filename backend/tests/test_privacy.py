@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 from app.api.privacy import cleanup
 from app.main import app
 from app.models.db import FeatureEvent, Session, VisitorSession
+from app.services.terms import terms_version
 
 HEADERS = {"X-Pool-Request": "1"}
 
@@ -90,7 +91,7 @@ def test_terms_cannot_be_accepted_without_adult_affirmation():
             client.post("/api/account/register", headers=HEADERS, json=credentials).status_code
             == 400
         )
-        credentials.update(adult=True, terms_version="2026-10-08")
+        credentials.update(adult=True, terms_version=terms_version())
         assert (
             client.post("/api/account/register", headers=HEADERS, json=credentials).status_code
             == 200
