@@ -14,6 +14,7 @@ os.environ["COOKIE_SECURE"] = "false"
 def clean_accounts_and_matches():
     from app.models.db import (
         Account,
+        AdminAudit,
         AuthThrottle,
         FeatureEvent,
         GameMatch,
@@ -33,6 +34,7 @@ def clean_accounts_and_matches():
     lobby.rooms.clear()
     with Session.begin() as db:
         for model in (
+            AdminAudit,
             MatchShot,
             MatchPlayer,
             GameMatch,

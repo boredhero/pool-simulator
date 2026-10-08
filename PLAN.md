@@ -3,6 +3,21 @@
 Live: https://pool.martinospizza.dev · `main` deploys via GHCR + compose.
 Flow: work on `develop`, PR to `main` (protected: PR + `ci` check), merge to ship.
 
+## Current release checklist
+- [x] 0.7.1: Premium flags, badges, unlimited Jev games, all three existing
+  accounts enabled; PR #25 merged and CI deployment verified live.
+- [x] 0.8.0: Owner-ID authorization, account search/filter/pagination, Premium
+  management and audits, Jev usage/cost dashboard, authorization regressions.
+- [x] 0.8.0: Accessible draggable Settings, View and Online panels.
+- [ ] 0.8.0: WASD camera movement and mobile HUD arrow controls.
+- [ ] 0.8.0: Browser/integration checks, version bump and develop → main PR.
+- [ ] 0.9.0: Research Jev decision representation and CPU planning.
+- [ ] 0.9.0: Bounded physics previews and diverse tactical shot candidates.
+- [ ] 0.9.0: Semantic Jev decisions and complete usage accounting.
+- [ ] 0.9.0: CPU/Jev ball-in-hand and head-string regressions, including
+  placement followed by an actual shot without skipping the AI turn.
+- [ ] 0.9.0: Offline comparative evaluation, tests, version bump and PR.
+
 ## Stack (locked)
 - Frontend: Vite + TS + Three.js (WebGL2 baseline, WebGPU path later), custom 2D+spin sim
 - Backend: FastAPI + uvicorn + SQLite WAL (`/srv/data` volume), serves `frontend/dist`
