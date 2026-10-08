@@ -1,3 +1,4 @@
+import {pickPocket} from './pocketPicking';
 import {GoldCoin} from './goldCoin';
 import { guideColor } from './guideColor';
 import { PocketDrops } from './pocketDrop';
@@ -45,6 +46,7 @@ export interface SceneHandle {
   setTheme(felt: string, wood: string): void;
   /** Raycast pointer to felt plane, sim coords or null. */
   pickFelt(clientX: number, clientY: number): [number, number] | null;
+  pickPocket(clientX:number,clientY:number):number|null;
   onFrame(cb: () => void): void;
 }
 
@@ -459,6 +461,7 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
         rz + dy * along + dx * BALL_R * tx);
     },
     pickFelt,
+    pickPocket(x,y){return pickPocket(camera,canvas.getBoundingClientRect(),x,y);},
     onFrame(cb) { cbs.push(cb); },
   };
 }

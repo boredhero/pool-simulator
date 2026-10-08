@@ -426,17 +426,17 @@ export class Game {
       if(this.cameraGesture)return;
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       if(!this.humanCueControls())return;
+      if(this.mode==='aim'&&this.humanTurn()&&callRequired(this.gs)&&this.calledPocket===null){
+        const pocket=this.scene.pickPocket(e.clientX,e.clientY);
+        if(pocket!==null){this.calledPocket=pocket;this.hud();}
+        // The whole gesture selects a destination; it can never start a pull or shot.
+        this.touchAim=false;this.pulling=false;this.pressPt=null;return;
+      }
       const p = this.scene.pickFelt(e.clientX, e.clientY);
       if (!p) return;
       if (this.mode === 'place') {
         this.placeX = p[0]; this.placeY = p[1];
         this.placementPress=[e.clientX,e.clientY];
-        return;
-      }
-      if (this.humanTurn() && callRequired(this.gs) && this.calledPocket === null) {
-        const distances = POCKETS.map(q => Math.hypot(q.x - p[0], q.y - p[1]));
-        const pocket = distances.indexOf(Math.min(...distances));
-        if (distances[pocket] < .20) { this.calledPocket = pocket; this.hud(); }
         return;
       }
       if (this.mode === 'aim' && !this.cue().potted) {
@@ -881,6 +881,12 @@ export class Game {
     else if (this.mode === 'wait' && this.room) msg += ' — waiting…';
     else if (this.room && this.seat !== null && this.seat !== this.gs.current && this.mode === 'aim') msg += ' — opponent aiming…';
     if(msg.startsWith('Illegal break'))msg += ' · no ball pocketed and fewer than four object balls reached a rail';
+    if(this.mode==='aim'&&this.humanTurn()&&callRequired(this.gs)&&this.calledPocket===null){
+      const targets=legalTargets(this.gs);
+      const ball=targets.includes(this.calledBall??-1)?this.calledBall:targets[0];
+      const prompt=ball===8?'Select a pocket for the 8 ball':`Select a pocket for ball ${ball}`;
+      msg=`${prompt} · ${msg}`;
+    }
     this.el.msg.textContent = (this.coinPending()&&this.coin.status?this.coin.status:msg).replace(/\bPlayer ([12])\b/g,(_,seat)=>this.playerName(Number(seat)-1));
     this.el.turn.textContent = this.gs.winner !== null ? 'Game over' : this.playerName(this.gs.current);
     this.el.turn.classList.toggle('me', !this.room || this.seat === this.gs.current);
