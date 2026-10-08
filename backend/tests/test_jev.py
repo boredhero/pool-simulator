@@ -60,7 +60,9 @@ def test_guests_and_unaccepted_terms_cannot_use_jev():
 def test_free_game_resumes_and_other_accounts_have_independent_allowances():
     game = start()
     assert start()["id"] == game["id"]
-    assert client.get("/api/opponents/jev").json()["usage"]["gamesRemaining"] == 4
+    assert (
+        client.get("/api/opponents/jev").json()["usage"]["budget"]["remainingNano"] == 150_000_000
+    )
     client.cookies.clear()
     register("secondjev")
     assert client.post("/api/opponents/jev/games", headers=HEADERS, json={}).status_code == 200
@@ -410,23 +412,19 @@ def test_sim_permission_shared_weighted_allowance_and_spectator_ledger():
     first = sim_start("jev-jev")
     assert first.status_code == 200, first.text
     game = first.json()
-    assert game["dailyCost"] == 2 and game["simulation"] == "jev-jev"
+    assert game["simulation"] == "jev-jev"
     assert game["state"]["names"] == ["Jev AI 1", "Jev AI 2"]
-    assert client.get("/api/opponents/jev").json()["usage"]["gamesRemaining"] == 3
+    assert (
+        client.get("/api/opponents/jev").json()["usage"]["budget"]["remainingNano"] == 150_000_000
+    )
     with Session() as db:
         assert db.get(GameMatch, game["id"]).mode == "simulation"
         players = db.scalars(select(MatchPlayer).where(MatchPlayer.match_id == game["id"])).all()
         assert len(players) == 2 and all(p.account_id is None for p in players)
     assert sim_start("jev-cpu").status_code == 200
-    normal = client.post(
-        "/api/opponents/jev/games", headers=HEADERS, json={"new_game": True}
-    ).json()
-    assert client.get("/api/opponents/jev").json()["usage"]["gamesRemaining"] == 1
-    assert sim_start("jev-jev").status_code == 429
-    assert start()["id"] == normal["id"]
-    assert sim_start("jev-cpu").status_code == 200
-    assert client.get("/api/opponents/jev").json()["usage"]["gamesRemaining"] == 0
-    assert sim_start("jev-cpu").status_code == 429
+    for _ in range(6):
+        assert sim_start("jev-jev").status_code == 200
+    assert client.get("/api/opponents/jev").json()["usage"]["budget"]["spentNano"] == 0
     assert account["premium"] is False
 
 
@@ -450,7 +448,7 @@ def test_sim_revocation_blocks_turn_and_resume_and_premium_does_not_grant_permis
     enable_sim()
     for _ in range(4):
         assert sim_start("jev-jev").status_code == 200
-    assert client.get("/api/opponents/jev").json()["usage"]["gamesRemaining"] is None
+    assert client.get("/api/opponents/jev").json()["usage"]["budget"]["unlimited"] is True
 
 
 @pytest.mark.parametrize(

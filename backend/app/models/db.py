@@ -57,6 +57,7 @@ def init_db() -> None:
         upgrade_account_status,
         upgrade_jev_allowance,
         upgrade_match_modes,
+        upgrade_monthly_budget,
         upgrade_premium,
         upgrade_simulation,
         upgrade_terms,
@@ -67,6 +68,7 @@ def init_db() -> None:
         upgrade_premium(connection)
         upgrade_jev_allowance(connection)
         upgrade_simulation(connection)
+        upgrade_monthly_budget(connection)
         upgrade_terms(connection)
         upgrade_match_modes(connection)
         from app.services.matches import backfill_jev_matches
@@ -84,6 +86,8 @@ class Account(Base):
     created_at: Mapped[int] = mapped_column(Integer)
     premium: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     sim_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    last_active_at: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    monthly_budget_nano: Mapped[int | None] = mapped_column(Integer, nullable=True)
     disabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
 
 
@@ -216,4 +220,44 @@ class AdminAccountAction(Base):
     actor_id: Mapped[str] = mapped_column(String(32))
     account_id: Mapped[str] = mapped_column(String(32), index=True)
     action: Mapped[str] = mapped_column(String(16))
+    occurred_at: Mapped[int] = mapped_column(Integer)
+
+
+class JevRequest(Base):
+    """One durable provider attempt; unknown costs retain a separate reservation."""
+
+    __tablename__ = "jev_requests"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), index=True)
+    game_id: Mapped[str] = mapped_column(String(32), index=True)
+    revision: Mapped[int] = mapped_column(Integer)
+    seat: Mapped[int] = mapped_column(Integer)
+    month: Mapped[str] = mapped_column(String(7), index=True)
+    started_at: Mapped[int] = mapped_column(Integer)
+    finished_at: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    model: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(16), default="pending")
+    input_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    input_price_nano: Mapped[int] = mapped_column(Integer)
+    cost_nano: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    reserved_nano: Mapped[int] = mapped_column(Integer)
+
+
+class JevBudgetSetting(Base):
+    __tablename__ = "jev_budget_settings"
+    key: Mapped[str] = mapped_column(String(32), primary_key=True)
+    value: Mapped[int] = mapped_column(Integer)
+
+
+class JevBudgetAdjustment(Base):
+    __tablename__ = "jev_budget_adjustments"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    account_id: Mapped[str | None] = mapped_column(
+        ForeignKey("accounts.id"), nullable=True, index=True
+    )
+    actor_id: Mapped[str] = mapped_column(String(32))
+    month: Mapped[str] = mapped_column(String(7), index=True)
+    kind: Mapped[str] = mapped_column(String(16))
+    amount_nano: Mapped[int] = mapped_column(Integer)
     occurred_at: Mapped[int] = mapped_column(Integer)

@@ -1,4 +1,4 @@
-/** Authenticated daily games. All shots and provider choices are server-owned. */
+/** Authenticated monthly-budget games. All shots and provider choices are server-owned. */
 export async function jevRequest(path: string, body: object, signal: AbortSignal): Promise<any> {
   const response = await fetch('/api/opponents/jev'+path, {
     method:'POST', headers:{'Content-Type':'application/json','X-Pool-Request':'1'},

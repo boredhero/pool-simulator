@@ -1,5 +1,17 @@
 [
   {
+    "version": "1.1.0",
+    "date": "2026-10-08",
+    "title": "Monthly Jev allowances and request accounting",
+    "changes": [
+      "Daily game limits are replaced by monthly dollar allowances, defaulting to $0.15. Premium remains unlimited; CPU play is free.",
+      "The request ledger records TypeSafe-reported tokens and calculates charges precisely. Missing usage is marked unknown with a separate reservation. Jev vs Jev meters both seats individually.",
+      "Admin can configure the default and per-account monthly limits, add dollar top-ups for this month, and inspect recent requests. Top-ups are audited and protected against duplicate retries.",
+      "An admitted game gets $0.02 completion grace; CPU finishes the rack if that grace runs out.",
+      "Admin shows account last-active timestamps alongside creation dates. TypeSafe prepaid balance is explicitly unavailable through its documented API, with a link to billing."
+    ]
+  },
+  {
     "version": "1.0.3",
     "date": "2026-10-08",
     "title": "Simulation games and account controls",

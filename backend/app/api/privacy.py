@@ -9,7 +9,16 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import delete
 
-from app.models.db import FeatureEvent, JevGame, Session, TermsAcceptance, VisitorSession, init_db
+from app.models.db import (
+    FeatureEvent,
+    JevBudgetAdjustment,
+    JevGame,
+    JevRequest,
+    Session,
+    TermsAcceptance,
+    VisitorSession,
+    init_db,
+)
 from app.services.auth import current_account, digest, mutation_guard, rate_limit
 from app.services.terms import terms_version
 
@@ -75,6 +84,12 @@ def cleanup(db):
     old = db.query(VisitorSession.id).filter(VisitorSession.last_seen < cutoff)
     db.execute(delete(FeatureEvent).where(FeatureEvent.session_id.in_(old)))
     db.execute(delete(VisitorSession).where(VisitorSession.last_seen < cutoff))
+    db.execute(delete(JevRequest).where(JevRequest.started_at < int(time.time()) - 90 * 86400))
+    db.execute(
+        delete(JevBudgetAdjustment).where(
+            JevBudgetAdjustment.occurred_at < int(time.time()) - 90 * 86400
+        )
+    )
     db.execute(delete(JevGame).where(JevGame.updated_at < int(time.time()) - 90 * 86400))
 
 

@@ -104,7 +104,7 @@ test('daily Jev game uses server state and survives a page reload',async({page})
   await expect.poll(()=>page.evaluate(()=>(window as any).__pool.jevGame)).toEqual({id,revision});
   if(breaker===1)expect(await page.evaluate(()=>(window as any).__pool.gs.current)).toBe(1);
   const info=await page.request.get('/api/opponents/jev');
-  expect((await info.json()).usage.gamesRemaining).toBe(0);
+  expect((await info.json()).usage.budget.spentNano).toBe(0);
   await page.screenshot({path:'/tmp/pool-jev-desktop.png'});
   await page.setViewportSize({width:390,height:844});
   await page.locator('#morecontrols').click();
