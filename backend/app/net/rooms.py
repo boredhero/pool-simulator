@@ -73,6 +73,7 @@ class Room:
             "t": "state",
             "code": self.code,
             "balls": ball_dump(self.gs.balls),
+            "return_order": self.gs.return_order,
             "current": self.gs.current,
             "groups": self.gs.groups,
             "open": self.gs.open,

@@ -5,6 +5,7 @@ import type { Placement } from '../sim/rules';
 export interface ShotParams { aim: number; power: number; tipX: number; tipY: number; vmax?: number; elevation?: number; calledBall?: number | null; calledPocket?: number | null }
 export interface ServerBall { id: number; n: number | null; x: number; y: number; potted: boolean }
 export interface RoomState {
+  return_order: number[];
   code: string; balls: ServerBall[]; current: number;
   groups: Array<string | null>; open: boolean; ball_in_hand: boolean;
   winner: number | null; message: string;

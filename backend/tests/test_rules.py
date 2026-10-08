@@ -8,6 +8,7 @@ from app.sim.rules import apply_shot, begin_shot, new_game, place_cue
 
 FIXTURES = json.loads((Path(__file__).parents[2] / "contracts/rules-fixtures.json").read_text())
 KEYS = {
+    "returnOrder": "return_order",
     "breakShot": "break_shot",
     "ballInHand": "ball_in_hand",
     "kitchenShot": "kitchen_shot",

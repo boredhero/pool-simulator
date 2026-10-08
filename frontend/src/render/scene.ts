@@ -1,3 +1,4 @@
+import { createCabinet, returnPosition } from './cabinet';
 import { feltTextures, woodTextures } from './surfaceTextures';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -49,6 +50,7 @@ export interface SceneHandle {
   setBalls(
     list: Array<{ n: number | null; x: number; y: number; z: number; potted: boolean; wx: number; wy: number; wz: number }>,
     dt: number,
+    returnOrder?: number[],
   ): void;
   /** Cue stick. pull in meters of drawback. */
   setCue(visible: boolean, cx: number, cy: number, angle: number, pull: number, tipX?: number, tipY?: number): void;
@@ -73,6 +75,7 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x100e0c);
+  scene.fog = new THREE.Fog(0x100e0c,8,22);
   const pmrem = new THREE.PMREMGenerator(renderer);
   const environment = new RoomEnvironment();
   scene.environment = pmrem.fromScene(environment, 0.04).texture;
@@ -152,6 +155,10 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
   const frameMesh = new THREE.Mesh(surroundGeo, woodMat);
   frameMesh.castShadow = frameMesh.receiveShadow = true;
   scene.add(frameMesh);
+  scene.add(createCabinet(woodMat));
+  const floor=new THREE.Mesh(new THREE.PlaneGeometry(30,30),new THREE.MeshStandardMaterial({color:0x211c16,roughness:.98}));
+  floor.name='Room floor';floor.rotation.x=-Math.PI/2;floor.position.y=-.78;floor.receiveShadow=true;scene.add(floor);
+
 
   // Cushion noses use the collision segments, so all six mouths line up.
   // The bed and cushion cloth share textures, finish, and theme updates.
@@ -218,12 +225,12 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
     rim.position.set(rx, 0.001, rz);
     rim.receiveShadow = true;
     scene.add(rim);
-    const well = new THREE.Mesh(new THREE.CylinderGeometry(p.r, p.r * 0.85, 0.13, 48, 1, true), pocketMat);
-    well.position.set(rx, -0.065, rz);
+    const well = new THREE.Mesh(new THREE.CylinderGeometry(p.r, p.r * 0.85, 0.075, 48, 1, true), pocketMat);
+    well.position.set(rx, -0.0375, rz);
     scene.add(well);
     const bottom = new THREE.Mesh(new THREE.CircleGeometry(p.r * 0.85, 48), pocketMat);
     bottom.rotation.x = -Math.PI / 2;
-    bottom.position.set(rx, -0.13, rz);
+    bottom.position.set(rx, -0.075, rz);
     scene.add(bottom);
   }
 
@@ -339,9 +346,9 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
     const nextPortrait = w < h;
     if (portrait !== nextPortrait) {
       portrait = nextPortrait;
-      controls.target.set(0, 0, 0);
+      controls.target.set(0, portrait ? 0 : -.16, 0);
       if (portrait) camera.position.set(-2.3, 3.4, 0);
-      else camera.position.set(-1.8, 2.5, 2.0);
+      else camera.position.set(-2.4, 1.9, 2.8);
       camera.lookAt(controls.target);
     }
     // Fit the whole surround with room for the HUD; retain the current orbit.
@@ -350,8 +357,10 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
       let fits = true;
       for (const x of [-TABLE_W / 2 - RAIL_W, TABLE_W / 2 + RAIL_W]) {
         for (const z of [-TABLE_H / 2 - RAIL_W, TABLE_H / 2 + RAIL_W]) {
-          const p = new THREE.Vector3(x, 0.05, z).project(camera);
-          if (Math.abs(p.x) > 0.91 || Math.abs(p.y) > 0.8) fits = false;
+          for(const height of portrait ? [.05] : [.05,-.78]) {
+            const p = new THREE.Vector3(x,height,z).project(camera);
+            if (Math.abs(p.x) > .91 || Math.abs(p.y) > .8) fits=false;
+          }
         }
       }
       if (fits) break;
@@ -386,18 +395,28 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
   };
   frame();
 
+  const storedPositions = new Map<number,THREE.Vector3>();
   let cueObstacles: Parameters<typeof cueElevation>[4] = [];
   return {
     renderer,
     controls,
-    setBalls(list, dt) {
+    setBalls(list, dt, returnOrder = []) {
       cueObstacles = list;
       const axis = new THREE.Vector3();
       for (const b of list) {
         const m = getMesh(b.n);
         const [rx, rz] = toRender(b.x, b.y);
         m.position.set(rx, BALL_R, rz);
-        m.visible = !b.potted;
+        const slot=b.n===null?-1:returnOrder.indexOf(b.n);
+        m.visible = !b.potted || slot>=0;
+        if (b.potted && slot>=0) {
+          const target=returnPosition(slot);
+          let position=storedPositions.get(b.n!);
+          if(!position){position=target.clone().add(new THREE.Vector3(.075,0,0));storedPositions.set(b.n!,position);}
+          position.lerp(target,1-Math.exp(-dt*9));m.position.copy(position);
+          m.rotation.set(0,0,0);continue;
+        }
+        if(b.n!==null)storedPositions.delete(b.n);
         if (!b.potted) {
           // Lip dip: balls sink as their center crosses into the pocket mouth.
           let dip = 0;

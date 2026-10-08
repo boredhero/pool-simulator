@@ -29,6 +29,7 @@ class ShotContext:
 @dataclass
 class GameState:
     balls: list[Ball] = field(default_factory=list)
+    return_order: list[int] = field(default_factory=list)
     current: int = 0
     groups: list[str | None] = field(default_factory=lambda: [None, None])
     open: bool = True
@@ -111,6 +112,7 @@ def spot_ball(gs: GameState, n: int) -> None:
             b.id == ball.id or b.potted or math.hypot(b.x - x, b.y - y) >= 2 * BALL_R + 0.001
             for b in gs.balls
         ):
+            gs.return_order = [value for value in gs.return_order if value != n]
             ball.__dict__.update(Ball(id=ball.id, n=n, x=x, y=y).__dict__)
             return
     raise ValueError("No free spot for object ball")
@@ -128,6 +130,9 @@ def apply_shot(gs: GameState, ev: ShotEvents, before: ShotContext | None = None)
         return gs
     before = before or gs.shot or begin_shot(gs)
     gs.shot = None
+    for n in ev.potted:
+        if n not in gs.return_order:
+            gs.return_order.append(n)
     me, other = before.current, 1 - before.current
     on_eight = not before.open and before.group is not None and not before.remaining
     eight_down, eight_off = 8 in ev.potted, 8 in ev.off_table

@@ -387,7 +387,8 @@ export class Game {
         this.hud();
       }
     }
-    this.scene.setBalls(this.gs.balls, fdt);
+    const returnOrder = [...new Set([...this.gs.returnOrder, ...(this.mode === 'rolling' || this.mode === 'wait' ? this.ev.potted : [])])].filter(n => this.gs.balls.some(b => b.n === n && b.potted));
+    this.scene.setBalls(this.gs.balls, fdt, returnOrder);
     // Ease aim toward target (kills mouse jitter twitch), frame-rate independent.
     {
       let d = this.targetAngle - this.angle;
@@ -491,6 +492,7 @@ export class Game {
     }
     this.gs.current = s.current === 1 ? 1 : 0;
     this.gs.groups = [(s.groups[0] ?? null) as never, (s.groups[1] ?? null) as never];
+    this.gs.returnOrder = s.return_order ?? [];
     this.gs.open = s.open;
     this.gs.breakShot = s.break_shot; this.gs.placement = s.placement; this.gs.kitchenShot = s.kitchen_shot; this.gs.rules = s.rules;
     this.calledBall = this.calledPocket = null; delete this.gs.shot;

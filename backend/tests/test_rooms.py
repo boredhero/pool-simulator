@@ -14,6 +14,7 @@ def test_create_join_shot_flow():
         code = r1["code"]
         assert len(code) == 4
         assert len(r1["state"]["balls"]) == 16
+        assert r1["state"]["return_order"] == []
 
         w2.send_json({"t": "join", "code": code, "name": "B"})
         r2 = w2.receive_json()
@@ -103,3 +104,17 @@ def test_room_rules_revision_and_authoritative_calls():
         result = ws.receive_json()
         assert result["revision"] == 1
         assert result["winner"] is None  # Fake client 8-Ball event cannot decide the match.
+
+
+def test_room_state_carries_capture_order_for_joining_players():
+    from app.net.rooms import Room
+    from app.sim.physics import ShotEvents
+    from app.sim.rules import apply_shot, begin_shot, new_game
+
+    gs = new_game()
+    gs.break_shot = False
+    begin_shot(gs)
+    for n in [12, 3, 10]:
+        next(b for b in gs.balls if b.n == n).potted = True
+    apply_shot(gs, ShotEvents(first_contact=3, potted=[12, 3, 10], rail_after_contact=True))
+    assert Room(code="TEST", gs=gs).state_msg()["return_order"] == [12, 3, 10]

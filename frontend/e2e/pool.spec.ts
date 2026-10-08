@@ -113,3 +113,18 @@ test('kitchen guide and locally persisted sight shape', async ({page})=>{
   await page.evaluate(()=>{const g=(window as any).__pool;g.gs.kitchenShot=false;g.frame();});
   await expect(page.locator('#headstringguide')).toBeHidden();
 });
+
+
+test('capture history survives consecutive shots and clears with a new rack', async ({page})=>{
+  await page.goto('/');
+  const result=await page.evaluate(()=>{
+    const g=(window as any).__pool;g.gs.breakShot=false;
+    const capture=(numbers:number[])=>{
+      for(const n of numbers)g.gs.balls.find((b:any)=>b.n===n).potted=true;
+      g.ev={firstContact:numbers[0],potted:numbers,offTable:[],railAfterContact:true,cuePotted:false};g.mode='rolling';g.frame();
+    };
+    capture([12,3]);capture([10]);
+    const order=[...g.gs.returnOrder];g.reset();return {order,reset:g.gs.returnOrder};
+  });
+  expect(result.order).toEqual([12,3,10]);expect(result.reset).toEqual([]);
+});

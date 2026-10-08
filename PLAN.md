@@ -114,3 +114,18 @@ Flow: work on `develop`, PR to `main` (protected: PR + `ci` check), merge to shi
   [Simonis nap-free worsted cloth](https://www.simoniscloth.com/product/simonis-860/).
   A remaining refinement is individual longitudinal UV mapping on the short
   end rails; the current continuous surround retains its original UV layout.
+
+## Cabinet and ordered ball return
+- The rail and bed outlines now use 140 mm rounded outside corners, with a
+  softer 8 mm rail bevel. Pocket and cushion physics coordinates are unchanged.
+- Added apron panels, rounded skirt trim, underframe, four tapered legs,
+  adjustable feet, shadow-receiving floor, and a glazed side return channel.
+- Captured object balls are displayed oldest-first across the channel during
+  shots. Capture order persists in client/server match state and room snapshots;
+  spotting removes a ball from the channel, and a new rack resets it. Scratched
+  cue balls return to ball-in-hand instead of occupying the object-ball window.
+- Return travel is a presentation animation, not a simulated internal chute.
+  Desktop framing includes the cabinet; mobile retains a larger playing surface
+  and can orbit down to inspect the cabinet.
+- References: [Brunswick Gold Crown VI aprons, legs and rail castings](https://www.brunswickbilliards.com/products/gold-crown-vi-9-foot-pool-table)
+  and [Valley ball-view doors](https://www.valley-dynamoparts.com/product_categories.php?catid=16&line=2).

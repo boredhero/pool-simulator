@@ -4,17 +4,22 @@ import { POCKETS, TABLE_H, TABLE_W } from '../sim/table';
 export const RAIL_W = 0.17;
 export const CUSHION_W = 0.035;
 
+export const CORNER_RADIUS = .14;
+export function roundedOutline(left:number,top:number,width:number,height:number,radius:number): THREE.Shape {
+  const shape=new THREE.Shape(),right=left+width,bottom=top+height;
+  shape.moveTo(left+radius,top);shape.lineTo(right-radius,top);
+  shape.absarc(right-radius,top+radius,radius,-Math.PI/2,0,false);
+  shape.lineTo(right,bottom-radius);shape.absarc(right-radius,bottom-radius,radius,0,Math.PI/2,false);
+  shape.lineTo(left+radius,bottom);shape.absarc(left+radius,bottom-radius,radius,Math.PI/2,Math.PI,false);
+  shape.lineTo(left,top+radius);shape.absarc(left+radius,top+radius,radius,Math.PI,Math.PI*1.5,false);shape.closePath();return shape;
+}
+
 export function bedGeometry(): THREE.BufferGeometry {
   // Extend the pocket shelf behind the noses, then cut through the bed.
   // All six circles lie entirely inside this outline, including the corners.
   // Inset the outside faces to avoid coplanar wood/cloth flicker.
   const shelf = RAIL_W - 0.0001;
-  const bed = new THREE.Shape();
-  bed.moveTo(-shelf, -shelf);
-  bed.lineTo(TABLE_W + shelf, -shelf);
-  bed.lineTo(TABLE_W + shelf, TABLE_H + shelf);
-  bed.lineTo(-shelf, TABLE_H + shelf);
-  bed.closePath();
+  const bed = roundedOutline(-shelf,-shelf,TABLE_W+2*shelf,TABLE_H+2*shelf,CORNER_RADIUS);
   for (const p of POCKETS) {
     const hole = new THREE.Path();
     hole.absarc(p.x, p.y, p.r, 0, Math.PI * 2, true);
@@ -54,15 +59,10 @@ export function surroundGeometry(): THREE.BufferGeometry {
   arc(cuts[3], atY(cuts[3], inner.bottom, 1), atX(cuts[3], inner.left, -1));
   arc(cuts[0], atX(cuts[0], inner.left, 1), start);
   opening.closePath();
-  const surround = new THREE.Shape();
-  surround.moveTo(-RAIL_W, -RAIL_W);
-  surround.lineTo(TABLE_W + RAIL_W, -RAIL_W);
-  surround.lineTo(TABLE_W + RAIL_W, TABLE_H + RAIL_W);
-  surround.lineTo(-RAIL_W, TABLE_H + RAIL_W);
-  surround.closePath();
+  const surround = roundedOutline(-RAIL_W,-RAIL_W,TABLE_W+2*RAIL_W,TABLE_H+2*RAIL_W,CORNER_RADIUS);
   surround.holes.push(opening);
-  const surroundGeo = new THREE.ExtrudeGeometry(surround, { curveSegments: 32, depth: 0.19, bevelEnabled: true, bevelSegments: 2, steps: 1, bevelSize: 0.002, bevelThickness: 0.002 });
+  const surroundGeo = new THREE.ExtrudeGeometry(surround, { curveSegments: 32, depth: 0.12, bevelEnabled: true, bevelSegments: 5, steps: 1, bevelSize: 0.008, bevelThickness: 0.008 });
   surroundGeo.rotateX(Math.PI / 2);
-  surroundGeo.translate(-TABLE_W / 2, 0.05, -TABLE_H / 2);
+  surroundGeo.translate(-TABLE_W / 2, 0.044, -TABLE_H / 2);
   return surroundGeo;
 }

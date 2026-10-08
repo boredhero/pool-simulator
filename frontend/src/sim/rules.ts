@@ -10,6 +10,7 @@ export interface ShotContext {
   remaining: number[]; kitchen: boolean; calledBall: number | null; calledPocket: number | null;
 }
 export interface GameState {
+  returnOrder: number[];
   balls: Ball[]; current: 0 | 1; groups: [Group, Group]; open: boolean;
   ballInHand: boolean; placement: Placement; kitchenShot: boolean; breakShot: boolean;
   winner: 0 | 1 | null; message: string; rules: MatchConfig; shot?: ShotContext;
@@ -27,7 +28,7 @@ export function newGame(seed = 1, options: MatchConfig = BAR_RULES): GameState {
   const balls = [makeBall(0, null, ...HEAD_SPOT)];
   const order = rackOrder(seed), pos = rackPositions();
   order.forEach((n, i) => balls.push(makeBall(i + 1, n, ...pos[i])));
-  return { balls, current: 0, groups: [null, null], open: true, ballInHand: false, placement: 'none', kitchenShot: false, breakShot: true, winner: null, message: 'Player 1 to break', rules: matchConfig(options) };
+  return { returnOrder: [], balls, current: 0, groups: [null, null], open: true, ballInHand: false, placement: 'none', kitchenShot: false, breakShot: true, winner: null, message: 'Player 1 to break', rules: matchConfig(options) };
 }
 export function groupOf(n: number): 'solid' | 'stripe' | 'eight' { return n === 8 ? 'eight' : n < 8 ? 'solid' : 'stripe'; }
 function remaining(gs: GameState): number[] {
@@ -56,6 +57,7 @@ export function spotBall(gs: GameState, n: number): void {
   for (let x = .1; x < TABLE_W - .1; x += .07) for (let y = .1; y < TABLE_H - .1; y += .07) candidates.push([x, y]);
   const point = candidates.find(([x, y]) => x > BALL_R && x < TABLE_W - BALL_R && gs.balls.every(b => b.id === ball.id || b.potted || Math.hypot(b.x - x, b.y - y) >= 2 * BALL_R + .001));
   if (!point) throw new Error('No free spot for object ball');
+  gs.returnOrder = gs.returnOrder.filter(value => value !== n);
   Object.assign(ball, makeBall(ball.id, n, ...point));
 }
 function grantPlacement(gs: GameState, zone: Placement): void {
@@ -70,6 +72,7 @@ function grantPlacement(gs: GameState, zone: Placement): void {
 export function applyShot(gs: GameState, ev: ShotEvents, before = gs.shot ?? beginShot(gs)): GameState {
   if (gs.winner !== null) return gs;
   delete gs.shot;
+  for (const n of ev.potted) if (!gs.returnOrder.includes(n)) gs.returnOrder.push(n);
   const me = before.current, other = (1 - me) as 0 | 1;
   const onEight = !before.open && before.group !== null && before.remaining.length === 0;
   const eightDown = ev.potted.includes(8), eightOff = ev.offTable.includes(8);

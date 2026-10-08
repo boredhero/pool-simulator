@@ -605,5 +605,83 @@
         null
       ]
     }
+  },
+  {
+    "name": "return channel preserves capture order across shots",
+    "state": {
+      "breakShot": false,
+      "returnOrder": [
+        9,
+        3
+      ]
+    },
+    "pottedBefore": [
+      9,
+      3
+    ],
+    "ev": {
+      "firstContact": 1,
+      "potted": [
+        12,
+        1
+      ],
+      "offTable": [],
+      "railAfterContact": true,
+      "cuePotted": false
+    },
+    "expected": {
+      "returnOrder": [
+        9,
+        3,
+        12,
+        1
+      ]
+    }
+  },
+  {
+    "name": "respotted eight is removed from the return window",
+    "preset": "tournament",
+    "state": {},
+    "ev": {
+      "firstContact": 1,
+      "potted": [
+        2,
+        8,
+        11
+      ],
+      "offTable": [],
+      "railAfterContact": true,
+      "cuePotted": false
+    },
+    "expected": {
+      "returnOrder": [
+        2,
+        11
+      ]
+    },
+    "respot": [
+      8
+    ]
+  },
+  {
+    "name": "scratch does not store cue in object ball channel",
+    "state": {
+      "breakShot": false
+    },
+    "ev": {
+      "firstContact": 1,
+      "potted": [
+        1
+      ],
+      "offTable": [],
+      "railAfterContact": true,
+      "cuePotted": true
+    },
+    "expected": {
+      "returnOrder": [
+        1
+      ],
+      "placement": "kitchen"
+    }
   }
 ]
