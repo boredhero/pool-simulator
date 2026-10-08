@@ -651,9 +651,8 @@ export class Game {
         this.gs.ballInHand=false;this.mode='aim';
         this.angle=this.targetAngle=selected.aim;
         this.calledBall=selected.calledBall;this.calledPocket=selected.calledPocket;
-        this.setSpin(selected.tipX,selected.tipY,true);
         this.jevPlayback=true;
-        try {this.fire(selected.power,selected.vmax,selected.elevation);} finally {this.jevPlayback=false;}
+        try {this.fire(selected.power,selected.vmax,selected.elevation,selected);} finally {this.jevPlayback=false;}
       }
       this.pendingNetwork.push(()=>{if(valid())this.applyJevState(result.state);});
       this.el.opponentstatus.textContent=result.source==='jev'?`Jev AI selected a ${result.family??'planned'} shot`:
@@ -671,7 +670,7 @@ export class Game {
     }
   }
 
-  fire(power: number, vmax = this.gs.breakShot ? this.gs.rules.breakMax : this.gs.rules.normalMax, authoritativeElevation?:number): void {
+  fire(power: number, vmax = this.gs.breakShot ? this.gs.rules.breakMax : this.gs.rules.normalMax, authoritativeElevation?:number, shotSpin?:{tipX:number;tipY:number}): void {
     if (!this.canShoot() || (this.tutorial.active&&this.tutorial.action!=='shot')) return;
     document.querySelector('.hint')?.classList.add('gone');
     try { localStorage.setItem('pool:seen', '1'); } catch { /* private mode */ }
@@ -684,11 +683,12 @@ export class Game {
     this.targetAngle=this.angle;
     if(this.jevGame && !this.jevPlayback){void this.playJevTurn(power);return;}
     this.power = power;
+    const {tipX,tipY}=shotSpin??this;
     const elevation = authoritativeElevation??cueElevation(c.x, c.y, this.angle, 0, this.gs.balls);
     beginShot(this.gs, this.calledBall, this.calledPocket);
-    const params = { aim: this.angle, power, tipX: this.tipX, tipY: this.tipY, vmax, elevation, calledBall: this.calledBall, calledPocket: this.calledPocket };
+    const params = { aim: this.angle, power, tipX, tipY, vmax, elevation, calledBall: this.calledBall, calledPocket: this.calledPocket };
     if(!this.cpuOpponent||this.gs.current===0)this.tutorial.record('shot');
-    strike(c, Math.cos(this.angle), Math.sin(this.angle), power, this.tipX, this.tipY, vmax, elevation);
+    strike(c, Math.cos(this.angle), Math.sin(this.angle), power, tipX, tipY, vmax, elevation);
     this.ev = freshEv();
     this.contact = { v: false };
     this.whoShot = this.seat;
@@ -716,9 +716,8 @@ export class Game {
       if(state.ballInHand&&!placeCue(state,selected.placement.x,selected.placement.y))return;
       this.opponentAction=null;this.mode='aim';
       this.angle=this.targetAngle=selected.aim;this.power=selected.power;
-      this.setSpin(selected.tipX,selected.tipY,true);
       this.calledBall=selected.calledBall;this.calledPocket=selected.calledPocket;
-      this.fire(selected.power);
+      this.fire(selected.power,undefined,undefined,selected);
     } finally {if(this.opponentAction===action)this.opponentAction=null;}
   }
 
