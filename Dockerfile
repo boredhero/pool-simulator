@@ -1,5 +1,5 @@
 # Frontend build and Python runtime in one release image.
-FROM node:22-slim AS web
+FROM node:25-slim AS web
 WORKDIR /web
 COPY frontend/package.json frontend/package-lock.json* frontend/pnpm-lock.yaml* ./
 RUN if [ -f pnpm-lock.yaml ]; then npm install -g pnpm && pnpm install; elif [ -f package-lock.json ]; then npm ci; else npm install; fi
