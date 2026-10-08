@@ -17,6 +17,7 @@ export class TableOptions {
     let dismissed = false;
     try { dismissed = localStorage.getItem('pool:help-dismissed') === '1'; } catch { /* private storage */ }
     select('rulespreset').addEventListener('change', () => this.write(matchConfig({ preset: select('rulespreset').value as MatchConfig['preset'] })));
+    el('closesettings').addEventListener('click',()=>{el('settingspanel').classList.remove('open');el('settingsbtn').focus();});
     el('applyrules').addEventListener('click', () => { start(this.read()); el('settingspanel').classList.remove('open'); });
     const show = (open: boolean, remember = false) => {
       if (!open && remember) { dismissed = true; try { localStorage.setItem('pool:help-dismissed', '1'); } catch { /* private storage */ } }
@@ -39,7 +40,7 @@ export class TableOptions {
     const desktop = matchMedia('(min-width: 1101px)');
     show(desktop.matches && !dismissed);
     desktop.addEventListener('change', e => show(e.matches && !dismissed));
-    addEventListener('keydown', e => { if (e.key === 'Escape') { show(false, true); el('settingspanel').classList.remove('open'); el('onlinepanel').classList.remove('open'); } });
+    addEventListener('keydown', e => { if (e.key === 'Escape') { if(el('settingspanel').classList.contains('open'))el('settingsbtn').focus(); show(false, true); el('settingspanel').classList.remove('open'); el('onlinepanel').classList.remove('open'); } });
     this.write(matchConfig());
   }
   read(): MatchConfig {

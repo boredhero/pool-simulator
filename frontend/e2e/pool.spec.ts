@@ -373,3 +373,22 @@ test('camera faces current player targets and aligns the idle cue with the final
   expect(results.eight).toEqual([8]);expect(results.cue).toBeNull();expect(results.alignment).toBeCloseTo(-1);
   expect(results.placement).toBe(true);expect(results.cueAlignment).toBeCloseTo(-1);expect(results.placementKeepsAim).toBe(true);
 });
+
+test('settings title and close button stay visible while scrolling on desktop and mobile',async({page})=>{
+  await openGame(page);
+  for(const viewport of [{width:1280,height:720},{width:390,height:844}]) {
+    await page.setViewportSize(viewport);
+    await page.locator('#settingsbtn').click();
+    const header=page.locator('.settings-header'),before=(await header.boundingBox())!;
+    await page.locator('.settings-body').evaluate(el=>el.scrollTop=el.scrollHeight);
+    expect(await page.locator('.settings-body').evaluate(el=>el.scrollTop)).toBeGreaterThan(100);
+    const after=(await header.boundingBox())!;expect(after.y).toBeCloseTo(before.y);
+    await expect(page.getByRole('heading',{name:'Settings',exact:true})).toBeVisible();
+    await page.getByRole('button',{name:'Close settings',exact:true}).click();
+    await expect(page.locator('#settingspanel')).not.toBeVisible();
+    await expect(page.locator('#settingsbtn')).toBeFocused();
+    await page.locator('#settingsbtn').click();await page.keyboard.press('Escape');
+    await expect(page.locator('#settingspanel')).not.toBeVisible();
+    await expect(page.locator('#settingsbtn')).toBeFocused();
+  }
+});

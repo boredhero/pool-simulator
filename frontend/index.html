@@ -90,6 +90,7 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
 #viewpanel{display:none;position:fixed;z-index:8;right:24px;top:var(--below-header,136px);width:310px;padding:18px;background:#211d18;border:1px solid #75634a;border-radius:16px}#viewpanel.open{display:grid;gap:12px}#viewpanel .row button{flex:1;font-size:16px;padding:0 8px}@media(max-width:600px){#viewpanel{right:12px;width:min(310px,calc(100vw - 24px))}.toolbar{gap:4px}.toolbar button{padding:0 7px}}
 #changelog{width:min(1050px,94vw);height:88dvh;max-height:94dvh;padding:0;color:#eee5d6;background:#211d18;border:1px solid #75634a;border-radius:20px}#changelog::backdrop{background:#000b;backdrop-filter:blur(5px)}.changelog-header{position:sticky;top:0;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:22px 28px;background:#211d18;border-bottom:1px solid #75634a}.changelog-header h2{margin:0;font-size:28px}#changelog-content{padding:8px 28px 28px;font-size:18px;line-height:1.65}#changelog-content h3{font-size:24px;margin-bottom:0}#changelog-content time{color:#c3b494;font-size:16px}#changelog-content li{margin:12px 0}#version{cursor:pointer}@media(max-width:600px){.status-meta{flex-wrap:wrap}#version{min-height:32px;padding:3px 6px}.changelog-header,#changelog-content{padding:16px}#changelog-content{font-size:17px}.toolbar button{font-size:14px}}
 .pball.eight-ball{margin-left:5px;outline:1px solid #ae9a73;outline-offset:2px}.pball.eight-ball.ready{outline:3px solid #e9cc81;box-shadow:0 0 12px #e9cc8160}
+#settingspanel{padding:0;overflow:hidden;gap:0}.settings-header{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-shrink:0;padding:12px 20px;background:#211d18;border-bottom:1px solid #75634a}.settings-header h2{margin:0}#closesettings{font-size:28px;line-height:1;width:44px;height:44px;padding:0;flex-shrink:0}.settings-body{display:flex;flex-direction:column;gap:12px;padding:20px;overflow-y:auto;min-height:0;overscroll-behavior:contain}.settings-body>*{flex-shrink:0}@media(min-width:900px){.settings-header{padding:14px 26px}.settings-body{padding:26px;gap:14px}}
 </style>
 </head>
 <body>
@@ -128,7 +129,9 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
   <div id="rulesummary" class="rules-summary"></div>
 </aside>
 <div id="callpanel" hidden><label for="callball">Call your shot</label><select id="callball" aria-label="Called ball"></select><span id="callstatus">Tap a pocket on the table</span><button id="clearcall">Change pocket</button></div>
-<div id="settingspanel">
+<div id="settingspanel" role="dialog" aria-labelledby="settings-title">
+  <header class="settings-header"><h2 id="settings-title">Settings</h2><button id="closesettings" type="button" aria-label="Close settings" title="Close settings">×</button></header>
+  <div class="settings-body">
   <h2>Table &amp; rules</h2>
   <label for="rulespreset">Game</label><select id="rulespreset"><option value="bar">8-Ball (Bar)</option><option value="tournament">8-Ball (Tourny)</option><option value="custom">8-Ball (Custom)</option></select>
   <p class="guide-note" id="rulesnotice">Preset rules are locked. Choose Custom to make them your own.</p>
@@ -164,6 +167,7 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
   <input type="color" id="feltcustom" value="#0a6c2f" />
   <label>Custom rails</label>
   <input type="color" id="woodcustom" value="#4a2c14" />
+</div>
 </div>
 <div id="viewpanel" aria-label="Camera controls">
   <button id="cameramode" aria-pressed="false">Move camera</button>

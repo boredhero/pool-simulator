@@ -4,6 +4,7 @@
     "date": "2026-10-08",
     "title": "A natural stance and clearer Bar play",
     "changes": [
+      "Settings now has a fixed title bar and close button that stay visible while scrolling, with Escape dismissal and keyboard focus restored to the Table button.",
       "Automatic framing uses a lower, closer playing view and tighter bounds around the visible balls. Cue alignment remains adjustable and never overrides a shot being pulled.",
       "Automatic camera framing now swings behind the cue toward the majority of the current player\u2019s legal targets, including the final 8-Ball, with the idle cue facing forward from the new view.",
       "Bar house rules now keep the layout after an empty break instead of automatically reracking. Players alternate until a legal pot assigns groups; pots made with a scratch stay down without assigning a group.",
