@@ -1,6 +1,8 @@
+import { acceptWelcomeBeforeLoad } from './welcomeFixture';
 import { expect, test } from '@playwright/test';
 
 test.beforeEach(async ({ page }) => {
+  await acceptWelcomeBeforeLoad(page);
   await page.route('**/api/account', route => route.fulfill({ json: { account: null, stats: null } }));
   await page.route('**/api/version', route => route.fulfill({ json: { version: 'e2e' } }));
   await page.addInitScript(() => {

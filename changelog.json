@@ -1,5 +1,15 @@
 [
   {
+    "version": "0.9.3",
+    "date": "2026-10-08",
+    "title": "Welcome flow and guided practice",
+    "changes": [
+      "New visitors get a welcome screen with game context, explicit terms acceptance, a separate optional analytics choice and a prominent quick tutorial option.",
+      "The interactive tutorial uses staged offline practice shots and camera framing, with compact instructions that leave the table and current controls usable on phones and desktops.",
+      "Tutorial instructions follow touch, mouse or trackpad controls. Exiting practice restores the previous local game."
+    ]
+  },
+  {
     "version": "0.9.2",
     "date": "2026-10-08",
     "title": "Opponent cue strokes and purposeful cluster shots",

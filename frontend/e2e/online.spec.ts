@@ -1,6 +1,8 @@
+import { acceptWelcomeBeforeLoad } from './welcomeFixture';
 import { expect, test, type Page } from '@playwright/test';
 
 async function open(page:Page,path='/'){
+  await acceptWelcomeBeforeLoad(page);
   await page.addInitScript(()=>{
     const w=window as any,raf=requestAnimationFrame.bind(window);
     window.requestAnimationFrame=fn=>raf(t=>{if(w.__pool&&!w.__draw){const r=w.__pool.scene.renderer;w.__draw=r.render.bind(r);r.render=()=>{};}fn(t);});

@@ -1,6 +1,8 @@
+import { acceptWelcomeBeforeLoad } from './welcomeFixture';
 import { expect, test, type Page } from '@playwright/test';
 
 test.beforeEach(async ({page}) => {
+  await acceptWelcomeBeforeLoad(page);
   // This suite covers the standalone frontend. Backend API tests cover /api/version.
   await page.route('**/api/account',route=>route.fulfill({json:{account:null,stats:null}}));
   await page.route('**/api/version', route => route.fulfill({json:{version:'e2e'}}));

@@ -26,7 +26,21 @@ Flow: work on `develop`, PR to `main` (protected: PR + `ci` check), merge to shi
 - [x] 0.9.2: Visible opponent cue/aim/stroke, player input lock during opponent
   turns, submitted-cue direction regression, cluster shot-power research and
   implementation, cohesive camera HUD and consistent legal controls.
-- [ ] 0.9.2: Integrated tests, separate release PR and CI checks.
+- [x] 0.9.2: 124 backend/96 frontend tests, focused and real online checks;
+  PR #29 merged, full browser CI passed and deployment verified live.
+- [ ] 0.9.3: Responsive staged tutorial with isolated practice/restore and
+  mouse/trackpad/touch instructions.
+- [ ] 0.9.3: First-visit welcome, explicit Terms acceptance, independent optional
+  analytics consent and prominent tutorial handoff.
+- [ ] 0.9.3: Viewport/input/consent regressions, version bump, PR and CI.
+
+## Follow-up 0.9.4
+- [ ] Detect clear legal pot lines after cue-ball placement and offer helpful camera framing that yields to manual input.
+- [ ] Research rare off-table ball physics and official tournament versus house/bar rules; implement consistent frontend/server outcomes and regression fixtures.
+- [ ] Show the signed-in username prominently and make account settings easy to reach.
+- [ ] Refine the input-profile selector above legal controls and rename page/version branding to Pool Simulator.
+- [ ] Winner dialog with correct player identity, reduced-motion-aware confetti and mode-specific replay action.
+- [ ] Separate version bump, validation and develop → main PR after 0.9.3.
 
 ## Stack (locked)
 - Frontend: Vite + TS + Three.js (WebGL2 baseline, WebGPU path later), custom 2D+spin sim
