@@ -1,4 +1,4 @@
-import { acceptWelcomeBeforeLoad } from './welcomeFixture';
+import { acceptWelcomeBeforeLoad, waitForOpening } from './welcomeFixture';
 import { expect, test, type Page } from '@playwright/test';
 
 async function open(page:Page,path='/'){
@@ -7,7 +7,7 @@ async function open(page:Page,path='/'){
     const w=window as any,raf=requestAnimationFrame.bind(window);
     window.requestAnimationFrame=fn=>raf(t=>{if(w.__pool&&!w.__draw){const r=w.__pool.scene.renderer;w.__draw=r.render.bind(r);r.render=()=>{};}fn(t);});
   });
-  await page.goto(path);await page.waitForFunction(()=>!!(window as any).__draw);
+  await page.goto(path);await page.waitForFunction(()=>!!(window as any).__draw);await waitForOpening(page);
 }
 async function account(page:Page){await page.locator('#onlinebtn').click();await page.locator('#accountbtn').click();}
 
@@ -48,7 +48,9 @@ test('registered host shares a guest invite and both receive server results',asy
     await guest.locator('#pname').fill('Guest Friend');await guest.locator('#joinbtn').click();
     await expect(page.locator('#roominfo')).toContainText('Connected');await expect(guest.locator('#roominfo')).toContainText('Connected');
     await expect(guest.locator('.pcard').first()).toContainText(name);
-    await page.evaluate(()=>{const g=(window as any).__pool;g.angle=0;g.fire(.3);});
+    await Promise.all([waitForOpening(page),waitForOpening(guest)]);
+    const breaker=await page.evaluate(()=>(window as any).__pool.gs.current);
+    await (breaker===0?page:guest).evaluate(()=>{const g=(window as any).__pool;g.angle=0;g.fire(.3);});
     // Advance local playback without changing physics; the server result is independent.
     await expect.poll(()=>page.evaluate(()=>(window as any).__pool.room.revision)).toBeGreaterThan(0);
     for(const p of [page,guest])await p.evaluate(()=>{const g=(window as any).__pool;for(let i=0;i<200&&g.mode==='rolling';i++){g.accumulator+=.25;g.frame();}g.frame();});
@@ -56,7 +58,7 @@ test('registered host shares a guest invite and both receive server results',asy
     const hostState=await page.evaluate(()=>{const g=(window as any).__pool;return{turn:g.gs.current,balls:g.gs.balls.map((b:any)=>[b.x,b.y,b.potted])};});
     const guestState=await guest.evaluate(()=>{const g=(window as any).__pool;return{turn:g.gs.current,balls:g.gs.balls.map((b:any)=>[b.x,b.y,b.potted])};});
     expect(guestState).toEqual(hostState);
-    const stats=await page.request.get('/api/account');expect((await stats.json()).stats.shots).toBe(1);
+    const stats=await page.request.get('/api/account');expect((await stats.json()).stats.shots).toBe(breaker===0?1:0);
     await page.locator('#leaveroom').click();await expect(guest.locator('#roominfo')).toContainText('closed');
     await expect(page.locator('#createbtn')).toBeVisible();
     await expect.poll(async()=>{const r=await page.request.get('/api/account');return (await r.json()).stats.losses;}).toBe(1);
@@ -86,14 +88,19 @@ test('daily Jev game uses server state and survives a page reload',async({page})
   await page.locator('#jevbtn').click();
   await expect.poll(()=>page.evaluate(()=>(window as any).__pool.jevGame?.revision)).toBe(0);
   const id=await page.evaluate(()=>(window as any).__pool.jevGame.id);
-  await page.evaluate(()=>{const g=(window as any).__pool;g.angle=0;g.fire(.05);});
+  await waitForOpening(page);
+  const breaker=await page.evaluate(()=>(window as any).__pool.gs.current);
+  // This integration fixture pauses Jev decisions; either persisted coin outcome is valid.
+  if(breaker===0)await page.evaluate(()=>{const g=(window as any).__pool;g.angle=0;g.fire(.05);});
+  const revision=breaker===0?1:0;
   await expect.poll(async()=>{
     const response=await page.request.get('/api/opponents/jev');
     return (await response.json()).game?.state.revision;
-  }).toBe(1);
+  }).toBe(revision);
   await page.reload();await page.waitForFunction(()=>!!(window as any).__draw);
   await page.locator('#jevbtn').click();
-  await expect.poll(()=>page.evaluate(()=>(window as any).__pool.jevGame)).toEqual({id,revision:1});
+  await expect.poll(()=>page.evaluate(()=>(window as any).__pool.jevGame)).toEqual({id,revision});
+  if(breaker===1)expect(await page.evaluate(()=>(window as any).__pool.gs.current)).toBe(1);
   const info=await page.request.get('/api/opponents/jev');
   expect((await info.json()).usage.gamesRemaining).toBe(0);
   await page.screenshot({path:'/tmp/pool-jev-desktop.png'});

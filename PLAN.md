@@ -32,15 +32,18 @@ Flow: work on `develop`, PR to `main` (protected: PR + `ci` check), merge to shi
   mouse/trackpad/touch instructions.
 - [x] 0.9.3: First-visit welcome, explicit Terms acceptance, independent optional
   analytics consent and prominent tutorial handoff.
-- [ ] 0.9.3: Viewport/input/consent regressions, version bump, PR and CI.
+- [x] 0.9.3: 97 frontend tests, focused welcome/tutorial and four real online checks; PR #30 merged, required CI and deployment passed.
 
 ## Follow-up 0.9.4
-- [ ] Detect clear legal pot lines after cue-ball placement and offer helpful camera framing that yields to manual input.
-- [ ] Research rare off-table ball physics and official tournament versus house/bar rules; implement consistent frontend/server outcomes and regression fixtures.
-- [ ] Show the signed-in username prominently and make account settings easy to reach.
-- [ ] Refine the input-profile selector above legal controls and rename page/version branding to Pool Simulator.
-- [ ] Winner dialog with correct player identity, reduced-motion-aware confetti and mode-specific replay action.
-- [ ] Separate version bump, validation and develop → main PR after 0.9.3.
+- [x] Detect clear legal pot lines after cue-ball placement and offer helpful camera framing that yields to manual input.
+- [x] Research rare off-table ball physics and official tournament versus house/bar rules; implement consistent frontend/server outcomes and regression fixtures.
+- [x] Show the signed-in username prominently and make account settings easy to reach.
+- [x] Refine the input-profile selector above legal controls and rename page/version branding to Pool Simulator.
+- [x] Winner dialog with correct player identity, reduced-motion-aware confetti and mode-specific replay action.
+- [x] Correct tutorial shot controls for each active pointer interface.
+- [x] Animated denarius toss chooses the breaker once for all new game modes.
+- [x] Immediate human Jev shot playback with authoritative final-state reconciliation.
+- [ ] Final integrated browser/online validation and develop → main PR.
 
 ## Stack (locked)
 - Frontend: Vite + TS + Three.js (WebGL2 baseline, WebGPU path later), custom 2D+spin sim
@@ -90,7 +93,9 @@ Flow: work on `develop`, PR to `main` (protected: PR + `ci` check), merge to shi
 - Tourny is a tournament-inspired preset: call every scoring shot, normal
   scratch anywhere, break scratch in kitchen, 8 on break respots. This is not
   a claim of complete WPA officiating: illegal breaks automatically rerack for
-  the opponent and off-table objects respot; no referee choice flow is modeled.
+  the opponent and break-foul placement is automatic; no referee choice flow is modeled.
+  Since 0.9.4, ordinary off-table objects remain out, the eight off on the break
+  is spotted, and the eight off during regular play loses.
 - Pre-shot group membership decides whether the shooter was legally on the 8;
   pocketing the final group ball and 8 in the same stroke is an early-8 loss.
 - Flight uses a rigid impulse/restitution approximation (slate restitution .5,
