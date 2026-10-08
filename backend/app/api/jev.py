@@ -386,7 +386,7 @@ async def play_turn(
             if not options:
                 raise HTTPException(409, "No legal shot plan. Resume your game.")
             s = options[0]
-            source = "geometry"
+            source = "planner"
             if len(options) > 1 and not gs.break_shot:
                 source = "cpu-fallback"
                 try:
