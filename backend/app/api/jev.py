@@ -1,7 +1,6 @@
 """Authenticated, server-owned daily Jev games and private cost accounting."""
 
 import asyncio
-import ipaddress
 import json
 import math
 import os
@@ -20,7 +19,7 @@ from sqlalchemy.exc import IntegrityError
 from app.api.privacy import require_terms
 from app.models.db import JevGame, JevUsage, Session
 from app.net.rooms import Room
-from app.services.auth import current_account, digest, mutation_guard, rate_limit
+from app.services.auth import current_account, mutation_guard
 from app.services.matches import ensure_jev_match, record_shot_in_session
 from app.sim import opening
 from app.sim.config import match_config
@@ -41,6 +40,7 @@ from app.sim.rules import (
 router = APIRouter(prefix="/opponents/jev")
 MODEL = "jev-1.13.0"
 active_games: set[str] = set()
+FREE_DAILY_GAMES = 5
 
 
 @dataclass
@@ -101,17 +101,6 @@ def require_account(request: Request) -> dict:
     return account
 
 
-def network_key(request):
-    ip = request.client.host if request.client else "unknown"
-    try:
-        address = ipaddress.ip_address(ip)
-        if address.version == 6:
-            ip = str(ipaddress.ip_network(f"{ip}/64", strict=False))
-    except ValueError:
-        pass
-    return digest("jev-network:" + ip)
-
-
 def decode(raw):
     state = json.loads(raw)
     state["balls"] = [Ball(**ball) for ball in state["balls"]]
@@ -129,16 +118,12 @@ def public_game(game, premium=False, *, created=False):
         "created": created,
         "state": state,
         "status": game.status,
-        "expiresAt": None if premium or game.day is None else (game.day + 1) * 86400,
+        "expiresAt": None,
     }
 
 
 def resumable_game(db, account, day):
-    query = select(JevGame).where(JevGame.account_id == account["id"])
-    if account["premium"]:
-        query = query.where(JevGame.status == "active")
-    else:
-        query = query.where(JevGame.day == day)
+    query = select(JevGame).where(JevGame.account_id == account["id"], JevGame.status == "active")
     return db.scalar(query.order_by(JevGame.started_at.desc(), JevGame.id.desc()).limit(1))
 
 
@@ -148,9 +133,13 @@ def availability(request: Request, response: Response, account: dict = Depends(r
     day = int(time.time()) // 86400
     with Session() as db:
         game = resumable_game(db, account, day)
-        network_used = db.scalar(
-            select(JevGame.id).where(
-                JevGame.network_hash == network_key(request), JevGame.day == day
+        used = db.scalar(
+            select(func.count())
+            .select_from(JevGame)
+            .where(
+                JevGame.account_id == account["id"],
+                JevGame.day == day,
+                JevGame.daily_slot.is_not(None),
             )
         )
         total = db.get(JevUsage, account["id"])
@@ -160,9 +149,7 @@ def availability(request: Request, response: Response, account: dict = Depends(r
             "game": public_game(game, account["premium"]) if game else None,
             "usage": {
                 "unlimited": account["premium"],
-                "gamesRemaining": None
-                if account["premium"]
-                else int(game is None and network_used is None),
+                "gamesRemaining": None if account["premium"] else max(0, FREE_DAILY_GAMES - used),
                 "resetsAt": None if account["premium"] else (day + 1) * 86400,
                 "attempts": total.attempts if total else 0,
                 "completed": total.completed if total else 0,
@@ -180,38 +167,35 @@ async def start_game(
     day = now // 86400
     premium = account["premium"]
     fresh = payload is not None and payload.new_game
-    if fresh and not premium:
-        raise HTTPException(403, "Starting another Jev game requires Premium.")
-    # A short request throttle is independent of the daily game allowance.
-    rate_limit("jev-start", account["id"] if premium else network_key(request), 10, 60)
     with Session.begin() as db:
         existing = resumable_game(db, account, day)
-        if existing:
-            if fresh:
-                if existing.id in active_games:
-                    raise HTTPException(409, "Wait for your current shot to finish.")
-                ledger = ensure_jev_match(db, existing)
-                ledger.status, ledger.ended_at, ledger.ended_by = "abandoned", now, 0
-                existing.status = "abandoned"
-                existing.updated_at = now
-            elif existing.status == "active":
-                return public_game(existing, premium)
-            else:
-                raise HTTPException(
-                    429, "Your daily Jev game is finished. Try CPU or return tomorrow (UTC)."
+        if existing and existing.status == "active" and not fresh:
+            return public_game(existing, premium)
+        slot = None
+        if not premium:
+            used = db.scalar(
+                select(func.count())
+                .select_from(JevGame)
+                .where(
+                    JevGame.account_id == account["id"],
+                    JevGame.day == day,
+                    JevGame.daily_slot.is_not(None),
                 )
-        if not premium and db.scalar(
-            select(JevGame.id).where(
-                JevGame.network_hash == network_key(request), JevGame.day == day
             )
-        ):
-            raise HTTPException(
-                429, "This network has used today's Jev game. Try CPU or return tomorrow (UTC)."
-            )
-        # Hard admission guard, independent of optional analytics or account creation.
-        count = db.scalar(select(func.count()).select_from(JevGame).where(JevGame.day == day))
-        if not premium and count >= 100:
-            raise HTTPException(429, "Today's Jev capacity is full. CPU remains available.")
+            if used >= FREE_DAILY_GAMES:
+                raise HTTPException(
+                    429,
+                    "You've used your five free Jev games today. "
+                    "Try CPU or return after midnight UTC.",
+                )
+            slot = used + 1
+        if existing and existing.status == "active":
+            if existing.id in active_games:
+                raise HTTPException(409, "Wait for your current shot to finish.")
+            ledger = ensure_jev_match(db, existing)
+            ledger.status, ledger.ended_at, ledger.ended_by = "abandoned", now, 0
+            existing.status = "abandoned"
+            existing.updated_at = now
         state = new_game(
             secrets.randbelow(2**30),
             payload.rules.model_dump() if payload and payload.rules else None,
@@ -222,7 +206,8 @@ async def start_game(
             id=secrets.token_hex(16),
             account_id=account["id"],
             day=None if premium else day,
-            network_hash=network_key(request),
+            daily_slot=slot,
+            network_hash="",
             started_at=now,
             updated_at=now,
             state=json.dumps(asdict(state)),
@@ -234,7 +219,7 @@ async def start_game(
             db.flush()
         except IntegrityError:
             raise HTTPException(
-                409, "A daily game was already started. Refresh to resume."
+                409, "Another game was just started. Retry to refresh your allowance."
             ) from None
         ensure_jev_match(db, game, historical=False)
         return public_game(game, premium, created=True)
@@ -418,17 +403,14 @@ async def evaluate(payload: Selection, key: str) -> Evaluation:
 async def play_turn(
     game_id: str, payload: Turn, request: Request, account: dict = Depends(require_account)
 ):
-    rate_limit("jev-turn", account["id"], 30, 60)
     if game_id in active_games or len(active_games) >= 4:
         raise HTTPException(409, "Game is busy. Resume after this shot.")
     with Session() as db:
         record = db.get(JevGame, game_id)
         if record is None or record.account_id != account["id"]:
             raise HTTPException(404, "Game not found.")
-        if record.status != "active" or (
-            not account["premium"] and record.day != int(time.time()) // 86400
-        ):
-            raise HTTPException(409, "This daily game has ended.")
+        if record.status != "active":
+            raise HTTPException(409, "This game has ended.")
         if payload.revision != record.revision:
             raise HTTPException(409, "Table changed. Resume your game.")
         gs = decode(record.state)
@@ -461,7 +443,6 @@ async def play_turn(
             if len(options) > 1 and not gs.break_shot:
                 source = "cpu-fallback"
                 try:
-                    rate_limit("jev-global", "all", 1000, 86400)
                     with Session.begin() as db:
                         total = db.get(JevUsage, account["id"])
                         if total is None:

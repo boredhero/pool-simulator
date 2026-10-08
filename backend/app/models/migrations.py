@@ -61,3 +61,23 @@ def upgrade_match_modes(connection) -> None:
             "game_matches",
             Column("shot_stats_complete", Boolean, nullable=False, server_default="1"),
         )
+
+
+def upgrade_jev_allowance(connection) -> None:
+    """Replace legacy limits once; saved games and cost history remain intact."""
+    if "daily_slot" in {c["name"] for c in inspect(connection).get_columns("jev_games")}:
+        return
+    op = Operations(MigrationContext.configure(connection))
+    constraints = inspect(connection).get_unique_constraints("jev_games")
+    with op.batch_alter_table(
+        "jev_games",
+        naming_convention={"uq": "uq_%(table_name)s_%(column_0_name)s_%(column_1_name)s"},
+    ) as batch:
+        batch.add_column(Column("daily_slot", Integer, nullable=True))
+        for constraint in constraints:
+            columns = constraint["column_names"]
+            if columns in (["account_id", "day"], ["network_hash", "day"]):
+                name = constraint["name"] or f"uq_jev_games_{columns[0]}_{columns[1]}"
+                batch.drop_constraint(name, type_="unique")
+        batch.create_unique_constraint("uq_jev_daily_slot", ["account_id", "day", "daily_slot"])
+    # Existing rows have no slot: the new five-game allowance starts unused.

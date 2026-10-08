@@ -53,10 +53,16 @@ def init_db() -> None:
         except FileExistsError:
             pass
     Base.metadata.create_all(engine)
-    from app.models.migrations import upgrade_match_modes, upgrade_premium, upgrade_terms
+    from app.models.migrations import (
+        upgrade_jev_allowance,
+        upgrade_match_modes,
+        upgrade_premium,
+        upgrade_terms,
+    )
 
     with engine.begin() as connection:
         upgrade_premium(connection)
+        upgrade_jev_allowance(connection)
         upgrade_terms(connection)
         upgrade_match_modes(connection)
         from app.services.matches import backfill_jev_matches
@@ -149,13 +155,13 @@ class JevUsage(Base):
 class JevGame(Base):
     __tablename__ = "jev_games"
     __table_args__ = (
-        UniqueConstraint("account_id", "day"),
-        UniqueConstraint("network_hash", "day"),
+        UniqueConstraint("account_id", "day", "daily_slot", name="uq_jev_daily_slot"),
     )
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
     account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), index=True)
-    # Free allowance day; NULL exempts premium games from the daily unique keys.
+    # Free allowance day; premium games do not consume daily slots.
     day: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    daily_slot: Mapped[int | None] = mapped_column(Integer, nullable=True)
     network_hash: Mapped[str] = mapped_column(String(64), index=True)
     started_at: Mapped[int] = mapped_column(Integer)
     updated_at: Mapped[int] = mapped_column(Integer)

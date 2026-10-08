@@ -57,13 +57,13 @@ def test_guests_and_unaccepted_terms_cannot_use_jev():
     assert client.post("/api/opponents/jev/games", headers=HEADERS, json={}).status_code == 401
 
 
-def test_one_game_per_account_and_network_with_resume():
+def test_free_game_resumes_and_other_accounts_have_independent_allowances():
     game = start()
     assert start()["id"] == game["id"]
-    assert client.get("/api/opponents/jev").json()["usage"]["gamesRemaining"] == 0
+    assert client.get("/api/opponents/jev").json()["usage"]["gamesRemaining"] == 4
     client.cookies.clear()
     register("secondjev")
-    assert client.post("/api/opponents/jev/games", headers=HEADERS, json={}).status_code == 429
+    assert client.post("/api/opponents/jev/games", headers=HEADERS, json={}).status_code == 200
     assert (
         client.post(
             f"/api/opponents/jev/games/{game['id']}/turn",
@@ -92,7 +92,7 @@ def test_server_owns_state_and_rejects_replayed_turns():
     assert start()["state"]["revision"] == 1
     with Session.begin() as db:
         db.get(JevGame, game["id"]).status = "completed"
-    assert client.post("/api/opponents/jev/games", headers=HEADERS, json={}).status_code == 429
+    assert client.post("/api/opponents/jev/games", headers=HEADERS, json={}).status_code == 200
 
 
 def set_cpu_turn(game):

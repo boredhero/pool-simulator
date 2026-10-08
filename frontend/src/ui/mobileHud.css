@@ -77,3 +77,7 @@
   html.touch-input body:not(.tutorial-practice) .control-tray.expanded .actions{flex:none;flex-direction:column}
   #settingspanel,#onlinepanel,#viewpanel,#helppanel{top:8px;max-height:calc(100dvh - 16px)}
 }
+
+@media(max-width:380px) and (pointer:coarse){
+  html.touch-input body:not(.tutorial-practice) .spin-control .control-label{display:none}
+}

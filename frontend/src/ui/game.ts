@@ -585,12 +585,18 @@ export class Game {
     this.el.joinbtn.addEventListener('click', () => this.connectRoom(false));
     document.getElementById('callball')!.addEventListener('change', e => { if(!this.humanCueControls())return;this.calledBall = Number((e.target as HTMLSelectElement).value); this.calledPocket = null; this.hud(); });
     document.getElementById('clearcall')!.addEventListener('click', () => { if(!this.humanCueControls())return;this.calledPocket = null; this.hud(); });
+    const closeNewGame = () => {
+      document.querySelector('.control-tray')!.classList.remove('expanded');
+      document.getElementById('morecontrols')!.setAttribute('aria-expanded','false');
+    };
     this.el.rack.addEventListener('click', () => {
-      if(this.jevGame && this.account?.premium)void this.startJev(true);
+      closeNewGame();
+      if(this.jevGame)void this.startJev(true);
       else this.reset();
     });
     this.el.cpubtn.addEventListener('click', () => {
       if (this.room||this.tutorial.active) return;
+      closeNewGame();
       this.cpuOpponent = this.jevOpponent || !this.cpuOpponent;
       this.jevOpponent = false;
       this.el.jevbtn.classList.remove('on');
@@ -601,13 +607,14 @@ export class Game {
       this.reset();
     });
     this.el.jevbtn.addEventListener('click', () => {
-      if (this.room) return;
+      if (this.room||this.tutorial.active) return;
+      closeNewGame();
       if (!this.account) {
         this.el.opponentstatus.textContent='Sign in to play against Jev AI. CPU is available without an account.';
         document.getElementById('accountbtn')!.click();
         return;
       }
-      void this.startJev();
+      void this.startJev(true);
     });
   }
 
@@ -632,9 +639,9 @@ export class Game {
       this.el.cpubtn.textContent='Play vs CPU';
       this.applyJevState(game.state);
       if(game.created===true)this.coin.queue(this.gs,this.gs.current);
-      this.el.opponentstatus.textContent=game.expiresAt===null
+      this.el.opponentstatus.textContent=this.account?.premium
         ? 'Premium · Unlimited Jev AI · New rack starts another game'
-        : 'Daily Jev game · resets at midnight UTC · select Jev again to continue';
+        : 'Five free Jev games per day · New rack starts another game';
       if(game.created===false&&(Object.keys(requestedRules) as Array<keyof MatchConfig>).some(key=>requestedRules[key]!==game.state.rules[key]))
         this.el.opponentstatus.textContent='Your existing Jev game keeps its original rules.'+(this.account?.premium?' Open Table to start a new Jev game with different rules.':' These rules stay fixed for this game.');
     } catch(error) {
@@ -881,15 +888,15 @@ export class Game {
     const online=!!this.room,jev=!!this.jevGame;
     this.winnerDialog.sync({game:this.gs,name:this.playerName(this.gs.winner),
       detail:this.gs.message.replace(/\bPlayer ([12])\b/g,(_,seat)=>this.playerName(Number(seat)-1)),
-      action:online?'New online session':jev?(this.account?.premium?'Play Jev again':'Play a local rack'):'Play again',
-      note:online?'Start a fresh room and share its new invite with your friend.':jev&&!this.account?.premium?'Your daily Jev game is complete. You can keep playing locally.':''});
+      action:online?'New online session':jev?'Play Jev again':'Play again',
+      note:online?'Start a fresh room and share its new invite with your friend.':jev&&!this.account?.premium?'Five free Jev games per day; your allowance resets at midnight UTC.':''});
   }
 
   private async restartAfterWin():Promise<void> {
     if(this.room){
       this.leaveRoom('Starting a new online session.');
       this.el.onlinepanel.classList.add('open');this.connectRoom(true);
-    } else if(this.jevGame&&this.account?.premium){
+    } else if(this.jevGame){
       const previous=this.jevGame.id;await this.startJev(true);
       if(this.jevGame?.id===previous)throw new Error(this.el.opponentstatus.textContent||'Could not start another Jev game.');
     } else this.reset();
