@@ -21,3 +21,5 @@ body.tutorial-practice #callpanel,body.tutorial-practice #kitchenlabel{display:n
 
 html:not(.touch-input) body.tutorial-practice[data-tutorial-step=shot] .power-control{display:block!important;width:min(290px,calc(100vw - 48px))}
 body.tutorial-practice[data-tutorial-step=shot] .power-control .control-label,body.tutorial-practice[data-tutorial-step=shot] .power-control .control-help{display:block}
+/* Keep tutorial movement controls above the desktop input preference dock. */
+@media(hover:hover) and (pointer:fine){body.tutorial-practice[data-tutorial-step=camera] #camera-fly-hud{bottom:100px}}
