@@ -6,7 +6,7 @@ export interface ShotParams { aim: number; power: number; tipX: number; tipY: nu
 export interface ServerBall { id: number; n: number | null; x: number; y: number; potted: boolean }
 export interface RoomState {
   return_order: number[];
-  names?:string[]; ready?:boolean; registered?:boolean[];
+  names?:string[]; ready?:boolean; busy?:boolean; registered?:boolean[];
   code: string; balls: ServerBall[]; current: number;
   groups: Array<string | null>; open: boolean; ball_in_hand: boolean;
   winner: number | null; message: string;
@@ -56,6 +56,10 @@ export class RoomClient {
       } else if(d.t==='left'){
         this.close();this.onClose(d.message??'Opponent left. Room closed.');
       } else if (d.t === 'error') {
+        if(d.state){
+          this.revision=d.state.revision;this.ready=d.state.ready??true;
+          this.onState({...d.state,message:d.error});
+        }
         this.onError(d.error);
       }
     };

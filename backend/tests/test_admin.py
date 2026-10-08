@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.models.db import Account, AdminAudit, JevGame, JevUsage, LoginSession, Session
+from app.services.terms import terms_version
 
 HEADERS = {"X-Pool-Request": "1"}
 
@@ -17,7 +18,7 @@ def register(name):
             "username": name,
             "password": "a long admin test password",
             "adult": True,
-            "terms_version": "2026-10-08",
+            "terms_version": terms_version(),
             "isAdmin": True,
         },
     )

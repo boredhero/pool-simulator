@@ -20,6 +20,7 @@ from app.api.privacy import require_terms
 from app.models.db import JevGame, JevUsage, Session
 from app.net.rooms import Room
 from app.services.auth import current_account, digest, mutation_guard, rate_limit
+from app.services.matches import ensure_jev_match, record_shot_in_session
 from app.sim import opening
 from app.sim.cue import cue_elevation
 from app.sim.physics import Ball, simulate_shot, strike
@@ -173,6 +174,8 @@ async def start_game(
             if fresh:
                 if existing.id in active_games:
                     raise HTTPException(409, "Wait for your current shot to finish.")
+                ledger = ensure_jev_match(db, existing)
+                ledger.status, ledger.ended_at, ledger.ended_by = "abandoned", now, 0
                 existing.status = "abandoned"
                 existing.updated_at = now
             elif existing.status == "active":
@@ -214,6 +217,7 @@ async def start_game(
             raise HTTPException(
                 409, "A daily game was already started. Refresh to resume."
             ) from None
+        ensure_jev_match(db, game, historical=False)
         return public_game(game, premium, created=True)
 
 
@@ -475,11 +479,33 @@ async def play_turn(
         apply_shot(gs, events)
         with Session.begin() as db:
             game = db.get(JevGame, game_id)
+            ensure_jev_match(db, game)
             game.state = json.dumps(asdict(gs))
             game.revision += 1
             game.updated_at = int(time.time())
             if gs.winner is not None:
                 game.status = "completed"
+            facts = {
+                "potted": events.potted,
+                "off_table": events.off_table,
+                "cue_potted": events.cue_potted,
+                "first_contact": events.first_contact,
+            }
+            foul = (
+                gs.ball_in_hand
+                or gs.message.startswith("Illegal break")
+                or (gs.winner is not None and gs.winner != by)
+            )
+            record_shot_in_session(
+                db,
+                game.id,
+                game.revision,
+                by,
+                {**shot, "vmax": vmax, "elevation": elevation},
+                facts,
+                gs.winner,
+                foul,
+            )
             result = public_game(game, account["premium"])
         return {
             **result,

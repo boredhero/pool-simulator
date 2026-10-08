@@ -1,5 +1,19 @@
 [
   {
+    "version": "1.0.0",
+    "date": "2026-10-08",
+    "title": "Reliable matches and a polished table",
+    "changes": [
+      "Jev wins and losses now appear in account statistics and survive detailed game retention. Statistics refresh when opening your account.",
+      "Terms acceptance stays saved to your account until the agreement text changes. Account controls have clearer checkboxes, spacing and reliable loading states.",
+      "Desktop camera controls sit together near the legal links, with centered icons and spin control. Opponent shots preserve your chosen spin.",
+      "Calling the 8-ball pocket has a clear status prompt and larger selection targets. The win celebration has refined sparkles and a centered 8-ball emblem.",
+      "Mobile HUD uses compact rows to leave more space for the table. Mobile auto-camera frames the cue and relevant shot area more closely; Whole table remains available.",
+      "Online shot rejection restores authoritative state so players can retry. Concurrent simulation limits are enforced before asynchronous work begins.",
+      "Container builds are checked before release, dependencies use committed lockfiles, and unsuccessful deployment health checks fail CI."
+    ]
+  },
+  {
     "version": "0.9.5",
     "date": "2026-10-08",
     "title": "A gold coin on the table",

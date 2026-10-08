@@ -1,15 +1,20 @@
-import { chooseEssentialPrivacy, consent, privacyOptedOut, PRIVACY_VERSION, recordPrivacySession, savedPrivacyChoice } from './privacy';
+import { chooseEssentialPrivacy, consent, privacyOptedOut, recordPrivacySession, savedPrivacyChoice } from './privacy';
 import './welcome.css';
+import {acceptTerms,termsStatus,TERMS_VERSION,type TermsStatus} from './terms';
 
 export const WELCOME_KEY='pool:welcome';
-export const WELCOME_VERSION=PRIVACY_VERSION;
-export function needsWelcome():boolean {
-  try {const saved=JSON.parse(localStorage.getItem(WELCOME_KEY)??'null');return saved?.version!==WELCOME_VERSION||saved.accepted!==true;}catch{return true;}
+export const WELCOME_VERSION=TERMS_VERSION;
+export function needsWelcome(version=WELCOME_VERSION):boolean {
+  try {const saved=JSON.parse(localStorage.getItem(WELCOME_KEY)??'null');return saved?.version!==version||saved.accepted!==true;}catch{return true;}
 }
 
-/** Browser-local onboarding acknowledgment. Account TermsAcceptance remains server-owned. */
-export function setupWelcome(startTutorial:()=>void):void {
-  if(!needsWelcome()||document.getElementById('welcomedialog'))return;
+/** Local onboarding is content-versioned; signed-in agreements are saved by the server. */
+export async function setupWelcome(startTutorial:()=>void):Promise<void> {
+  if(document.getElementById('welcomedialog'))return;
+  let current:TermsStatus|null=null;
+  try{current=await termsStatus();}catch{/* Offline guests can acknowledge the bundled Terms; account acceptance stays server-owned. */}
+  const version=current?.version??WELCOME_VERSION;
+  if(!needsWelcome(version))return;
   const dialog=document.createElement('dialog');dialog.id='welcomedialog';
   dialog.setAttribute('aria-labelledby','welcometitle');
   dialog.innerHTML=`<form id="welcomeform">
@@ -55,25 +60,35 @@ export function setupWelcome(startTutorial:()=>void):void {
   document.getElementById('privacynotice')!.hidden=true;
   document.getElementById('helppanel')?.classList.remove('open');
   document.getElementById('helpbtn')?.setAttribute('aria-expanded','false');
+  if(current?.authenticated&&current.accepted){
+    agreement.checked=true;agreement.closest('.welcome-choice')!.setAttribute('hidden','');
+  }
   let busy=false;
   const refresh=()=>{primary.disabled=secondary.disabled=busy||!agreement.checked;agreement.disabled=busy;analytics.disabled=busy||privacyOptedOut();profile.disabled=busy;};
-  agreement.addEventListener('change',refresh);
+  agreement.addEventListener('change',refresh);refresh();
   const proceed=async(tutorial:boolean)=>{
     if(busy||!agreement.checked)return;
     busy=true;refresh();get('welcomestatus').textContent='';
     try {
+      if(current?.authenticated){
+        const latest=await termsStatus();
+        if(latest.accountId!==current.accountId||latest.version!==version)throw Error('Your account or the Terms changed. Reload to review the current agreement.');
+        if(current.accepted&&!latest.accepted){current=latest;agreement.checked=false;agreement.closest('.welcome-choice')!.removeAttribute('hidden');throw Error('Please confirm the current Terms for your account.');}
+        if(!latest.accepted)await acceptTerms(version,current.accountId!);
+        current.accepted=true;
+      }
       if(!respectSaved){
         if(analytics.checked&&!privacyOptedOut()){await consent(true);recordPrivacySession();}
         else chooseEssentialPrivacy();
       }
-      // Acceptance is explicit and local; it never substitutes for account/Jev terms.
-      try {localStorage.setItem(WELCOME_KEY,JSON.stringify({version:WELCOME_VERSION,accepted:true}));localStorage.setItem('pool:help-dismissed','1');}catch{/* session works without persistent storage */}
+      // Guest acknowledgment is local; authenticated acceptance was confirmed by the server above.
+      try {localStorage.setItem(WELCOME_KEY,JSON.stringify({version,accepted:true}));localStorage.setItem('pool:help-dismissed','1');}catch{/* session works without persistent storage */}
       dialog.close();
       if(tutorial)startTutorial();
       else if(!get('welcomeinvite').hidden)document.getElementById('joinbtn')?.focus();
       else document.getElementById('game-canvas')?.focus();
     } catch(error){
-      get('welcomestatus').textContent=(error instanceof Error?error.message:'Could not save your choice.')+' Try again, or uncheck analytics to continue without it.';
+      get('welcomestatus').textContent=(error instanceof Error?error.message:'Could not save your choice.')+(current?.authenticated&&!current.accepted?' Please try again.':' Try again, or uncheck analytics to continue without it.');
     } finally {busy=false;refresh();}
   };
   get<HTMLFormElement>('welcomeform').addEventListener('submit',event=>{event.preventDefault();void proceed(true);});

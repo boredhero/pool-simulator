@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from app.api import jev
 from app.main import app
 from app.models.db import JevGame, Session, TermsAcceptance
+from app.services.terms import terms_version
 from app.sim.rules import new_game
 
 HEADERS = {"X-Pool-Request": "1"}
@@ -23,7 +24,7 @@ def register(name="jevtester"):
             "username": name,
             "password": "a long test password only",
             "adult": True,
-            "terms_version": "2026-10-08",
+            "terms_version": terms_version(),
         },
     )
     assert response.status_code == 200

@@ -10,7 +10,7 @@ export class WinnerDialog {
   private animationTimer=0;
   constructor(private replay:()=>Promise<void>) {
     this.dialog.id='winnerdialog';this.dialog.setAttribute('aria-labelledby','winnertitle');
-    this.dialog.innerHTML='<div class="winner-confetti" aria-hidden="true"></div><div class="winner-content"><span class="winner-eyebrow">Rack complete</span><div class="winner-eight" aria-hidden="true">8</div><h2 id="winnertitle"></h2><p id="winnerdetail"></p><p id="winnernote"></p><p id="winnerstatus" role="status"></p><div class="winner-actions"><button id="winnerreplay" type="button"></button><button id="winnerclose" type="button">View table</button></div></div>';
+    this.dialog.innerHTML='<div class="winner-confetti" aria-hidden="true"></div><div class="winner-content"><span class="winner-eyebrow">Rack complete</span><div class="winner-eight" aria-hidden="true"><svg viewBox="0 0 40 40" focusable="false"><path d="M20 20C10 20 10 8 20 8C30 8 30 20 20 20C8 20 8 32 20 32C32 32 32 20 20 20" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg></div><h2 id="winnertitle"></h2><p id="winnerdetail"></p><p id="winnernote"></p><p id="winnerstatus" role="status"></p><div class="winner-actions"><button id="winnerreplay" type="button"></button><button id="winnerclose" type="button">View table</button></div></div>';
     document.body.append(this.dialog);
     this.get('winnerclose').addEventListener('click',()=>this.dialog.close());
     this.dialog.addEventListener('keydown',e=>e.stopPropagation());
@@ -43,10 +43,10 @@ export class WinnerDialog {
   private clearConfetti(){clearTimeout(this.animationTimer);this.dialog.querySelector('.winner-confetti')!.replaceChildren();}
   private celebrate(){
     this.clearConfetti();if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
-    const box=this.dialog.querySelector('.winner-confetti')!;
-    for(let i=0;i<38;i++){
-      const piece=document.createElement('i');piece.style.cssText=`--x:${(i*37)%100}%;--delay:${(i%9)*.055}s;--turn:${i%2?360:-300}deg;--color:${['#eac77b','#b6d8a0','#f4e7c6','#94cacc'][i%4]}`;box.append(piece);
+    const box=this.dialog.querySelector<HTMLElement>('.winner-confetti')!;box.style.setProperty('--fall',`${this.dialog.clientHeight+40}px`);
+    for(let i=0;i<56;i++){
+      const piece=document.createElement('i');piece.className=i<12?'winner-spark':'winner-ribbon';piece.style.cssText=`--x:${(i*37)%100}%;--y:${18+(i*13)%38}%;--delay:${(i%9)*.06}s;--drift:${(i%2?1:-1)*(18+i%35)}px;--size:${5+i%5}px;--turn:${i%2?420:-360}deg;--color:${['#efcc7e','#b6d8a0','#fff0c8','#94cacc'][i%4]}`;box.append(piece);
     }
-    this.animationTimer=window.setTimeout(()=>this.clearConfetti(),2800);
+    this.animationTimer=window.setTimeout(()=>this.clearConfetti(),3200);
   }
 }

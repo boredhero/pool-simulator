@@ -842,6 +842,9 @@ test('practice touch aiming and profile-specific coaching use real controls',asy
   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
   await expect(page.locator('#tutorialprogress')).toHaveText('Control worked');
   expect(await page.evaluate(()=>(window as any).__pool.mode)).toBe('aim');
+  // Chromium suppresses a synthetic tap immediately after this raw CDP drag.
+  // Finish its gesture window before testing a separate, real Next tap.
+  await page.waitForTimeout(500);
   await touchPracticeControl(page,'#tutorialnext');await expect(page.locator('#tutorial')).toHaveAttribute('data-step','spin');await touchPracticeControl(page,'#tutorialnext');
   await expect(page.locator('#tutorialbody')).toContainText('two fingers');
   await cdp.send('Emulation.setTouchEmulationEnabled',{enabled:false});
@@ -904,4 +907,34 @@ test('practice shot controls follow actual pointer interface and trackpad profil
   await expect(page.locator('#tutorial')).toHaveAttribute('data-profile','trackpad');
   await expect(page.locator('.power-control')).toHaveClass(/tutorial-focus/);
   await pullPracticeShot(page);await expect(page.locator('#tutorialprogress')).toHaveText('Control worked');
+});
+
+for(const pointer of ['mouse','touch'] as const)test(`${pointer} selects the 8-ball pocket through black center or rim without shooting`,async({page,context})=>{
+  await page.setViewportSize(pointer==='touch'?{width:390,height:844}:{width:1280,height:800});await openGame(page);
+  if(await page.locator('#privacynotice').isVisible())await page.locator('#privacyessential').click();
+  if(await page.locator('#helppanel').isVisible())await page.locator('#closehelp').click();
+  const cdp=pointer==='touch'?await context.newCDPSession(page):null;
+  if(cdp)await cdp.send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:5});
+  for(const rim of [false,true]){
+    const point=await page.evaluate(rim=>{
+      const g=(window as any).__pool;g.cancelOpponent();g.cpuOpponent=false;g.gs.current=0;g.gs.winner=null;g.gs.open=false;g.gs.breakShot=false;
+      g.gs.groups=['solid','stripe'];g.gs.rules.calls='eight';for(const b of g.gs.balls)if(b.n>=1&&b.n<=7)b.potted=true;
+      g.mode='aim';g.calledBall=8;g.calledPocket=null;g.scene.cameraRig.cancel(true);g.hud();
+      const camera=g.scene.controls.object;camera.updateMatrixWorld();const r=g.scene.renderer.domElement.getBoundingClientRect();
+      const pockets=[[-.0287,-.0287],[1.27,-.066],[2.5687,-.0287],[-.0287,1.2987],[1.27,1.336],[2.5687,1.2987]];
+      for(let index=0;index<pockets.length;index++){
+        const [x,y]=pockets[index];const p=camera.position.clone().set(x-1.27,.04,y-.635);
+        if(rim)p.add(camera.position.clone().set(1,0,0).applyQuaternion(camera.quaternion).multiplyScalar(.085));
+        p.project(camera);const px=r.left+(p.x+1)*r.width/2,py=r.top+(1-p.y)*r.height/2;
+        if(document.elementFromPoint(px,py)?.id==='game-canvas'&&g.scene.pickPocket(px,py)===index)return{x:px,y:py,index};
+      }throw Error('No unobscured pocket target');
+    },rim);
+    await expect(page.locator('#msg')).toContainText('Select a pocket for the 8 ball');
+    if(cdp){await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:point.x,y:point.y,id:1}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});}
+    else await page.mouse.click(point.x,point.y);
+    expect(await page.evaluate(()=>{const g=(window as any).__pool;return{pocket:g.calledPocket,mode:g.mode,pulling:g.pulling,shot:g.gs.shot??null};})).toEqual({pocket:point.index,mode:'aim',pulling:false,shot:null});
+    await expect(page.locator('#msg')).not.toContainText('Select a pocket');
+  }
+  await page.evaluate(()=>{const g=(window as any).__pool;g.calledPocket=null;g.cpuOpponent=true;g.gs.current=1;g.hud();});
+  await expect(page.locator('#msg')).not.toContainText('Select a pocket');
 });

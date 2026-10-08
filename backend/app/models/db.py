@@ -53,10 +53,15 @@ def init_db() -> None:
         except FileExistsError:
             pass
     Base.metadata.create_all(engine)
-    from app.models.migrations import upgrade_premium
+    from app.models.migrations import upgrade_match_modes, upgrade_premium, upgrade_terms
 
     with engine.begin() as connection:
         upgrade_premium(connection)
+        upgrade_terms(connection)
+        upgrade_match_modes(connection)
+        from app.services.matches import backfill_jev_matches
+
+        backfill_jev_matches(connection)
 
 
 class Account(Base):
@@ -98,6 +103,8 @@ class GameMatch(Base):
     __tablename__ = "game_matches"
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
     status: Mapped[str] = mapped_column(String(16), default="active", index=True)
+    mode: Mapped[str] = mapped_column(String(16), default="online", server_default="online")
+    shot_stats_complete: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")
     ruleset: Mapped[str] = mapped_column(String(32), default="eight-ball:2")
     rules: Mapped[str] = mapped_column(Text)
     game_version: Mapped[str] = mapped_column(String(32))
@@ -167,7 +174,7 @@ class JevGame(Base):
 class TermsAcceptance(Base):
     __tablename__ = "terms_acceptances"
     account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), primary_key=True)
-    version: Mapped[str] = mapped_column(String(32))
+    version: Mapped[str] = mapped_column(String(64))
     accepted_at: Mapped[int] = mapped_column(Integer)
 
 

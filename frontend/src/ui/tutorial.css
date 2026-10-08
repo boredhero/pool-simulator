@@ -14,7 +14,7 @@ body.tutorial-practice[data-tutorial-step=aim] .control-tray,body.tutorial-pract
 body.tutorial-practice[data-tutorial-step=spin] #spincontrols{display:flex!important}
 html.touch-input body.tutorial-practice[data-tutorial-step=shot] .touch-shot{display:grid!important;width:min(290px,calc(100vw - 48px))}
 body.tutorial-practice:not([data-tutorial-step=camera]) #camera-fly-hud{display:none!important}
-body.tutorial-practice[data-tutorial-step=camera] #camera-fly-hud{bottom:100px}
+body.tutorial-practice[data-tutorial-step=camera] #camera-fly-hud{bottom:122px}
 body.tutorial-practice #callpanel,body.tutorial-practice #kitchenlabel{display:none!important}
 @media(max-width:420px){body.tutorial-practice #tutorial{font-size:13px;padding:6px 9px}body.tutorial-practice #tutorialtitle{font-size:14px}}
 @media(max-height:500px){body.tutorial-practice #tutorial{font-size:12px;padding:4px 8px;max-width:540px}body.tutorial-practice #tutorial header,body.tutorial-practice #tutorialclose{min-height:28px;height:28px}body.tutorial-practice #tutorial footer button{min-height:28px;height:28px}body.tutorial-practice #tutorialbody{margin:1px 0 3px}body.tutorial-practice .control-tray{padding:4px 8px}}

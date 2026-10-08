@@ -1,5 +1,6 @@
 import {CoinToss,randomBreaker} from './coinToss';
 import {placementLane} from './placementCamera';
+import {mobileShotFocus} from './mobileShotFocus';
 import type { PerspectiveCamera } from 'three';
 import { WinnerDialog } from './winner';
 import { animateOpponentCue, cuePresentation, freezeShot, type SelectedShot, type CuePhase } from './opponentCue';
@@ -71,6 +72,7 @@ export class Game {
   power = 0.5; // last fired power (drives cue rest offset)
   tipX = 0; tipY = 0;
   roomNames: string[] | null = null;
+  private roomNotice = 'No room connected';
   ev: ShotEvents = freshEv();
   contact = { v: false };
   el: Record<string, HTMLElement>;
@@ -134,7 +136,8 @@ export class Game {
     if(invitation&&/^[A-Z2-9]{8}$/i.test(invitation)){
       (this.el.rcode as HTMLInputElement).value=invitation.toUpperCase();
       this.el.onlinepanel.classList.add('open');document.getElementById('helppanel')!.classList.remove('open');
-      this.el.roominfo.textContent='You are invited. Choose a name and join—no account needed.';
+      this.roomNotice='You are invited. Choose a name and join—no account needed.';
+      this.el.roominfo.textContent=this.roomNotice;
     }
     new ResizeObserver(entries => {
       const bar = entries[0].target.getBoundingClientRect();
@@ -351,8 +354,17 @@ export class Game {
   private pendingPlacementCamera:{revision:number;seat:number;room:RoomClient;x:number;y:number}|null=null;
 
   frameBalls(whole=false,placement=false): void {
+    if(placement&&(this.tutorial.active||!this.options.autoCamera||this.cameraMode||this.scene.cameraRig.interacting))return;
+    if(!whole&&!this.tutorial.active&&this.scene.renderer.domElement.getBoundingClientRect().width<900){
+      const focus=mobileShotFocus(this.gs,this.calledBall,this.calledPocket);
+      if(focus){
+        const facing=this.scene.cameraRig.frame(focus.points,focus.cue,[],focus.theta);
+        if(!placement&&facing!==undefined&&this.humanTurn()&&!this.pulling)
+          this.targetAngle=Math.atan2(-Math.cos(facing),-Math.sin(facing));
+        return;
+      }
+    }
     if(placement){
-      if(this.tutorial.active||!this.options.autoCamera||this.cameraMode||this.scene.cameraRig.interacting)return;
       const lane=placementLane(this.gs);
       if(lane){this.scene.cameraRig.frame([lane.cue,lane.ghost,lane.object,lane.pocket],lane.cue,[],lane.theta);return;}
     }
@@ -426,17 +438,17 @@ export class Game {
       if(this.cameraGesture)return;
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       if(!this.humanCueControls())return;
+      if(this.mode==='aim'&&this.humanTurn()&&callRequired(this.gs)&&this.calledPocket===null){
+        const pocket=this.scene.pickPocket(e.clientX,e.clientY);
+        if(pocket!==null){this.calledPocket=pocket;this.hud();}
+        // The whole gesture selects a destination; it can never start a pull or shot.
+        this.touchAim=false;this.pulling=false;this.pressPt=null;return;
+      }
       const p = this.scene.pickFelt(e.clientX, e.clientY);
       if (!p) return;
       if (this.mode === 'place') {
         this.placeX = p[0]; this.placeY = p[1];
         this.placementPress=[e.clientX,e.clientY];
-        return;
-      }
-      if (this.humanTurn() && callRequired(this.gs) && this.calledPocket === null) {
-        const distances = POCKETS.map(q => Math.hypot(q.x - p[0], q.y - p[1]));
-        const pocket = distances.indexOf(Math.min(...distances));
-        if (distances[pocket] < .20) { this.calledPocket = pocket; this.hud(); }
         return;
       }
       if (this.mode === 'aim' && !this.cue().potted) {
@@ -651,9 +663,8 @@ export class Game {
         this.gs.ballInHand=false;this.mode='aim';
         this.angle=this.targetAngle=selected.aim;
         this.calledBall=selected.calledBall;this.calledPocket=selected.calledPocket;
-        this.setSpin(selected.tipX,selected.tipY,true);
         this.jevPlayback=true;
-        try {this.fire(selected.power,selected.vmax,selected.elevation);} finally {this.jevPlayback=false;}
+        try {this.fire(selected.power,selected.vmax,selected.elevation,selected);} finally {this.jevPlayback=false;}
       }
       this.pendingNetwork.push(()=>{if(valid())this.applyJevState(result.state);});
       this.el.opponentstatus.textContent=result.source==='jev'?`Jev AI selected a ${result.family??'planned'} shot`:
@@ -671,7 +682,7 @@ export class Game {
     }
   }
 
-  fire(power: number, vmax = this.gs.breakShot ? this.gs.rules.breakMax : this.gs.rules.normalMax, authoritativeElevation?:number): void {
+  fire(power: number, vmax = this.gs.breakShot ? this.gs.rules.breakMax : this.gs.rules.normalMax, authoritativeElevation?:number, shotSpin?:{tipX:number;tipY:number}): void {
     if (!this.canShoot() || (this.tutorial.active&&this.tutorial.action!=='shot')) return;
     document.querySelector('.hint')?.classList.add('gone');
     try { localStorage.setItem('pool:seen', '1'); } catch { /* private mode */ }
@@ -684,11 +695,12 @@ export class Game {
     this.targetAngle=this.angle;
     if(this.jevGame && !this.jevPlayback){void this.playJevTurn(power);return;}
     this.power = power;
+    const {tipX,tipY}=shotSpin??this;
     const elevation = authoritativeElevation??cueElevation(c.x, c.y, this.angle, 0, this.gs.balls);
     beginShot(this.gs, this.calledBall, this.calledPocket);
-    const params = { aim: this.angle, power, tipX: this.tipX, tipY: this.tipY, vmax, elevation, calledBall: this.calledBall, calledPocket: this.calledPocket };
+    const params = { aim: this.angle, power, tipX, tipY, vmax, elevation, calledBall: this.calledBall, calledPocket: this.calledPocket };
     if(!this.cpuOpponent||this.gs.current===0)this.tutorial.record('shot');
-    strike(c, Math.cos(this.angle), Math.sin(this.angle), power, this.tipX, this.tipY, vmax, elevation);
+    strike(c, Math.cos(this.angle), Math.sin(this.angle), power, tipX, tipY, vmax, elevation);
     this.ev = freshEv();
     this.contact = { v: false };
     this.whoShot = this.seat;
@@ -716,9 +728,8 @@ export class Game {
       if(state.ballInHand&&!placeCue(state,selected.placement.x,selected.placement.y))return;
       this.opponentAction=null;this.mode='aim';
       this.angle=this.targetAngle=selected.aim;this.power=selected.power;
-      this.setSpin(selected.tipX,selected.tipY,true);
       this.calledBall=selected.calledBall;this.calledPocket=selected.calledPocket;
-      this.fire(selected.power);
+      this.fire(selected.power,undefined,undefined,selected);
     } finally {if(this.opponentAction===action)this.opponentAction=null;}
   }
 
@@ -734,7 +745,7 @@ export class Game {
     const fdt = this.lastFrame ? Math.min((fnow - this.lastFrame) / 1000, 0.1) : 0.016;
     this.lastFrame = fnow;
     this.coin.update(this.gs,fdt,this.tutorial.active||document.hidden||!!document.querySelector('dialog[open]'),[this.playerName(0),this.playerName(1)]);
-    if(this.coin.status!==this.lastCoinStatus){this.lastCoinStatus=this.coin.status;this.hud();}
+    if(this.coin.status!==this.lastCoinStatus||(this.coinPending()&&this.coin.status&&this.el.msg.textContent!==this.coin.status)){this.lastCoinStatus=this.coin.status;this.hud();}
     let ballDt = fdt;
     for (const b of this.gs.balls) {
       if (b.potted) continue;
@@ -882,10 +893,16 @@ export class Game {
     else if (this.mode === 'wait' && this.room) msg += ' — waiting…';
     else if (this.room && this.seat !== null && this.seat !== this.gs.current && this.mode === 'aim') msg += ' — opponent aiming…';
     if(msg.startsWith('Illegal break'))msg += ' · no ball pocketed and fewer than four object balls reached a rail';
+    if(this.mode==='aim'&&this.humanTurn()&&callRequired(this.gs)&&this.calledPocket===null){
+      const targets=legalTargets(this.gs);
+      const ball=targets.includes(this.calledBall??-1)?this.calledBall:targets[0];
+      const prompt=ball===8?'Select a pocket for the 8 ball':`Select a pocket for ball ${ball}`;
+      msg=`${prompt} · ${msg}`;
+    }
     this.el.msg.textContent = (this.coinPending()&&this.coin.status?this.coin.status:msg).replace(/\bPlayer ([12])\b/g,(_,seat)=>this.playerName(Number(seat)-1));
     this.el.turn.textContent = this.gs.winner !== null ? 'Game over' : this.playerName(this.gs.current);
     this.el.turn.classList.toggle('me', !this.room || this.seat === this.gs.current);
-    this.el.roominfo.textContent = this.room ? (this.room.code ? `Room ${this.room.code} · ${this.room.ready?'Connected · your seat '+((this.seat??0)+1):'Waiting for your friend'}`:'Connecting…') : 'No room connected';
+    this.el.roominfo.textContent = this.room ? (this.room.code ? `Room ${this.room.code} · ${this.room.ready?'Connected · your seat '+((this.seat??0)+1):'Waiting for your friend'}`:'Connecting…') : this.roomNotice;
     if(this.room&&!this.room.ready)this.el.msg.textContent='Waiting for your friend · open Online to share the invite link';
     document.getElementById('roomentry')!.hidden=!!this.room;
     document.getElementById('roomsharing')!.hidden=!this.room?.code;
@@ -987,7 +1004,7 @@ export class Game {
     this.gs.ballInHand = s.ball_in_hand;
     this.gs.winner = s.winner === 1 ? 1 : s.winner === 0 ? 0 : null;
     this.gs.message = s.message;
-    this.mode = s.winner !== null ? 'over' : s.ball_in_hand && s.current === this.seat ? 'place' : 'aim';
+    this.mode = s.winner !== null ? 'over' : s.busy ? 'wait' : s.ball_in_hand && s.current === this.seat ? 'place' : 'aim';
     this.pulling = false; this.pressPt = null;
     if(wasPlacing&&!s.ball_in_hand&&s.winner===null&&placementCamera&&placementCamera.room===this.room&&Math.hypot(this.cue().x-placementCamera.x,this.cue().y-placementCamera.y)<.002&&placementCamera.seat===this.seat&&s.current===this.seat&&placementCamera.revision===this.scene.cameraRig.revision)this.frameBalls(false,true);
     const toss=s as RoomState&{break_starter?:number|null};
@@ -1000,6 +1017,7 @@ export class Game {
   }
 
   leaveRoom(message:string):void {
+    this.roomNotice=message;
     this.room?.close();this.room=null;this.seat=null;this.roomNames=null;this.pendingNetwork=[];
     this.jevRequest?.abort();this.jevRequest=null;this.jevOpponent=false;this.el.jevbtn.classList.remove('on');
     this.el.opponentstatus.textContent='';
@@ -1013,7 +1031,8 @@ export class Game {
     const name = ((this.el.pname as HTMLInputElement).value || 'Player').slice(0, 24);
     const code = (this.el.rcode as HTMLInputElement).value.trim().toUpperCase();
     if (!create && !/^[A-Z2-9]{8}$/.test(code)) {
-      this.el.roominfo.textContent = 'Enter an 8-character room code to join.';
+      this.roomNotice='Enter an 8-character room code to join.';
+      this.el.roominfo.textContent=this.roomNotice;
       return;
     }
     this.jevRequest?.abort();this.jevRequest=null;this.jevGame=null;this.jevOpponent=false;

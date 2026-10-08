@@ -10,16 +10,15 @@ after editing `pyproject.toml`.)
 
 ## Workflow
 - Work on `develop`, open a PR to `main`. Direct pushes to `main` are blocked
-  by branch protection (PR + `test` check required).
+  by branch protection (PR + `ci` check required).
 - Backend uses `uv` (`backend/pyproject.toml` + `uv.lock`). Never pipenv here.
-- Ruff is enforced by CI, not by hand: `test.yml` has a dedicated `lint` job
-  (`ruff check` + `ruff format --check` on `backend/`) that runs on every push
-  to any branch and every PR. A lint failure fails fast alongside tests — do
-  not merge red. Config: `select = ["E","F","I","W","UP"]` in
-  `backend/pyproject.toml`. You can still run `uvx ruff check --fix .` in
-  `backend/` locally before pushing to catch it early.
-- Deploy secrets (`DEPLOY_HOST/USER/KEY`) exist; `Build and Deploy` runs only
-  on `main` and skips SSH steps gracefully if secrets are absent.
+- `.github/workflows/ci.yml` runs Ruff, backend tests, frontend tests/build and
+  container builds for PRs. The aggregate `ci` check must pass. Browser tests run
+  separately in `e2e.yml`; run the relevant browser checks for interface changes.
+- Dependencies use frozen uv and npm lockfiles. Frontend type checking is part of
+  the build and is also available through `npm run typecheck`.
+- Only main pushes publish and deploy. Deploy secrets enable SSH deployment;
+  failed health probes must fail CI. Never manually deploy while preparing a PR.
 - Prod: https://pool.martinospizza.dev (nginx on boredhero.dyndns.org →
   127.0.0.1:8000, certbot auto-renew). Container: `~/pool-simulator`.
 

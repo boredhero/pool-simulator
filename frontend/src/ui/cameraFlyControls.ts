@@ -12,7 +12,7 @@ export function setupCameraFly(rig: CameraRig): void {
   toggle.id = 'camera-fly-toggle';
   toggle.setAttribute('aria-label', 'Show camera controls');
   const toggleLabel=document.createElement('span');toggleLabel.className='camera-toggle-label';toggleLabel.textContent='Camera';
-  const chevron=document.createElement('span');chevron.className='camera-toggle-chevron';chevron.textContent='⌃';chevron.setAttribute('aria-hidden','true');
+  const chevron=document.createElement('span');chevron.className='camera-toggle-chevron';chevron.innerHTML='<svg viewBox="0 0 16 16" width="16" height="16" focusable="false"><path d="M4 10 8 6 12 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'; chevron.setAttribute('aria-hidden','true');
   toggle.append(toggleLabel,chevron);
   toggle.title = 'Show camera controls';
   toggle.setAttribute('aria-expanded', 'false');

@@ -8,6 +8,7 @@ from app.main import app
 from app.models.db import GameMatch, MatchPlayer, MatchShot, Session
 from app.net.rooms import Room, lobby
 from app.services.matches import record_shot, start_match
+from app.services.terms import terms_version
 from app.sim.physics import ShotEvents
 from app.sim.rules import apply_shot, begin_shot, new_game
 
@@ -82,8 +83,9 @@ def test_room_rules_revision_and_authoritative_calls():
         room = lobby.get(code)
         assert room.gs.rules["normalMax"] == 4.2
         ws.send_json({"t": "shot", "revision": 1, "shot": {"aim": 0, "power": 0.5}})
-        assert ws.receive_json()["error"] == "stale table state"
-        assert ws.receive_json()["revision"] == 0
+        rejection = ws.receive_json()
+        assert rejection["error"] == "stale table state"
+        assert rejection["state"]["revision"] == 0
         room.gs.break_shot = False
         ws.send_json({"t": "shot", "revision": 0, "shot": {"aim": 0, "power": 0.5}})
         assert ws.receive_json()["error"] == "call a legal ball and pocket"
@@ -121,7 +123,7 @@ def test_registered_identity_and_authoritative_lifetime_stats():
         "/api/account/register",
         headers={"X-Pool-Request": "1"},
         json={
-            "terms_version": "2026-10-08",
+            "terms_version": terms_version(),
             "adult": True,
             "username": "ActualPlayer",
             "password": "long secure pool password",
@@ -221,7 +223,7 @@ def test_casual_forfeit_counts_loss_and_cannot_be_recorded_twice():
         "/api/account/register",
         headers={"X-Pool-Request": "1"},
         json={
-            "terms_version": "2026-10-08",
+            "terms_version": terms_version(),
             "adult": True,
             "username": "ForfeitPlayer",
             "password": secrets.token_urlsafe(24),
@@ -304,3 +306,116 @@ def test_coin_toss_waits_for_opponent_and_broadcasts_one_authoritative_starter(
         assert room.state_msg()["break_starter"] == starter
         assert room.state_msg()["current"] == 1 - starter
         assert calls == [starter]
+
+
+def test_capacity_resync_allows_both_real_socket_clients_to_continue(monkeypatch):
+    with TestClient(app) as client:
+        with client.websocket_connect("/ws") as first, client.websocket_connect("/ws") as second:
+            room = lobby.get(pair(first, second))
+            before = room.state_msg()
+            monkeypatch.setattr(lobby, "simulations", 4)
+            first.send_json({"t": "shot", "revision": 0, "shot": {"aim": 0, "power": 0.2}})
+            rejected = first.receive_json()
+            assert "busy" in rejected["error"]
+            assert rejected["state"]["balls"] == before["balls"]
+            assert rejected["state"]["revision"] == 0 and not rejected["state"]["busy"]
+            assert rejected["state"]["winner"] is None
+            monkeypatch.setattr(lobby, "simulations", 0)
+            first.send_json({"t": "shot", "revision": 0, "shot": {"aim": 0, "power": 0.2}})
+            for socket in (first, second):
+                assert socket.receive_json()["t"] == "shot"
+                result = socket.receive_json()
+                assert result["t"] == "result" and result["revision"] == 1
+            assert lobby.simulations == 0 and not room.busy
+            with Session() as db:
+                assert db.query(MatchShot).count() == 1
+                assert db.query(GameMatch).one().winner_seat is None
+
+
+def test_simulation_slots_reserved_before_broadcast_barrier(monkeypatch):
+    import asyncio
+    import threading
+    from contextlib import ExitStack
+
+    release = threading.Event()
+    reached = threading.Event()
+    entered = []
+    lock = threading.Lock()
+    original = Room.broadcast
+
+    async def broadcast(room, msg, exclude=-1):
+        if msg["t"] == "shot":
+            with lock:
+                entered.append(room.code)
+                if len(entered) == 4:
+                    reached.set()
+            await asyncio.to_thread(release.wait, 5)
+        await original(room, msg, exclude)
+
+    monkeypatch.setattr(Room, "broadcast", broadcast)
+    with ExitStack() as stack:
+        clients = [
+            stack.enter_context(TestClient(app, client=(f"10.0.0.{i}", 1000))) for i in range(5)
+        ]
+        pairs = []
+        for client in clients:
+            first = stack.enter_context(client.websocket_connect("/ws"))
+            second = stack.enter_context(client.websocket_connect("/ws"))
+            room = lobby.get(pair(first, second))
+            pairs.append((first, second, room))
+        try:
+            for first, _, _ in pairs[:4]:
+                first.send_json({"t": "shot", "revision": 0, "shot": {"aim": 0, "power": 0.2}})
+            assert reached.wait(3), (
+                "Four accepted shots must reach the pre-simulation broadcast barrier"
+            )
+            first, _, fifth = pairs[4]
+            first.send_json({"t": "shot", "revision": 0, "shot": {"aim": 0, "power": 0.2}})
+            rejection = first.receive_json()
+            assert "busy" in rejection["error"]
+            assert lobby.simulations == len(entered) == 4
+            assert not fifth.busy and not fifth.started
+            for _, _, room in pairs[:4]:
+                # The worker has not started; even strike must not mutate published state.
+                assert room.gs.balls[0].vx == 0 and room.gs.shot is None
+        finally:
+            release.set()
+        for first, second, _ in pairs[:4]:
+            for socket in (first, second):
+                assert socket.receive_json()["t"] == "shot"
+                assert socket.receive_json()["t"] == "result"
+        assert lobby.simulations == 0
+
+
+def test_busy_rejection_contains_last_completed_table_not_worker_positions(monkeypatch):
+    import threading
+
+    from app.net import rooms
+
+    reached, release = threading.Event(), threading.Event()
+    simulate = rooms.simulate_shot
+
+    def blocked(balls, cue_id):
+        events = simulate(balls, cue_id)
+        reached.set()
+        assert release.wait(5)
+        return events
+
+    monkeypatch.setattr(rooms, "simulate_shot", blocked)
+    with TestClient(app) as client:
+        with client.websocket_connect("/ws") as first, client.websocket_connect("/ws") as second:
+            room = lobby.get(pair(first, second))
+            before = room.state_msg()["balls"]
+            first.send_json({"t": "shot", "revision": 0, "shot": {"aim": 0, "power": 0.2}})
+            assert first.receive_json()["t"] == second.receive_json()["t"] == "shot"
+            try:
+                assert reached.wait(3)
+                second.send_json({"t": "shot", "revision": 0, "shot": {"aim": 0, "power": 0.2}})
+                rejected = second.receive_json()
+                assert rejected["state"]["busy"] and rejected["state"]["revision"] == 0
+                assert rejected["state"]["balls"] == before
+                assert room.gs.shot is None
+            finally:
+                release.set()
+            assert first.receive_json()["revision"] == second.receive_json()["revision"] == 1
+            assert not room.busy and lobby.simulations == 0
