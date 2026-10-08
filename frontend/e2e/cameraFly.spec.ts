@@ -181,7 +181,7 @@ test('camera HUD reveals help on demand and stays clear of shooting',async({page
   await expect(toggle).toHaveAccessibleName('Hide camera controls');
   const box=(await hud.boundingBox())!,tray=(await page.locator('.control-tray').boundingBox())!;
   expect(box.y).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(1024);
-  expect(box.y+box.height).toBeLessThan(tray.y);
+  expect(box.y+box.height<=tray.y||box.x>=tray.x+tray.width||box.x+box.width<=tray.x).toBe(true);
   for(const name of ['Fly camera rise','Fly camera lower','Fly camera turn-left','Fly camera turn-right']) {
     const control=page.getByRole('button',{name,exact:true});await expect(control).toBeInViewport();
     const button=(await control.boundingBox())!;expect(button.height).toBeGreaterThanOrEqual(44);expect(button.width).toBeGreaterThanOrEqual(44);
@@ -209,4 +209,14 @@ test('footer selector stacks above its label and camera chevron and neutral spin
     const offset=await page.locator('#spin').evaluate(element=>{const size=element.getBoundingClientRect(),dot=getComputedStyle(element,'::after'),matrix=new DOMMatrix(dot.transform);return{x:parseFloat(dot.left)+matrix.m41+parseFloat(dot.width)/2-size.width/2,y:parseFloat(dot.top)+matrix.m42+parseFloat(dot.height)/2-size.height/2};});
     expect(Math.abs(offset.x)).toBeLessThan(.1);expect(Math.abs(offset.y)).toBeLessThan(.1);
   }
+});
+
+for(const width of [1024,1440])test(`desktop camera stack uses equal gaps and expands upward at ${width}px`,async({page},testInfo)=>{
+  await page.setViewportSize({width,height:900});
+  const fly=page.locator('#camera-fly-hud'),profile=page.locator('#camera-profile-dock'),legal=page.locator('.legal-links');
+  const first=(await fly.boundingBox())!,middle=(await profile.boundingBox())!,last=(await legal.boundingBox())!;
+  expect(middle.y-first.y-first.height).toBeCloseTo(8,1);expect(last.y-middle.y-middle.height).toBeCloseTo(8,1);
+  await page.locator('#camera-fly-toggle').click();const expanded=(await fly.boundingBox())!,tray=(await page.locator('.control-tray').boundingBox())!;
+  expect(expanded.y).toBeLessThan(first.y);expect(expanded.y+expanded.height).toBeCloseTo(first.y+first.height,1);expect(expanded.x).toBeGreaterThanOrEqual(tray.x+tray.width);
+  expect((await profile.boundingBox())!.y).toBeCloseTo(middle.y,1);await page.screenshot({path:testInfo.outputPath('desktop-camera-stack.png')});
 });

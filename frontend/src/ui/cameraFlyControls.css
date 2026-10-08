@@ -31,3 +31,16 @@
 
 /* Even-sized marker and a relative transform keep neutral spin centered at every size. */
 #spin::after{width:10px;height:10px;margin:0;transform:translate(-50%,-50%)}
+
+#desktop-camera-stack{display:contents}
+@media(min-width:901px) and (hover:hover) and (pointer:fine){
+  #desktop-camera-stack{position:fixed;right:10px;bottom:4px;display:flex;flex-direction:column;align-items:flex-end;gap:8px;z-index:5}
+  #desktop-camera-stack #camera-fly-hud,#desktop-camera-stack #camera-profile-dock,#desktop-camera-stack .legal-links{position:relative;right:auto;bottom:auto}
+  .control-tray{right:160px}
+  body:has(#camera-fly-hud.expanded) .control-tray{right:302px}
+}
+@media(min-width:901px) and (max-width:1200px) and (hover:hover) and (pointer:fine){
+  body:has(#camera-fly-hud.expanded) .control-tray{flex-wrap:wrap;gap:10px}
+  body:has(#camera-fly-hud.expanded) .control-tray .power-control{flex:1;min-width:160px}
+  body:has(#camera-fly-hud.expanded) .control-tray .actions{flex-basis:100%;justify-content:space-between}
+}

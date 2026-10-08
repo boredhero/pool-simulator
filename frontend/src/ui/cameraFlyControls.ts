@@ -42,7 +42,10 @@ export function setupCameraFly(rig: CameraRig): void {
   const profileDock=document.createElement('aside');profileDock.id='camera-profile-dock';profileDock.setAttribute('aria-label','Camera input');
   const profileLabel=document.createElement('label');profileLabel.htmlFor=profile.id;profileLabel.textContent='Controls';
   profileDock.append(profileLabel,profile);
-  document.body.append(hud,profileDock);
+  const desktopStack=document.createElement('div');desktopStack.id='desktop-camera-stack';
+  desktopStack.append(hud,profileDock);
+  const legal=document.querySelector('.legal-links');if(legal)desktopStack.append(legal);
+  document.body.append(desktopStack);
 
   const keys = new Set<string>();
   const vectors: Record<string, [number, number, number, number]> = { KeyW:[1,0,0,0], KeyS:[-1,0,0,0], KeyA:[0,-1,0,0], KeyD:[0,1,0,0], Space:[0,0,1,0], ShiftLeft:[0,0,-1,0], KeyQ:[0,0,0,1], KeyE:[0,0,0,-1] };
