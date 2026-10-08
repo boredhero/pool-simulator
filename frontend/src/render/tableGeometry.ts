@@ -22,10 +22,11 @@ export function bedGeometry(): THREE.BufferGeometry {
   const bed = roundedOutline(-shelf,-shelf,TABLE_W+2*shelf,TABLE_H+2*shelf,CORNER_RADIUS);
   for (const p of POCKETS) {
     const hole = new THREE.Path();
-    hole.absarc(p.x, p.y, p.r, 0, Math.PI * 2, true);
+    // Recess the cut edge beneath the 9 mm leather flange.
+    hole.absarc(p.x, p.y, p.r + .006, 0, Math.PI * 2, true);
     bed.holes.push(hole);
   }
-  const bedGeo = new THREE.ExtrudeGeometry(bed, { depth: 0.04, bevelEnabled: false, curveSegments: 32 });
+  const bedGeo = new THREE.ExtrudeGeometry(bed, { depth: 0.04, bevelEnabled: false, curveSegments: 48 });
   bedGeo.rotateX(Math.PI / 2);
   bedGeo.translate(-TABLE_W / 2, 0, -TABLE_H / 2);
   return bedGeo;

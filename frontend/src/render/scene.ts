@@ -1,3 +1,4 @@
+import { cushionGeometry } from './cushionGeometry';
 import { constrainTableCamera } from './cameraBounds';
 import { createCabinet, returnPosition } from './cabinet';
 import { feltTextures, woodTextures } from './surfaceTextures';
@@ -9,7 +10,7 @@ import { cueElevation } from './cuePose';
 import { createCue } from './cueModel';
 import { createRailSights, type SightStyle } from './railSights';
 import { RAIL_W, CUSHION_W, bedGeometry, surroundGeometry } from './tableGeometry';
-import { BALL_R, POCKETS, TABLE_H, TABLE_W, cushions, jaws } from '../sim/table';
+import { BALL_R, POCKETS, TABLE_H, TABLE_W, cushions } from '../sim/table';
 
 // WPA 9ft visuals. Sim space [0,W]x[0,H] maps to render (x-W/2, z=y-H/2).
 export const toRender = (x: number, y: number): [number, number] => [x - TABLE_W / 2, y - TABLE_H / 2];
@@ -140,7 +141,8 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
     sheenRoughness: 0.82, envMapIntensity: 0.15,
   });
   const bedGeo = bedGeometry();
-  const felt = new THREE.Mesh(bedGeo, feltMat);
+  const pocketLining = new THREE.MeshStandardMaterial({ color: 0x100c09, roughness: 1 });
+  const felt = new THREE.Mesh(bedGeo, [feltMat, pocketLining]);
   felt.receiveShadow = true;
   scene.add(felt);
   const feltPlane = new THREE.PlaneGeometry(TABLE_W + 0.3, TABLE_H + 0.3);
@@ -164,53 +166,12 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
   // Cushion noses use the collision segments, so all six mouths line up.
   // The bed and cushion cloth share textures, finish, and theme updates.
   const cushionMat = feltMat;
-  for (const { x1, y1, x2, y2 } of cushions()) {
-    const alongX = y1 === y2;
-    const [ax, az] = toRender(x1, y1);
-    const [bx, bz] = toRender(x2, y2);
-    const len = Math.hypot(bx - ax, bz - az);
-    const nx = alongX ? 0 : x1 === 0 ? -1 : 1;
-    const nz = alongX ? (y1 === 0 ? -1 : 1) : 0;
-    // Sloped cloth face: the nose is 0.036 m above the bed; the
-    // cushion rises to meet the wooden rail, with clearance under the nose.
-    const profile = new THREE.Shape();
-    profile.moveTo(0, 0.036);
-    profile.lineTo(CUSHION_W, 0.049);
-    profile.lineTo(CUSHION_W, 0.004);
-    profile.lineTo(0.008, 0.012);
-    profile.closePath();
-    const geo = new THREE.ExtrudeGeometry(profile, { depth: len, bevelEnabled: false });
-    // Use meters for cloth UVs, as on the bed, rather than stretching one
-    // texture across the length of each cushion.
-    const positions = geo.getAttribute('position');
-    const clothUV = geo.getAttribute('uv');
-    for (let i = 0; i < positions.count; i++) {
-      const along = positions.getZ(i);
-      const across = positions.getX(i) + positions.getY(i);
-      clothUV.setXY(i, alongX ? along : across, alongX ? across : along);
-    }
-    const rail = new THREE.Mesh(geo, cushionMat);
-    const tangent = new THREE.Vector3(-nz, 0, nx);
-    rail.setRotationFromMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3(nx, 0, nz), new THREE.Vector3(0, 1, 0), tangent));
-    // Choose the endpoint which lets positive local z run along the segment.
-    rail.position.set(tangent.x + tangent.z > 0 ? ax : bx, 0, tangent.x + tangent.z > 0 ? az : bz);
+  for (const cushion of cushions()) {
+    const rail = new THREE.Mesh(cushionGeometry(cushion), cushionMat);
+    rail.name = 'Cloth cushion with integrated jaws';
     rail.castShadow = rail.receiveShadow = true;
     scene.add(rail);
   }
-  const jawList = jaws();
-  const jawGeo = new THREE.CylinderGeometry(1, 1, 1, 32);
-  const jawUV = jawGeo.getAttribute('uv');
-  for (let i = 0; i < jawUV.count; i++) jawUV.setXY(i, jawUV.getX(i) * 2 * Math.PI * 0.021, jawUV.getY(i) * 0.025);
-  const jawMesh = new THREE.InstancedMesh(jawGeo, cushionMat, jawList.length);
-  const jawMatrix = new THREE.Matrix4();
-  jawList.forEach((jaw, i) => {
-    const [x, z] = toRender(jaw.x, jaw.y);
-    jawMatrix.makeScale(jaw.r, 0.025, jaw.r).setPosition(x, 0.026, z);
-    jawMesh.setMatrixAt(i, jawMatrix);
-  });
-  jawMesh.instanceMatrix.needsUpdate = true;
-  jawMesh.castShadow = jawMesh.receiveShadow = true;
-  scene.add(jawMesh);
   const sights = createRailSights();
   scene.add(sights.group);
   // Recessed wells, with open tops and leather lips, remain visible while
@@ -221,15 +182,15 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
   for (const p of POCKETS) {
     const [rx, rz] = toRender(p.x, p.y);
     pocketCenters.push([rx, rz, p.r]);
-    const rim = new THREE.Mesh(new THREE.RingGeometry(p.r, p.r + 0.009, 48), rimMat);
+    const rim = new THREE.Mesh(new THREE.RingGeometry(p.r - .0005, p.r + 0.009, 96), rimMat);
     rim.rotation.x = -Math.PI / 2;
     rim.position.set(rx, 0.001, rz);
     rim.receiveShadow = true;
     scene.add(rim);
-    const well = new THREE.Mesh(new THREE.CylinderGeometry(p.r, p.r * 0.85, 0.075, 48, 1, true), pocketMat);
+    const well = new THREE.Mesh(new THREE.CylinderGeometry(p.r - .0005, p.r - .0005, 0.075, 96, 1, true), pocketMat);
     well.position.set(rx, -0.0375, rz);
     scene.add(well);
-    const bottom = new THREE.Mesh(new THREE.CircleGeometry(p.r * 0.85, 48), pocketMat);
+    const bottom = new THREE.Mesh(new THREE.CircleGeometry(p.r, 96), pocketMat);
     bottom.rotation.x = -Math.PI / 2;
     bottom.position.set(rx, -0.075, rz);
     scene.add(bottom);

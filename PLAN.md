@@ -203,3 +203,14 @@ Flow: work on `develop`, PR to `main` (protected: PR + `ci` check), merge to shi
   extent. Close zoom raises the lowest permitted viewing angle, keeping the
   eye and near-plane corners above the rail tops without changing zoom or yaw.
   The guard runs after orbit damping before drawing, for mouse and touch alike.
+
+## Pocket and return-window seam cleanup
+- Return-channel side walls and ceiling overlap its back and apron edges,
+  closing oblique sight lines through the cabinet around the glass frame.
+- Recessed felt cutouts, dark cut-edge materials and straight pocket liners
+  remove the green ring formerly exposed behind tapered wells.
+- Each cushion is one closed cloth mesh with rounded ends following the shared
+  jaw outlines. Separate intersecting jaw cylinders have been removed. These
+  are visual geometry changes; collision and capture definitions remain shared.
+- Checked close pocket and window views, plus raycast regressions for cushion
+  face orientation, closed return ends and the recessed felt edge.
