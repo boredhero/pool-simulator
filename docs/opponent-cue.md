@@ -3,7 +3,9 @@
 The client presents a selected shot, rather than inventing an animation of the
 model thinking. While CPU/Jev planning is pending, hide the human cue. Once a
 concrete executable shot is known, show its aim, pullback and forward stroke, then
-execute the exact selected shot once. Jev remains server-authoritative: presentation
+execute the exact selected shot once. Latch the submitted shot direction so a
+stale smoothing target or late pointer update cannot rotate the displayed cue
+while the server processes that shot. Jev remains server-authoritative: presentation
 does not select another aim, change power, or affect the stored outcome.
 
 Player aim, spin, power, placement and called-shot controls are unavailable during

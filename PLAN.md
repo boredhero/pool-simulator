@@ -22,9 +22,11 @@ Flow: work on `develop`, PR to `main` (protected: PR + `ci` check), merge to shi
 - [x] 0.9.1: Researched desktop trackpad controls and implemented persisted HUD
   profile, Space/Left Shift height, Q/E rotation, gesture safety and help.
 - [x] 0.9.1: 90 unit tests, camera/native-touch browser regressions, visual
-  review and separate PR #28; final CI checks running.
-- [ ] 0.9.2: Visible opponent cue/aim/stroke, player input lock during opponent
-  turns, cluster shot-power research and implementation, tests and separate PR.
+  review and separate PR #28, merged; CI deployment verified live.
+- [x] 0.9.2: Visible opponent cue/aim/stroke, player input lock during opponent
+  turns, submitted-cue direction regression, cluster shot-power research and
+  implementation, cohesive camera HUD and consistent legal controls.
+- [ ] 0.9.2: Integrated tests, separate release PR and CI checks.
 
 ## Stack (locked)
 - Frontend: Vite + TS + Three.js (WebGL2 baseline, WebGPU path later), custom 2D+spin sim

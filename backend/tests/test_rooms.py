@@ -1,3 +1,5 @@
+import time
+
 import pytest
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
@@ -47,8 +49,15 @@ def test_guest_create_join_and_server_result_without_done():
         assert "Leave" in w1.receive_json()["error"]
         assert len(lobby.rooms) == 1
     assert code not in lobby.rooms
-    with Session() as db:
-        assert db.query(GameMatch).one().status == "forfeit"
+    # Room removal precedes its thread-dispatched database write.
+    deadline = time.monotonic() + 2
+    while True:
+        with Session() as db:
+            status = db.query(GameMatch).one().status
+        if status != "active" or time.monotonic() >= deadline:
+            break
+        time.sleep(0.01)
+    assert status == "forfeit"
 
 
 def test_bad_code_waiting_room_and_cross_origin():
