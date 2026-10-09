@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyShot, beginShot, groupOf, newGame, placeCue } from '../src/sim/rules';
+import { applyShot, beginShot, callRequired, groupOf, newGame, placeCue } from '../src/sim/rules';
 import { allAsleep, simulateShot } from '../src/sim/physics';
 import fixtures from '../../contracts/rules-fixtures.json';
 import { matchConfig } from '../src/sim/config';
@@ -88,4 +88,24 @@ it('keeps a Bar soft dry-break layout and passes turns on the open table until a
   expect(gs.current).toBe(0);expect(gs.open).toBe(true);expect(gs.balls.map(b=>[b.x,b.y])).toEqual(layout);
   beginShot(gs);gs.balls.find(b=>b.n===1)!.potted=true;applyShot(gs,ev({firstContact:1,potted:[1]}));
   expect(gs.groups).toEqual(['solid','stripe']);expect(gs.current).toBe(0);expect(gs.open).toBe(false);
+});
+
+describe('called-shot presentation context',()=>{
+  it('does not require a bar-rules call retroactively when the last group ball drops',()=>{
+    const gs=newGame();gs.breakShot=false;gs.open=false;gs.groups=['solid','stripe'];
+    for(const ball of gs.balls)if(ball.n!==null&&ball.n>=2&&ball.n<=7)ball.potted=true;
+    const before=beginShot(gs,1,2);
+    expect(callRequired(gs,before)).toBe(false);
+    gs.balls.find(b=>b.n===1)!.potted=true;
+    expect(callRequired(gs)).toBe(true);
+    expect(callRequired(gs,before)).toBe(false);
+    expect(callRequired(gs,beginShot(gs,8,2))).toBe(true);
+  });
+  it('preserves custom all-ball calls and suppresses break and no-call markers',()=>{
+    const gs=newGame();gs.rules.calls='all';
+    const breaking=beginShot(gs,1,2);gs.breakShot=false;
+    expect(callRequired(gs,breaking)).toBe(false);
+    const regular=beginShot(gs,1,2);expect(callRequired(gs,regular)).toBe(true);
+    gs.rules.calls='none';expect(callRequired(gs,regular)).toBe(false);
+  });
 });

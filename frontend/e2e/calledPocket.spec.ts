@@ -15,7 +15,7 @@ for(const mobile of [false,true])test.describe(mobile?'mobile':'desktop',()=>{
       const g=(window as any).__pool;
       if(g&&!g.__capture){
         g.__capture=true;const draw=g.scene.renderer.render.bind(g.scene.renderer);
-        g.scene.renderer.render=(world:any,camera:any)=>{g.__world=world;if(g.__show)draw(world,camera);};
+        g.scene.renderer.render=(world:any,camera:any)=>{g.__world=world;if(g.__show){draw(world,camera);g.__show=false;g.__drawn=true;}};
       }
       cb(time);
     });
@@ -33,13 +33,38 @@ for(const mobile of [false,true])test.describe(mobile?'mobile':'desktop',()=>{
     const targets=Array.from({length:6},(_,i)=>g.__world.getObjectByName(`called-pocket-${i}`));
     return targets.map((t:any)=>({visible:t.visible,label:t.children.some((c:any)=>c.isSprite)}));
   });
+  await expect(page.locator('#callpanel')).toBeHidden();
   expect(selected.map(t=>t.visible)).toEqual([false,false,true,false,false,false]);
   expect(selected[2].label).toBe(true);
   expect(await page.evaluate(()=>{const g=(window as any).__pool;g.mode='wait';g.frame();const visible=g.__world.getObjectByName('called-pocket-2').visible;g.mode='aim';return visible;})).toBe(true);
+  const calls=await page.evaluate(()=>{
+    const g=(window as any).__pool;g.mode='wait';g.gs.shot={current:0,open:false,breakShot:false,group:'solid',remaining:[1],kitchen:false,calledBall:1,calledPocket:2};
+    g.calledBall=1;g.calledPocket=2;
+    const result=[];
+    for(const mode of ['cpu','jev'])for(const policy of ['eight','all','none']){
+      g.cpuOpponent=true;g.jevOpponent=mode==='jev';g.gs.rules.calls=policy;g.frame();
+      result.push({mode,policy,visible:g.__world.getObjectByName('called-pocket-2').visible});
+    }
+    g.cpuOpponent=false;g.jevOpponent=false;g.gs.rules.calls='eight';g.calledBall=8;delete g.gs.shot;g.mode='aim';g.frame();
+    return result;
+  });
+  for(const call of calls)expect(call.visible,`${call.mode} ${call.policy}`).toBe(call.policy==='all');
+  // Capture a completed frame instead of saturating software WebGL throughout screenshot capture.
   await page.evaluate(()=>{(window as any).__pool.__show=true;});
+  await page.waitForFunction(()=>(window as any).__pool.__drawn===true);
   await page.screenshot({path:info.outputPath('called-pocket.png')});
   await page.evaluate(()=>{const g=(window as any).__pool;g.__show=false;g.calledPocket=null;g.hud();g.frame();});
   expect(await page.evaluate(()=>Array.from({length:6},(_,i)=>(window as any).__pool.__world.getObjectByName(`called-pocket-${i}`).visible))).toEqual([false,false,false,false,false,false]);
+  await page.evaluate(()=>{const g=(window as any).__pool;g.gs.rules.calls='all';for(const b of g.gs.balls)if(b.n===1||b.n===2)b.potted=false;g.hud();});
+  await expect(page.locator('.control-tray #callpanel')).toBeVisible();
+  await expect(page.locator('#callpanel')).toHaveCSS('position','static');
+  await page.locator('#callball').selectOption('2');
+  await expect(page.locator('#msg')).toContainText('Select a pocket for ball 2');
+  expect(await page.evaluate(()=>{const g=(window as any).__pool;return[g.calledBall,g.calledPocket];})).toEqual([2,null]);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.evaluate(()=>{const g=(window as any).__pool;g.gs.rules.calls='none';g.hud();});
+  await expect(page.locator('#callpanel')).toBeHidden();
+
 });
 
 });

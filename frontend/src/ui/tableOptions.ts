@@ -37,7 +37,10 @@ export class TableOptions {
     el('closehelp').addEventListener('click', () => show(false, true));
     el('starttutorial').addEventListener('click',()=>show(false,true));
     for (const id of ['settingsbtn', 'onlinebtn']) el(id).addEventListener('click', () => show(false, true));
+    let inputProfile:boolean|undefined;
     const tab = (touch: boolean) => {
+      if(inputProfile===touch&&document.documentElement.classList.contains('touch-input')===touch)return;
+      inputProfile=touch;
       document.documentElement.classList.toggle('touch-input',touch);
       el('hint').textContent=touch?'Drag to aim · set power · tap Shoot · two fingers move the camera':'Aim on the felt · pull back and release · choose camera controls in the HUD';
       el('helppanel').querySelector('h2')!.textContent=touch?'Aim. Set power. Shoot.':'Aim. Pull. Release.';

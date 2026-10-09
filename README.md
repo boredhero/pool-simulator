@@ -66,13 +66,17 @@ npm --prefix frontend run build
 cd frontend
 npx playwright install chromium
 npm run test:e2e
+npm run test:passkeys
 npm run test:online
 ```
 
 The build includes TypeScript checking; `npm run typecheck` runs it separately.
 The online browser suite uses a temporary SQLite database, never production data.
 Required `ci` aggregates Ruff, backend tests, frontend tests/build and the container
-build. Browser checks run separately on development branches. Only pushes to
+build. Browser checks run separately on development branches: four standalone
+shards plus independent passkey and online integration jobs, each with one worker.
+The `browser-report` artifact contains the combined HTML report; per-job artifacts
+retain failure screenshots and traces. See the [Playwright sharding guide](https://playwright.dev/docs/test-sharding). Only pushes to
 `main` publish an image and deploy through CI/CD. A failed deployment health check
 fails the workflow. Live rooms are in memory: run **one API worker / instance**.
 
@@ -418,12 +422,13 @@ the player table and detail view; this is service activity, not optional analyti
 
 ### Installing the app
 
-Choose **Install app** in Settings or on the welcome screen. Browsers that expose
-`beforeinstallprompt` open their native prompt after your click. Other browsers
-show manual installation instructions; iPhone/iPad users use Safari → Share →
-Add to Home Screen (leave Open as Web App enabled when offered). macOS Safari
-uses File → Add to Dock. Browser install eligibility and prompts remain under
-browser control. Installed standalone windows mark the app installed.
+In the mobile interface, choose **Install app** in Settings or on the welcome
+screen. Desktop layouts hide these controls, including on touch-capable devices.
+Browsers that expose `beforeinstallprompt` open their native prompt after your
+click. Other mobile browsers show manual instructions; iPhone/iPad users use
+Safari → Share → Add to Home Screen (leave Open as Web App enabled when offered).
+Browser install eligibility and prompts remain under browser control. Installed
+standalone windows mark the app installed.
 
 The manifest uses the Pool Simulator name, a stable root ID, PNG icons at 192px
 and 512px, and a 180px Apple touch icon. The service worker registers over HTTPS.

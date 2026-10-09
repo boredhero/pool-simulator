@@ -524,11 +524,11 @@ export class Game {
       if(this.cameraGesture)return;
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       if(!this.humanCueControls())return;
-      if(this.mode==='aim'&&this.humanTurn()&&callRequired(this.gs)&&this.calledPocket===null){
+      if(this.mode==='aim'&&this.humanTurn()&&callRequired(this.gs)){
         const pocket=this.scene.pickPocket(e.clientX,e.clientY);
         if(pocket!==null){this.calledPocket=pocket;this.hud();}
-        // The whole gesture selects a destination; it can never start a pull or shot.
-        this.touchAim=false;this.pulling=false;this.pressPt=null;return;
+        // Selecting or changing a destination can never start a pull or shot.
+        if(pocket!==null||this.calledPocket===null){this.touchAim=false;this.pulling=false;this.pressPt=null;return;}
       }
       const p = this.scene.pickFelt(e.clientX, e.clientY);
       if (!p) return;
@@ -652,7 +652,6 @@ export class Game {
     this.el.createbtn.addEventListener('click', () => this.connectRoom(true));
     this.el.joinbtn.addEventListener('click', () => this.connectRoom(false));
     document.getElementById('callball')!.addEventListener('change', e => { if(!this.humanCueControls())return;this.calledBall = Number((e.target as HTMLSelectElement).value); this.calledPocket = null; this.hud(); });
-    document.getElementById('clearcall')!.addEventListener('click', () => { if(!this.humanCueControls())return;this.calledPocket = null; this.hud(); });
     const closeNewGame = () => {
       document.querySelector('.control-tray')!.classList.remove('expanded');
       document.getElementById('morecontrols')!.setAttribute('aria-expanded','false');
@@ -959,16 +958,19 @@ export class Game {
     const aiming = this.mode === 'aim' && !this.cue().potted && this.humanCueControls();
     const pulling = this.pulling && aiming;
     const pull = 0.012 + (pulling ? this.pullPower() * 0.18 : 0);
-    this.scene.setCall(this.calledPocket, callRequired(this.gs) && (aiming || ((this.mode==='rolling'||this.mode==='wait')&&this.calledPocket!==null)));
+    const playingShot=this.mode==='rolling'||this.mode==='wait';
+    // A ball dropping cannot retroactively turn this stroke into an 8-ball call.
+    const showCall=callRequired(this.gs,playingShot?this.gs.shot:undefined)
+      && (this.gs.rules.calls!=='eight'||this.calledPocket===null||this.calledBall===8);
+    this.scene.setCall(this.calledPocket, showCall && (aiming || (playingShot&&this.calledPocket!==null)));
     if(presented&&this.opponentAction){
       const pose=cuePresentation(this.opponentAction.elapsed,presented.power,this.opponentAction.reduced);
       this.scene.setCue(true,presented.placement.x,presented.placement.y,presented.aim,pose.pull,presented.tipX,presented.tipY,presented.elevation);
-      this.scene.setCall(presented.calledPocket,callRequired(this.gs));
+      this.scene.setCall(presented.calledPocket,callRequired(this.gs)&&(this.gs.rules.calls!=='eight'||presented.calledBall===8));
     } else this.scene.setCue(aiming, this.cue().x, this.cue().y, this.angle, pull, this.tipX, this.tipY);
     const controls=this.humanCueControls();
     (document.getElementById('touchpower') as HTMLInputElement).disabled=!controls;
     (document.getElementById('callball') as HTMLSelectElement).disabled=!controls;
-    (document.getElementById('clearcall') as HTMLButtonElement).disabled=!controls;
     (document.getElementById('resetspin') as HTMLButtonElement).disabled=!controls||Math.hypot(this.tipX,this.tipY)<1e-9;
     this.el.spin.setAttribute('aria-disabled',String(!controls));
     (this.el.chargefill as HTMLElement).style.width = pulling ? `${this.pullPower() * 100}%` : '0%';
@@ -1038,13 +1040,13 @@ export class Game {
     document.getElementById('roomsharing')!.hidden=!this.room?.code;
     this.options.summary(this.gs.rules);
     const needCall = this.mode === 'aim' && this.humanTurn() && callRequired(this.gs);
-    document.getElementById('callpanel')!.hidden = !needCall;
+    const callTargets=needCall?legalTargets(this.gs):[];
+    document.getElementById('callpanel')!.hidden = !needCall||callTargets.length<=1;
     if (needCall) {
       const targets = legalTargets(this.gs);
       if (this.calledBall === null || !targets.includes(this.calledBall)) this.calledBall = targets[0] ?? null;
       const select = document.getElementById('callball') as HTMLSelectElement;
       select.replaceChildren(...targets.map(n => new Option(`Ball ${n}`, String(n), false, n === this.calledBall)));
-      document.getElementById('callstatus')!.textContent = this.calledPocket === null ? 'Tap a pocket on the table' : `Pocket called · ready to shoot`;
     }
     for (const id of ['rack', 'cpubtn', 'jevbtn']) (this.el[id] as HTMLButtonElement).disabled = !!this.room;
     this.renderScorecard();

@@ -4,3 +4,5 @@
 .app-installed #welcomeinstall{display:none}
 #welcomeinstall{justify-self:start;min-height:44px;font-size:15px}
 html:not(.touch-input) [data-install-app],html:not(.touch-input) #installappstatus{display:none!important}
+
+@media(min-width:901px),(pointer:fine),(pointer:none){[data-install-app],#installappstatus{display:none!important}}

@@ -45,9 +45,26 @@ for(const profile of ['mouse','trackpad'])test(`desktop ${profile} hides install
  await expect(page.locator('#installapp')).toBeHidden();await expect(page.locator('#installappstatus')).toBeHidden();
  await page.evaluate(()=>window.dispatchEvent(new Event('appinstalled')));await expect(page.locator('#installapp')).toBeHidden();await expect(page.locator('#installappstatus')).toBeHidden();
 });
-test('install controls follow live touch mode changes',async({page})=>{
- await page.goto('/');await page.locator('#settingsbtn').click();await expect(page.locator('#installapp')).toBeHidden();
- await page.evaluate(()=>document.documentElement.classList.add('touch-input'));await expect(page.locator('#installapp')).toBeVisible();
- await page.locator('#installapp').evaluate(button=>(button as HTMLButtonElement).click());await expect(page.locator('#installappdialog')).toBeVisible();
- await page.evaluate(()=>document.documentElement.classList.remove('touch-input'));await expect(page.locator('#installappdialog')).not.toBeVisible();await expect(page.locator('#installapp')).toBeHidden();
+test.describe('responsive installation controls',()=>{
+ test.use({hasTouch:true,isMobile:true,viewport:{width:390,height:844}});
+ test('mobile installation closes and hides when the interface becomes desktop',async({page})=>{
+  await page.goto('/');await page.locator('#settingsbtn').click();await expect(page.locator('#installapp')).toBeVisible();
+  await page.locator('#installapp').tap();await expect(page.locator('#installappdialog')).toBeVisible();
+  await page.setViewportSize({width:1280,height:800});
+  await expect(page.locator('#installappdialog')).not.toBeVisible();await expect(page.locator('#installapp')).toBeHidden();
+  await page.setViewportSize({width:390,height:844});await expect(page.locator('#installapp')).toBeVisible();
+ });
+});
+test('a desktop touch event cannot expose installation in settings or welcome',async({page})=>{
+ await page.addInitScript(()=>localStorage.removeItem('pool:welcome'));
+ await page.goto('/');
+ await page.evaluate(()=>window.dispatchEvent(new PointerEvent('pointerdown',{pointerType:'touch'})));
+ await expect(page.locator('#welcomeinstall')).toBeHidden();
+ await page.locator('#welcometerms').check();await page.locator('#welcomeplay').click();await page.locator('#settingsbtn').click();
+ await page.evaluate(()=>window.dispatchEvent(new PointerEvent('pointerdown',{pointerType:'touch'})));
+ await expect(page.locator('#installapp')).toBeHidden();
+ await page.setViewportSize({width:390,height:844});
+ await expect(page.locator('#installapp')).toBeHidden();
+ await page.locator('#installapp').evaluate(button=>(button as HTMLButtonElement).click());
+ await expect(page.locator('#installappdialog')).not.toBeVisible();
 });
