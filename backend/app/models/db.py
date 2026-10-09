@@ -61,9 +61,11 @@ def init_db() -> None:
         upgrade_premium,
         upgrade_simulation,
         upgrade_terms,
+        upgrade_username_changes,
     )
 
     with engine.begin() as connection:
+        upgrade_username_changes(connection)
         upgrade_account_status(connection)
         upgrade_premium(connection)
         upgrade_jev_allowance(connection)
@@ -81,6 +83,7 @@ class Account(Base):
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
     username: Mapped[str] = mapped_column(String(20))
     username_key: Mapped[str] = mapped_column(String(20), unique=True, index=True)
+    username_changed_at: Mapped[int | None] = mapped_column(Integer, nullable=True)
     password_hash: Mapped[str] = mapped_column(Text)
     recovery_hash: Mapped[str] = mapped_column(Text)
     created_at: Mapped[int] = mapped_column(Integer)

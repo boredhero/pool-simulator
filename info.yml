@@ -1,5 +1,5 @@
 name: pool-simulator
-version: 1.2.0
+version: 1.2.1
 description: GPU-accelerated browser pool with Python backend
 license: MIT
 repository: https://github.com/boredhero/pool-simulator

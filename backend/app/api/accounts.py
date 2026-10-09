@@ -5,7 +5,7 @@ import time
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
-from sqlalchemy import delete, update
+from sqlalchemy import delete, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
 from app.models.db import (
@@ -22,6 +22,7 @@ from app.services.auth import (
     COOKIE,
     DUMMY_HASH,
     HASHER,
+    USERNAME_CHANGE_SECONDS,
     current_account,
     digest,
     mutation_guard,
@@ -182,3 +183,68 @@ def activity(request: Request):
     if account is None:
         raise HTTPException(401, "Sign in first.")
     return {"lastActiveAt": account["lastActiveAt"]}
+
+
+class UsernameChange(BaseModel):
+    username: str = Field(min_length=3, max_length=20)
+
+
+@router.get("/username/availability")
+def username_availability(username: str, request: Request, response: Response):
+    account = current_account(request)
+    if account is None:
+        raise HTTPException(401, "Sign in first.")
+    response.headers["Cache-Control"] = "no-store"
+    rate_limit("username-check", account["id"], 120)
+    key = username_key(username)
+    with Session() as db:
+        owner_id = db.scalar(select(Account.id).where(Account.username_key == key))
+    return {"available": owner_id is None or owner_id == account["id"]}
+
+
+@router.post("/username", dependencies=[Depends(mutation_guard)])
+def change_username(payload: UsernameChange, request: Request, response: Response):
+    account = current_account(request)
+    if account is None:
+        raise HTTPException(401, "Sign in first.")
+    rate_limit("username-change", account["id"], 12)
+    key = username_key(payload.username)
+    if payload.username == account["username"]:
+        raise HTTPException(400, "Choose a different username.")
+    now = int(time.time())
+    session_hash = digest(request.cookies.get(COOKIE, ""))
+    try:
+        with Session.begin() as db:
+            # One atomic update enforces cooldown and uniqueness across racing requests.
+            # Recheck the session here so concurrent recovery/logout cannot authorize a rename.
+            changed = db.execute(
+                update(Account)
+                .where(
+                    Account.id == account["id"],
+                    Account.disabled.is_(False),
+                    or_(
+                        Account.username_changed_at.is_(None),
+                        Account.username_changed_at <= now - USERNAME_CHANGE_SECONDS,
+                    ),
+                    select(LoginSession.token_hash)
+                    .where(
+                        LoginSession.token_hash == session_hash,
+                        LoginSession.account_id == account["id"],
+                        LoginSession.expires_at > now,
+                    )
+                    .exists(),
+                )
+                .values(username=payload.username, username_key=key, username_changed_at=now)
+            )
+            if changed.rowcount != 1:
+                raise HTTPException(
+                    409,
+                    "Username changes are available once every 365 days. "
+                    "Refresh your account for the next available date.",
+                )
+            user = db.get(Account, account["id"])
+            result = public_account(user)
+    except IntegrityError as exc:
+        raise HTTPException(409, "That username is already taken. Choose another.") from exc
+    response.headers["Cache-Control"] = "no-store"
+    return {"account": result}

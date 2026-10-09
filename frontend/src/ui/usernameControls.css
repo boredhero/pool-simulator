@@ -1,0 +1,2 @@
+#username-settings{margin:16px 0;padding:16px;border:1px solid #75634a;border-radius:12px;background:#191610}
+#username-settings h3{margin:0 0 8px}#usernameform{display:grid;gap:8px}#usernamechange{min-height:44px;font-size:16px}#usernameavailability:empty{display:none}#usernameavailability,#usernamecooldown{font-size:14px;line-height:1.5;margin:4px 0}#username-settings .guide-note{line-height:1.5}

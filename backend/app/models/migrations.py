@@ -120,3 +120,12 @@ def upgrade_monthly_budget(connection) -> None:
         Operations(MigrationContext.configure(connection)).add_column(
             "accounts", Column("last_active_at", Integer, nullable=True)
         )
+
+
+def upgrade_username_changes(connection) -> None:
+    if "username_changed_at" not in {
+        c["name"] for c in inspect(connection).get_columns("accounts")
+    }:
+        Operations(MigrationContext.configure(connection)).add_column(
+            "accounts", Column("username_changed_at", Integer, nullable=True)
+        )

@@ -241,7 +241,7 @@ body:has(#tutorial:not([hidden])) .privacy-notice{display:none}
   <header class="settings-header"><h2 id="accounttitle">Your account</h2><button class="icon-close" id="accountclose" aria-label="Close account">×</button></header>
   <div class="account-body">
     <p id="accountstatus" role="status"></p>
-    <p id="accountplaying" class="guide-note" hidden>Leave your room before signing in, recovering an account, or signing out.</p>
+    <p id="accountplaying" class="guide-note" hidden>Leave your room before changing your username, signing in, recovering an account, or signing out.</p>
     <section id="accountauth">
       <div class="account-tabs"><button id="account-login" aria-pressed="true">Sign in</button><button id="account-register" aria-pressed="false">Create account</button><button id="account-recover" aria-pressed="false">Recover</button></div>
       <button id="passkeylogin" type="button" hidden>Sign in with a passkey</button>
@@ -264,6 +264,7 @@ body:has(#tutorial:not([hidden])) .privacy-notice{display:none}
     </section>
     <section id="accountprofile" hidden>
       <h3><span id="accountname"></span> <span id="accountpremium" class="premium-badge" hidden>Premium</span></h3><p id="accountsince" class="guide-note"></p>
+      <section id="username-settings" aria-labelledby="username-settings-title"><h3 id="username-settings-title">Username</h3><p class="guide-note">Change your username once every 365 days. Your old name becomes available to other players. Your account, stats, and sign-in methods stay with you.</p><p id="usernamecooldown"></p><form id="usernameform"><label for="newusername">New username</label><input id="newusername" required minlength="3" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="usernameavailability usernamecooldown usernameformat"><p id="usernameformat" class="guide-note">3–20 letters, numbers, or underscores. Availability is case-insensitive.</p><p id="usernameavailability" role="status"></p><button id="usernamechange" type="submit">Change username</button></form></section>
       <section id="passkeys" aria-labelledby="passkeystitle">
         <div id="passkeyoffer" hidden><h3>Add a passkey?</h3><p>Sign in next time with your device’s fingerprint, face unlock, or screen lock. It’s optional—your password will still work.</p><div class="row"><button id="passkeyofferadd" type="button">Add a passkey</button><button id="passkeyskip" type="button">Not now</button></div></div>
         <h3 id="passkeystitle">Passkeys</h3><p class="guide-note">An alternative to your password. Save passkeys with multiple providers or devices so you always have another way in. Your biometric data stays on your device.</p>

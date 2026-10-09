@@ -1,10 +1,11 @@
+import {UsernameControls} from './usernameControls';
 import {PasskeyPanel} from './passkeys';
 import {PasswordControls} from './passwordControls';
 import './accountIdentity.css';
 import './mobileHud.css';
 import {acceptTerms,termsStatus,type TermsStatus} from './terms';
 import { AdminPanel } from './admin';
-export interface Account {id:string;username:string;createdAt:number;premium:boolean;simEnabled?:boolean;isAdmin:boolean}
+export interface Account {id:string;username:string;usernameChangedAt?:number|null;usernameChangeAvailableAt?:number|null;createdAt:number;premium:boolean;simEnabled?:boolean;isAdmin:boolean}
 interface Stats {matches:number;wins:number;losses:number;abandoned:number;shots:number;ballsPocketed:number;scratches:number;fouls:number;shotStatsComplete?:boolean;byMode?:Record<string,{matches:number;wins:number;losses:number}>;recent:Array<{id:string;opponent:string;status:string;result:string|null;mode?:string;shotStatsComplete?:boolean}>}
 const el=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 
@@ -13,6 +14,7 @@ export class AccountPanel {
   private passwords=new PasswordControls();
   private passkeys:PasskeyPanel;
   private offerPasskey=false;
+  private usernames:UsernameControls;
   private mode:'login'|'register'|'recover'='login';
   private recoveryPending=false;
   private busy=false;
@@ -24,12 +26,13 @@ export class AccountPanel {
   private admin=new AdminPanel(()=>void this.refresh());
   constructor(private playing:()=>boolean,private changed:(account:Account|null)=>void) {
     this.passkeys=new PasskeyPanel(account=>{this.account=account;this.changed(account);this.passwords.reset();this.render();void this.refreshAgreement();},()=>this.playing()||this.busy||this.agreementBusy||this.recoveryPending,busy=>{this.busy=busy;++this.accountRevision;el<HTMLButtonElement>('accountsubmit').disabled=busy;el<HTMLButtonElement>('accountclose').disabled=busy;el<HTMLButtonElement>('accountlogout').disabled=busy||this.playing();if(!busy)void this.refresh();});
+    this.usernames=new UsernameControls(name=>this.rename(name));
     el('settingspasskeys').addEventListener('click',()=>{this.opener=el('settingspasskeys');el<HTMLDialogElement>('accountdialog').showModal();void this.refresh();el('passkeys').scrollIntoView({block:'start'});el('passkeystitle').setAttribute('tabindex','-1');el('passkeystitle').focus();});
     for(const id of ['accountbtn','accountidentity'])el(id).addEventListener('click',()=>{this.opener=el(id);el<HTMLDialogElement>('accountdialog').showModal();void this.refresh();});
     el('accountdialog').addEventListener('keydown',e=>e.stopPropagation());
     el('accountclose').addEventListener('click',()=>el<HTMLDialogElement>('accountdialog').close());
     el('accountdialog').addEventListener('cancel',e=>{if(this.recoveryPending||this.busy||this.agreementBusy)e.preventDefault();});
-    el('accountdialog').addEventListener('close',()=>{this.passwords.reset();this.passkeys.close();this.opener?.focus();});
+    el('accountdialog').addEventListener('close',()=>{this.passwords.reset();this.passkeys.close();this.usernames.cancel();this.opener?.focus();});
     for(const mode of ['login','register','recover'] as const)el('account-'+mode).addEventListener('click',()=>this.setMode(mode));
     el('accountform').addEventListener('submit',e=>{e.preventDefault();void this.submit();});
     el('accountlogout').addEventListener('click',()=>void this.logout());
@@ -107,6 +110,7 @@ export class AccountPanel {
   }
   private render(stats?:Stats) {
     this.admin.setAccount(this.account);
+    this.usernames.update(this.account,this.busy||this.agreementBusy||this.playing());
     this.passkeys.update(this.account,this.mode==='login'&&el<HTMLDialogElement>('accountdialog').open&&!this.recoveryPending);
     for(const id of ['accountpremium','settingspremium'])el(id).hidden=!this.account?.premium;
     el('accountbtn').textContent=this.account?`${this.account.username} · Account`:'Sign in / Create account';
@@ -170,6 +174,17 @@ export class AccountPanel {
     } catch(error){this.status(error instanceof Error?error.message:'Unable to complete request.');}
     finally {this.passwords.reset();recovery.value='';this.busy=false;el<HTMLButtonElement>('accountsubmit').disabled=false;el<HTMLButtonElement>('accountclose').disabled=this.recoveryPending;}
     if(!this.recoveryPending)await this.refresh();
+  }
+  private async rename(username:string){
+    if(this.busy||this.agreementBusy||!this.account)return;
+    if(this.playing()){this.status('Leave your current room before changing your username.');return;}
+    this.busy=true;++this.accountRevision;this.usernames.cancel();this.usernames.update(this.account,true);
+    el<HTMLButtonElement>('accountclose').disabled=true;el<HTMLButtonElement>('accountlogout').disabled=true;
+    try{
+      const data=await this.request('/username',{username});this.account=data.account;this.changed(this.account);this.render();
+      this.status(`Your username is now ${this.account!.username}. Use it for password sign-in. Your passkeys still work.`);
+    }catch(error){this.status(error instanceof Error?error.message:'Could not change your username.');}
+    finally{this.busy=false;el<HTMLButtonElement>('accountclose').disabled=this.recoveryPending;el<HTMLButtonElement>('accountlogout').disabled=this.playing();this.usernames.update(this.account,this.playing());}
   }
   private async logout(){
     if(this.busy||this.agreementBusy)return;
