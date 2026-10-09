@@ -5,7 +5,8 @@ export function setupInstallApp(){
  let deferred:InstallEvent|null=null,busy=false,confirmed=false,opener:HTMLElement|null=null;
  const display=matchMedia('(display-mode: standalone)');
  const installed=()=>confirmed||display.matches||(navigator as Navigator&{standalone?:boolean}).standalone===true;
- const touch=()=>document.documentElement.classList.contains('touch-input');
+ const mobile=matchMedia('(max-width:900px) and (pointer:coarse)');
+ const touch=()=>mobile.matches&&document.documentElement.classList.contains('touch-input');
  const button=document.getElementById('installapp') as HTMLButtonElement;
  const status=document.getElementById('installappstatus')!;
  const dialog=document.createElement('dialog');dialog.id='installappdialog';dialog.setAttribute('aria-labelledby','installapptitle');
@@ -25,7 +26,7 @@ export function setupInstallApp(){
  };
  done.addEventListener('click',()=>dialog.close());dialog.addEventListener('close',()=>opener?.focus());dialog.addEventListener('keydown',e=>e.stopPropagation());
  addEventListener('beforeinstallprompt',event=>{if(touch())event.preventDefault();deferred=event as InstallEvent;refresh();});
- addEventListener('appinstalled',()=>{confirmed=true;deferred=null;if(dialog.open)dialog.close();refresh();});display.addEventListener('change',refresh);
+ addEventListener('appinstalled',()=>{confirmed=true;deferred=null;if(dialog.open)dialog.close();refresh();});display.addEventListener('change',refresh);mobile.addEventListener('change',refresh);
  document.addEventListener('click',async event=>{
   if(!(event.target instanceof Element)||!event.target.closest('[data-install-app]')||!touch()||installed()||busy)return;
   opener=event.target.closest('[data-install-app]') as HTMLElement;
