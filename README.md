@@ -462,3 +462,15 @@ Physical Safari/iOS passkey-provider behavior still benefits from a device smoke
 References: [WebAuthn server verification](https://duo-labs.github.io/py_webauthn/),
 [passkey management](https://web.dev/articles/passkey-management),
 [conditional autofill](https://web.dev/articles/passkey-form-autofill).
+
+
+### Username changes
+
+Account settings offers a first username change immediately, then one change every rolling
+365 days. Availability is case-insensitive; the previous name is released on success.
+The update and cooldown are atomic, so concurrent attempts cannot reserve the same name or
+bypass the limit. Failed validation, collisions, and unchanged names do not consume a change.
+Existing accounts receive a nullable `username_changed_at` column through an idempotent migration.
+Account IDs, roles, balances, history, sessions, recovery codes and passkeys remain attached to
+the same account. Password login uses the new username. Recorded match names remain historical
+snapshots; leave an online room before changing your name in the UI.

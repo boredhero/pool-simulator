@@ -59,6 +59,11 @@ app.include_router(admin_router, prefix="/api")
 
 @app.exception_handler(RequestValidationError)
 async def validation_error(request, exc):
+    if request.url.path.startswith("/api/account/username"):
+        return JSONResponse(
+            status_code=422,
+            content={"detail": "Username must be 3–20 letters, numbers, or underscores."},
+        )
     if request.url.path.startswith("/api/account"):
         return JSONResponse(
             status_code=422,

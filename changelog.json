@@ -1,5 +1,15 @@
 [
   {
+    "version": "1.2.1",
+    "date": "2026-10-08",
+    "title": "Account username changes",
+    "changes": [
+      "Change your username from account settings once every 365 days. Your first change is available immediately.",
+      "Check name availability before saving. Names are case-insensitive and your old name becomes available immediately.",
+      "Account identity, admin access, Premium, stats, passkeys and balances stay with your account."
+    ]
+  },
+  {
     "version": "1.2.0",
     "date": "2026-10-08",
     "title": "Optional passkey sign-in",

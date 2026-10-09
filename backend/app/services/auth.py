@@ -19,6 +19,7 @@ from app.models.db import Account, AuthFresh, AuthThrottle, LoginSession, Sessio
 HASHER = PasswordHasher(time_cost=2, memory_cost=19456, parallelism=1)
 DUMMY_HASH = HASHER.hash(secrets.token_urlsafe(32))
 COOKIE = "pool_session"
+USERNAME_CHANGE_SECONDS = 365 * 24 * 3600
 SESSION_SECONDS = 30 * 24 * 3600
 throttle_lock = threading.Lock()
 
@@ -33,6 +34,12 @@ def public_account(user: Account) -> dict:
     return {
         "id": user.id,
         "username": user.username,
+        "usernameChangedAt": user.username_changed_at,
+        "usernameChangeAvailableAt": (
+            user.username_changed_at + USERNAME_CHANGE_SECONDS
+            if user.username_changed_at is not None
+            else None
+        ),
         "createdAt": user.created_at,
         "lastActiveAt": user.last_active_at,
         "premium": user.premium,
