@@ -5,6 +5,7 @@
     "title": "Browser checks and desktop help",
     "changes": [
       "Give the desktop controls guide more room for readable instructions.",
+      "Keep optional turn status consistent with the active player in every game mode.",
       "Run browser, passkey, and multiplayer checks independently with complete diagnostic reports.",
       "Update browser regression checks for current game and input behavior."
     ]

@@ -496,7 +496,7 @@ test('premium badges and unlimited racks follow the server account',async({page}
   await page.locator('#closesettings').click();
   await page.locator('#onlinebtn').click();await page.locator('#accountbtn').click();
   await expect(page.locator('#accountpremium')).toBeVisible();
-  await expect(page.locator('#accountjev')).toContainText('Unlimited Jev AI games');
+  await expect(page.locator('#accountjev')).toContainText('Jev AI · Unlimited games');
   await page.setViewportSize({width:390,height:844});
   await expect(page.locator('#accountpremium')).toBeVisible();
   await page.locator('#accountclose').click();await page.locator('#closeonline').click();
