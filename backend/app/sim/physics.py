@@ -65,7 +65,10 @@ class ShotEvents:
 
 def shoot_speed(power: float, vmax: float = VMAX_NORMAL) -> float:
     p = min(1.0, max(0.0, power))
-    return VMIN + (p**1.55) * (vmax - VMIN)
+    # Canonicalize only the derived launch-speed calibration, never ball state.
+    # libm pow differs by an ULP across V8 versions; dense racks amplify it.
+    speed = VMIN + (p**1.55) * (vmax - VMIN)
+    return math.floor(speed * 1e12 + 0.5) / 1e12
 
 
 def throw_mu(v_rel: float) -> float:

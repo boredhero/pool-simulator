@@ -38,6 +38,13 @@ micrometres. The regression compares the live implementations, requires equal
 pocket outcomes, and permits at most ten micrometres of final position error.
 This tolerance is a test bound, not a reason to round network coordinates.
 
+The power-to-speed curve also canonicalizes its derived speed to 12 decimal
+places using the same `floor(v * 1e12 + 0.5) / 1e12` expression in both engines.
+Node 22 and Python differed in the last bit of `power ** 1.55` for a reproduced
+shot; rack collisions amplified that initial difference. This defines a common
+shot-speed resolution (1e-12 m/s), not a coordinate or per-tick state rounding
+policy. The regression exercises Node 22 as well as the current local runtime.
+
 [Box2D's determinism notes](https://box2d.org/posts/2024/08/determinism/) explain
 why math-library implementations, operation order, fused arithmetic, and platform
 differences matter. Strict cross-platform guarantees require controlled math

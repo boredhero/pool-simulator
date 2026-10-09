@@ -54,7 +54,10 @@ export function makeBall(id: number, n: number | null, x: number, y: number): Ba
 /** Power [0,1] -> cue-ball speed m/s. Break rips, normal play stays calm. */
 export function shootSpeed(power: number, vmax = VMAX_NORMAL): number {
   const p = Math.min(1, Math.max(0, power));
-  return VMIN + Math.pow(p, 1.55) * (vmax - VMIN);
+  // Match the server's launch-speed calibration to 1 picometre/second.
+  // This removes pow's runtime ULP noise without rounding any ball state.
+  const speed = VMIN + Math.pow(p, 1.55) * (vmax - VMIN);
+  return Math.floor(speed * 1e12 + 0.5) / 1e12;
 }
 
 /** Throw friction falls with closing speed (Dr. Dave fit of Colenso data). */
