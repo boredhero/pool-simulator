@@ -5,7 +5,7 @@ const account={id:'player',username:'player',createdAt:1,premium:true,isAdmin:fa
 const stats={matches:0,wins:0,losses:0,abandoned:0,shots:0,ballsPocketed:0,scratches:0,fouls:0,recent:[]};
 test.beforeEach(async({page})=>{
  await acceptWelcomeBeforeLoad(page);
- await page.addInitScript(()=>{localStorage.setItem('pool:help-dismissed','1');localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-08',allow:false}));const raf=requestAnimationFrame.bind(window);window.requestAnimationFrame=cb=>raf(t=>{const g=(window as any).__pool;if(g)g.scene.renderer.render=()=>{};cb(t);});});
+ await page.addInitScript(()=>{localStorage.setItem('pool:help-dismissed','1');localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-09',allow:false}));const raf=requestAnimationFrame.bind(window);window.requestAnimationFrame=cb=>raf(t=>{const g=(window as any).__pool;if(g)g.scene.renderer.render=()=>{};cb(t);});});
  await page.route('**/api/account',r=>r.fulfill({json:{account,stats}}));
  await page.route('**/api/version',r=>r.fulfill({json:{version:'e2e'}}));
  await page.route('**/api/opponents/jev',r=>r.fulfill({json:{available:false}}));

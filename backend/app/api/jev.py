@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 import math
 import os
 import random
@@ -505,8 +506,11 @@ async def play_turn(
                     KeyError,
                     TypeError,
                     HTTPException,
-                ):
-                    pass  # Preserve a playable deterministic fallback and private errors.
+                ) as error:
+                    logging.getLogger("pool.jev").warning(
+                        "jev_fallback",
+                        extra={"error_type": type(error).__name__, "game_id": game_id},
+                    )
                 finally:
                     if attempt is not None:
                         jev_budget.settle(attempt, result)

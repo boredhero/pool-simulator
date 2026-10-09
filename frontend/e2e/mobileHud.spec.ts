@@ -4,7 +4,7 @@ import {TERMS_VERSION} from '../src/ui/terms';
 test.use({hasTouch:true,isMobile:true});
 for(const viewport of [{width:320,height:700},{width:390,height:844},{width:844,height:390}])test(`compact mobile HUD keeps touch controls reachable at ${viewport.width}x${viewport.height}`,async({page},testInfo)=>{
   await page.setViewportSize(viewport);await acceptWelcomeBeforeLoad(page);
-  await page.addInitScript(()=>{localStorage.setItem('pool:help-dismissed','1');const raf=requestAnimationFrame.bind(window);window.requestAnimationFrame=cb=>raf(t=>{const g=(window as any).__pool;if(g&&!((window as any).__draw)){(window as any).__draw=g.scene.renderer.render.bind(g.scene.renderer);g.scene.renderer.render=(...args:any[])=>{(window as any).__renderArgs=args;};}cb(t);});localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-08',allow:false}));});
+  await page.addInitScript(()=>{localStorage.setItem('pool:help-dismissed','1');const raf=requestAnimationFrame.bind(window);window.requestAnimationFrame=cb=>raf(t=>{const g=(window as any).__pool;if(g&&!((window as any).__draw)){(window as any).__draw=g.scene.renderer.render.bind(g.scene.renderer);g.scene.renderer.render=(...args:any[])=>{(window as any).__renderArgs=args;};}cb(t);});localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-09',allow:false}));});
   await page.route('**/api/version',r=>r.fulfill({json:{version:'1.0.0'}}));
   await page.route('**/api/account',r=>r.fulfill({json:{account:{id:'player',username:'developer',createdAt:1,premium:true,isAdmin:false},stats:null}}));
   await page.route('**/api/privacy/terms',r=>r.fulfill({json:{version:TERMS_VERSION,accepted:true,authenticated:true,accountId:'player'}}));
@@ -42,7 +42,7 @@ test.describe('desktop retains the original HUD',()=>{
   test.use({hasTouch:false,isMobile:false});
   for(const width of [1024,1440])test(`mobile layout preserves desktop at ${width}px`,async({page},testInfo)=>{
     await page.setViewportSize({width,height:900});await acceptWelcomeBeforeLoad(page);
-    await page.addInitScript(()=>{localStorage.setItem('pool:help-dismissed','1');localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-08',allow:false}));const raf=requestAnimationFrame.bind(window);window.requestAnimationFrame=cb=>raf(t=>{const g=(window as any).__pool;if(g&&!(window as any).__draw){(window as any).__draw=g.scene.renderer.render.bind(g.scene.renderer);g.scene.renderer.render=(...args:any[])=>{(window as any).__renderArgs=args;};}cb(t);});});
+    await page.addInitScript(()=>{localStorage.setItem('pool:help-dismissed','1');localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-09',allow:false}));const raf=requestAnimationFrame.bind(window);window.requestAnimationFrame=cb=>raf(t=>{const g=(window as any).__pool;if(g&&!(window as any).__draw){(window as any).__draw=g.scene.renderer.render.bind(g.scene.renderer);g.scene.renderer.render=(...args:any[])=>{(window as any).__renderArgs=args;};}cb(t);});});
     await page.route('**/api/account',r=>r.fulfill({json:{account:null,stats:null}}));await page.route('**/api/opponents/jev',r=>r.fulfill({json:{available:false}}));
     await page.goto('/');await waitForOpening(page);
     await expect(page.locator('.status-meta #version')).toBeAttached();await expect(page.locator('#desktop-camera-stack .legal-links')).toBeVisible();await expect(page.locator('.topbar #scorecard')).toHaveCount(0);await expect(page.locator('#mobile-settings-about')).not.toBeVisible();await expect(page.locator('.settings-mobile-icon')).not.toBeVisible();

@@ -4,7 +4,7 @@ for(const mobile of [false,true])test.describe(mobile?'mobile username':'desktop
  if(mobile)test.use({viewport:{width:390,height:844},hasTouch:true,isMobile:true});
  test('availability, conflict, rename and cooldown are usable and preserve identity',async({page})=>{
   await acceptWelcomeBeforeLoad(page);
-  await page.addInitScript(()=>{localStorage.setItem('pool:help-dismissed','1');localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-08',allow:false}));const raf=requestAnimationFrame.bind(window);window.requestAnimationFrame=cb=>raf(t=>{const g=(window as any).__pool;if(g)g.scene.renderer.render=()=>{};cb(t);});});
+  await page.addInitScript(()=>{localStorage.setItem('pool:help-dismissed','1');localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-09',allow:false}));const raf=requestAnimationFrame.bind(window);window.requestAnimationFrame=cb=>raf(t=>{const g=(window as any).__pool;if(g)g.scene.renderer.render=()=>{};cb(t);});});
   let account:any={id:'same-account',username:'Before',createdAt:1,premium:true,isAdmin:false,usernameChangedAt:null,usernameChangeAvailableAt:null};
   await page.route('**/api/account',r=>r.fulfill({json:{account,stats:null}}));
   await page.route('**/api/account/passkeys',r=>r.fulfill({json:{passkeys:[],recentlyVerified:true}}));

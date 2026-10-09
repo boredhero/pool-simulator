@@ -5,7 +5,15 @@ services:
       - "8000:8000"
     volumes:
       - pool_data:/srv/data
+      - pool_logs:/srv/logs
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
     environment:
+      POOL_LOG_DIR: /srv/logs
       JEV_API_KEY: ${JEV_API_KEY:-}
       ADMIN_ACCOUNT_ID: ${ADMIN_ACCOUNT_ID:-}
       WEBAUTHN_ORIGIN: ${WEBAUTHN_ORIGIN:-http://localhost:8000}
@@ -14,3 +22,4 @@ services:
 
 volumes:
   pool_data:
+  pool_logs:

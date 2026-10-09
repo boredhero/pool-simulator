@@ -21,6 +21,7 @@ if __name__ == "__main__":
             "app.main:app",
             host="0.0.0.0",
             port=8000,
+            access_log=False,
             ws_max_size=16384,
             ws_max_queue=8,
             ws_per_message_deflate=False,

@@ -3,7 +3,7 @@ import {acceptWelcomeBeforeLoad} from './welcomeFixture';
 import {TERMS_VERSION} from '../src/ui/terms';
 async function prepare(page:Page){
  await acceptWelcomeBeforeLoad(page);
- await page.addInitScript(()=>{localStorage.setItem('pool:help-dismissed','1');localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-08',allow:false}));const raf=requestAnimationFrame.bind(window);window.requestAnimationFrame=cb=>raf(t=>{const g=(window as any).__pool;if(g)g.scene.renderer.render=()=>{};cb(t);});});
+ await page.addInitScript(()=>{localStorage.setItem('pool:help-dismissed','1');localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-09',allow:false}));const raf=requestAnimationFrame.bind(window);window.requestAnimationFrame=cb=>raf(t=>{const g=(window as any).__pool;if(g)g.scene.renderer.render=()=>{};cb(t);});});
  const state={account:null as any,linked:false,finish:'signup',scripts:0,finishes:0,signupBody:null as any};
  await page.route('**/api/account',r=>r.fulfill({json:{account:state.account,stats:null}}));
  await page.route('**/api/account/passkeys',r=>r.fulfill({json:{passkeys:[],recentlyVerified:true}}));

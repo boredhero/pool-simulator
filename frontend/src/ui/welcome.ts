@@ -24,7 +24,7 @@ export async function setupWelcome(startTutorial:()=>void):Promise<void> {
       <label id="welcomeprofilelabel" class="welcome-profile">Your controls<select id="welcomeprofile"><option value="mouse">Mouse &amp; Keyboard Mode</option><option value="trackpad">Trackpad Mode</option></select></label>
       <p id="welcomecontrols" class="welcome-controls"></p>
       <div class="welcome-choice"><input id="welcometerms" type="checkbox" required><label for="welcometerms">I am 18 or older and accept the <a href="/terms.html" target="_blank" rel="noopener">Terms of Service</a>.</label></div>
-      <div id="welcomeanalyticschoice" class="welcome-choice"><input id="welcomeanalytics" type="checkbox"><label for="welcomeanalytics">Allow optional usage analytics <span>Help improve the game with feature-use sessions and device type. No account identity, IP address, typing, or advertising trackers. You can change this in Privacy choices.</span></label></div>
+      <div id="welcomeanalyticschoice" class="welcome-choice"><input id="welcomeanalytics" type="checkbox"><label for="welcomeanalytics">Allow optional usage analytics <span>Help improve the game with visit counts, feature use, and device type. No account identity, IP address, typing, or advertising trackers. You can change this in Privacy choices.</span></label></div>
       <p id="welcomeprivacy-note" class="welcome-small"></p>
       <a class="welcome-privacy-link" href="/privacy.html" target="_blank" rel="noopener">Read the Privacy Notice</a>
       <button id="welcomeinstall" data-install-app type="button">Install app on this device</button>

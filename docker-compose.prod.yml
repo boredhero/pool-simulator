@@ -7,7 +7,14 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:8000:8000"
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
     environment:
+      POOL_LOG_DIR: /srv/logs
       GOOGLE_CLIENT_ID: ${POOL_MARTINOSPIZZA_DEV_OAUTH_CLIENT_ID:-}
       GOOGLE_ORIGIN: https://pool.martinospizza.dev
       JEV_API_KEY: ${JEV_API_KEY:-}
@@ -21,6 +28,7 @@ services:
       ALLOWED_ORIGINS: https://pool.martinospizza.dev
     volumes:
       - pool_data:/srv/data
+      - pool_logs:/srv/logs
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8000/healthz"]
       interval: 30s
@@ -30,3 +38,4 @@ services:
 
 volumes:
   pool_data:
+  pool_logs:

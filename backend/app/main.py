@@ -1,6 +1,9 @@
 """FastAPI entry: serves API + frontend/dist in prod, /healthz."""
 
 import asyncio
+import logging
+import secrets
+import time
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
@@ -10,6 +13,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from app import observability
 from app.api.accounts import router as accounts_router
 from app.api.admin import router as admin_router
 from app.api.google import router as google_router
@@ -26,6 +30,7 @@ from app.services.matches import interrupt_matches
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    observability.configure()
     interrupt_matches()
     init_db()
     with Session.begin() as db:
@@ -34,6 +39,7 @@ async def lifespan(app: FastAPI):
     async def retention():
         while True:
             await asyncio.sleep(3600)
+            await asyncio.to_thread(observability.maintenance)
             with Session.begin() as db:
                 cleanup(db)
 
@@ -77,6 +83,39 @@ async def validation_error(request, exc):
             content={"detail": "Check the username and password length (15–128 characters)."},
         )
     return await request_validation_exception_handler(request, exc)
+
+
+@app.middleware("http")
+async def diagnostics(request, call_next):
+    request_id = secrets.token_hex(12)
+    start = time.monotonic()
+    status = 500
+    logger = logging.getLogger("pool.http")
+    try:
+        response = await call_next(request)
+        status = response.status_code
+        response.headers["X-Request-ID"] = request_id
+        return response
+    except Exception:
+        logger.exception("request_failed", extra={"request_id": request_id})
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal server error", "requestId": request_id},
+            headers={"X-Request-ID": request_id},
+        )
+    finally:
+        route = getattr(request.scope.get("route"), "path", "unmatched")
+        if route != "/healthz":
+            logger.info(
+                "http_request",
+                extra={
+                    "request_id": request_id,
+                    "method": request.method,
+                    "route": route,
+                    "status": status,
+                    "duration_ms": round((time.monotonic() - start) * 1000, 2),
+                },
+            )
 
 
 @app.middleware("http")
