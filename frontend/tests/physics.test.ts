@@ -235,6 +235,7 @@ it('keeps every live pair separated throughout seeded full-power breaks', async 
       }
     }
     expect(smallestGap, `seed ${seed}`).toBeGreaterThanOrEqual(2 * BALL_R - 1e-7);
+    expect(ev.offTable).toEqual([]);
     expect(allAsleep(balls)).toBe(true);
   }
 });

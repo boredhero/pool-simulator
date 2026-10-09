@@ -23,7 +23,7 @@ function execute(gs:ReturnType<typeof newGame>,shot:NonNullable<ReturnType<typeo
   const cue=gs.balls[0];beginShot(gs,shot.ball,shot.pocket);
   strike(cue,Math.cos(shot.angle),Math.sin(shot.angle),shot.power,shot.tipX,shot.tipY,
     gs.rules[gs.breakShot?'breakMax':'normalMax'],cueElevation(cue.x,cue.y,shot.angle,0,gs.balls));
-  const ev=simulateShot(gs.balls,0);applyShot(gs,ev);expect(allAsleep(gs.balls)).toBe(true);
+  const ev=simulateShot(gs.balls,0);applyShot(gs,ev);expect(allAsleep(gs.balls)).toBe(true);return ev;
 }
 it.each(settings)('plans and executes with custom settings %j',rules=>{
   const gs=fixture(rules),before=structuredClone(gs),shot=planCpuTurn(gs,4,Infinity)!;
@@ -42,5 +42,6 @@ it('calibrates zero-budget geometry to physical speed at both custom cap boundar
 });
 it.each([1,9.5,12])('executes a full break at cap %s even when strict break cannot be satisfied',breakMax=>{
   const gs=newGame(1,{preset:'custom',breakMax,strictBreak:true});
-  const shot=planCpuTurn(gs,1,Infinity)!;expect(shot.power).toBe(1);execute(gs,shot);
+  const shot=planCpuTurn(gs,1,Infinity)!;expect(shot.power).toBe(1);const ev=execute(gs,shot);
+  if(breakMax===9.5)expect(ev.offTable).toEqual([]);
 });

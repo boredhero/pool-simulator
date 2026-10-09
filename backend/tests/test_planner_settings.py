@@ -85,7 +85,9 @@ def test_break_cap_is_used_by_actual_plan_and_replay(maximum):
     gs = new_game(1, {"preset": "custom", "breakMax": maximum, "strictBreak": True})
     selected = plan_shots(gs, max_trials=1, budget_seconds=None)[0]
     assert selected["power"] == 1
-    execute(gs, selected)  # A low cap may foul; it must still finish and remain executable.
+    events = execute(gs, selected)  # Low caps may foul but must finish.
+    if maximum == 9.5:
+        assert not events.off_table
 
 
 def test_exhausted_budget_kitchen_fallback_calls_own_ball():

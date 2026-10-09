@@ -145,4 +145,5 @@ def test_break_separation_every_step():
                         distance = ((a.x - b.x) ** 2 + (a.y - b.y) ** 2) ** 0.5
                         smallest_gap = min(smallest_gap, distance)
         assert smallest_gap >= 2 * BALL_R - 1e-7, (seed, smallest_gap)
+        assert not ev.off_table
         assert all_asleep(balls)
