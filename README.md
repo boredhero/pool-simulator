@@ -21,9 +21,9 @@ flowchart LR
 ```
 
 The browser predicts player shots immediately. In online and Jev games, only the
-server resolves turns, fouls and results. Both simulators use shared golden vectors
-in `contracts/golden/`; this checks parity for those cases, not every possible
-trajectory. Ball flight, spin, cushions and pockets are approximations rather than
+server resolves turns, fouls and results. Both simulators use shared fixtures in `contracts/`; these check agreement for
+the covered cases, not every possible trajectory. See [simulation synchronization](docs/simulation-sync.md)
+for snapshot precision and replay checks. Ball flight, spin, cushions and pockets are approximations rather than
 a calibrated professional billiards model. See [planner evaluation and limitations](docs/planner-research.md).
 
 - `frontend/src/`: rendering, input, local simulation and interface.

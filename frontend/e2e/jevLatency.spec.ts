@@ -1,5 +1,6 @@
 import {expect,test,type Page} from '@playwright/test';
 import {acceptWelcomeBeforeLoad} from './welcomeFixture';
+import replayFixtures from '../../contracts/snapshot-replay.json' with {type:'json'};
 
 test.beforeEach(async({page})=>{
   await acceptWelcomeBeforeLoad(page);
@@ -34,6 +35,44 @@ async function settlePrediction(page:Page){
     if(g.mode==='rolling')throw Error('Prediction failed to settle within 60 simulated seconds');
   });
 }
+
+test('Jev snapshots retain exact coordinates, flight, velocity and spin',async({page})=>{
+  const state=await setup(page);
+  const snapshot={...state.balls[0],x:.02857500000001,y:1.123456789012345,z:.0123456789012345,
+    vx:.123456789012345,vy:-1.123456789012345,vz:.234567890123456,
+    wx:-4.56789012345678,wy:3.45678901234567,wz:-2.34567890123456,asleep:false,potted:false};
+  const actual=await page.evaluate(({state,snapshot})=>{
+    const g=(window as any).__pool;
+    g.applyJevState({...state,balls:[snapshot,...state.balls.slice(1)]});
+    return structuredClone(g.cue());
+  },{state,snapshot});
+  expect(actual).toEqual(snapshot);
+});
+
+test('two sequential object pots remain down after the authoritative Jev result',async({page})=>{
+  const state=await setup(page);
+  const balls=replayFixtures.sequentialPots.balls;
+  let release!:()=>void;const gate=new Promise<void>(resolve=>release=resolve);
+  const finalBalls=balls.map(ball=>({...ball,potted:ball.n!==null,asleep:true,
+    vx:0,vy:0,vz:0,z:0,wx:0,wy:0,wz:0}));
+  await page.route('**/api/opponents/jev/games/latency/turn',async route=>{
+    await gate;await route.fulfill({json:{state:{...state,balls:finalBalls,return_order:[2,1]},by:0,source:'human'}});
+  });
+  await page.evaluate(({state,balls})=>{
+    const g=(window as any).__pool;g.gs.balls=structuredClone(balls);
+    g.applyJevState({...state,revision:0,balls});g.fire(.05);
+  },{state,balls});
+  await settlePrediction(page);
+  expect(await page.evaluate(()=>{
+    const g=(window as any).__pool;
+    return {mode:g.mode,potted:g.ev.potted,objects:g.gs.balls.filter((b:any)=>b.n!==null).map((b:any)=>b.potted)};
+  })).toEqual({mode:'wait',potted:[2,1],objects:[true,true]});
+  release();await expect.poll(()=>page.evaluate(()=>(window as any).__pool.jevGame.revision)).toBe(1);
+  expect(await page.evaluate(()=>{
+    const g=(window as any).__pool;
+    return {mode:g.mode,returnOrder:g.gs.returnOrder,objects:g.gs.balls.filter((b:any)=>b.n!==null).map((b:any)=>b.potted)};
+  })).toEqual({mode:'aim',returnOrder:[2,1],objects:[true,true]});
+});
 
 test('human Jev stroke moves immediately, locks aim, and commits only one authoritative result',async({page})=>{
   const state=await setup(page);let release!:()=>void;const gate=new Promise<void>(resolve=>release=resolve);let requests=0;

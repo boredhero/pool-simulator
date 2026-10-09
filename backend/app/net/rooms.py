@@ -10,7 +10,7 @@ import math
 import random
 import secrets
 import time
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 
 from anyio import CancelScope
 from fastapi import HTTPException, WebSocket, WebSocketDisconnect
@@ -41,10 +41,11 @@ def _code() -> str:
 
 
 def ball_dump(balls: list[Ball]) -> list[dict]:
-    return [
-        {"id": b.id, "n": b.n, "x": round(b.x, 5), "y": round(b.y, 5), "potted": b.potted}
-        for b in balls
-    ]
+    # These are simulation inputs for the next browser replay, not display
+    # coordinates. Micrometer rounding can change collisions and pocket results.
+    # Completed shots normally have zero motion, but preserve every field rather
+    # than silently flattening a snapshot that still contains flight or spin.
+    return [asdict(b) for b in balls]
 
 
 def ev_dump(ev: ShotEvents) -> dict:

@@ -127,6 +127,30 @@ jobs:
         working-directory: frontend
         run: npm run build
 
+  replay-parity:
+    name: replay-parity
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Compare live Python and browser physics
+        working-directory: frontend
+        env:
+          POOL_REPLAY_PARITY: '1'
+        run: npm test -- --run tests/replayParity.test.ts
+
   docker:
     name: docker
     needs: changes
@@ -162,7 +186,7 @@ jobs:
 
   deploy:
     name: deploy
-    needs: [docker, lint, test, frontend]
+    needs: [docker, lint, test, frontend, replay-parity]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
@@ -213,7 +237,7 @@ jobs:
   ci:
     name: ci
     if: always()
-    needs: [changes, lint, test, frontend, docker, deploy]
+    needs: [changes, lint, test, frontend, replay-parity, docker, deploy]
     runs-on: ubuntu-latest
     steps:
       - name: Summarize required checks

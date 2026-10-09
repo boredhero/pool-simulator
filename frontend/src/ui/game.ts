@@ -26,7 +26,7 @@ import { jevRequest } from '../sim/jev';
 import { Sfx } from './sfx';
 import { POCKETS, TABLE_H, TABLE_W } from '../sim/table';
 import { init, type SceneHandle } from '../render/scene';
-import { RoomClient, type RoomState } from '../net/room';
+import { applyServerBalls, RoomClient, type RoomState } from '../net/room';
 
 type Mode = 'aim' | 'rolling' | 'place' | 'over' | 'wait';
 
@@ -1088,14 +1088,7 @@ export class Game {
     this.cancelOpponent();
     const wasPlacing=this.gs.ballInHand;
     const placementCamera=this.pendingPlacementCamera;this.pendingPlacementCamera=null;
-    for (const sb of s.balls) {
-      const b = this.gs.balls.find((q) => q.id === sb.id);
-      if (!b) continue;
-      b.n = sb.n; b.z = b.vz = 0;
-      b.x = sb.x; b.y = sb.y; b.potted = sb.potted;
-      b.vx = b.vy = b.wx = b.wy = b.wz = 0;
-      b.asleep = true;
-    }
+    applyServerBalls(this.gs.balls, s.balls);
     if(s.names)this.roomNames=s.names;
     this.gs.current = s.current === 1 ? 1 : 0;
     this.gs.groups = [(s.groups[0] ?? null) as never, (s.groups[1] ?? null) as never];

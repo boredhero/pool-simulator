@@ -9,7 +9,8 @@
       "Online matches share Chalk-Sim when either participant has it selected, without changing the other account\u2019s preferences.",
       "Signed-in appearance, camera input, auto-camera, and playback settings now follow your account across devices. Guest preferences remain local.",
       "Install app controls are shown only in mobile mode.",
-      "Fixed grounded object balls passing through cushions after another ball pushed them slightly into the rail."
+      "Fixed grounded object balls passing through cushions after another ball pushed them slightly into the rail.",
+      "Preserved full-precision server ball snapshots and aligned replay calculations to prevent predicted pockets being reversed by synchronization."
     ]
   },
   {

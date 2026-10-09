@@ -1,3 +1,4 @@
+import {norm} from './numeric';
 import {chalkContact} from './chalk';
 // Planar rolling plus 3D flight and spin. Fixed dt=1/240, semi-implicit Euler
 // for friction + swept (analytic TOI) ball-ball / cushion / jaw collisions.
@@ -65,7 +66,7 @@ export function throwMu(vRel: number): number {
 /** Rigid cue impulse + frictional slate rebound. See pooltool's
  * instantaneous_point and frictional_inelastic ball/table models. */
 export function strike(b: Ball, dx: number, dy: number, power: number, tipX: number, tipY: number, vmax = VMAX_NORMAL, elevation = 0, chalkLevel = 1): void {
-  const offset = Math.hypot(tipX, tipY);
+  const offset = norm(tipX, tipY);
   const scale = offset > TIP_MAX ? TIP_MAX / offset : 1;
   const tx = tipX * scale, ty = tipY * scale;
   const theta = Math.max(0, Math.min(Math.PI / 2 - 0.01, elevation));
@@ -98,7 +99,7 @@ export function land(b: Ball): void {
   if (b.vz >= 0) return;
   const normal = -1.5 * b.vz; // slate restitution 0.5 (tunable approximation)
   const ux = b.vx - BALL_R * b.wy, uy = b.vy + BALL_R * b.wx;
-  const slip = Math.hypot(ux, uy);
+  const slip = norm(ux, uy);
   if (slip > 1e-12) {
     const impulse = Math.min(2 * slip / 7, MU_S * normal);
     const ix = -impulse * ux / slip, iy = -impulse * uy / slip;
@@ -122,11 +123,11 @@ function advance(b: Ball, dt: number, ev: ShotEvents, cueId: number): void {
 
 function friction(b: Ball, dt: number): void {
   // Pocket lip gravity: overhanging slow balls get pulled in, never rest on air.
-  const spd0 = Math.hypot(b.vx, b.vy);
+  const spd0 = norm(b.vx, b.vy);
   if (spd0 < 1.5) {
     for (const p of POCKETS) {
       const dx = p.x - b.x, dy = p.y - b.y;
-      const d = Math.hypot(dx, dy);
+      const d = norm(dx, dy);
       const cr = captureRadius(p, spd0);
       if (d < cr + BALL_R && d > 1e-6) {
         const a = 0.5 + 3.0 * (1 - d / (cr + BALL_R));
@@ -137,7 +138,7 @@ function friction(b: Ball, dt: number): void {
   }
   const ux = b.vx - BALL_R * b.wy;
   const uy = b.vy + BALL_R * b.wx;
-  const s = Math.hypot(ux, uy);
+  const s = norm(ux, uy);
   // Solid-sphere contact slip decays at (1 + 5/2)*mu*g. Stop the
   // sliding impulse exactly at zero slip, then roll for the remaining time.
   const slideTime = Math.min(dt, s / (3.5 * MU_S * G));
@@ -148,7 +149,7 @@ function friction(b: Ball, dt: number): void {
     b.wy += 2.5 * impulse * ux / (BALL_R * s);
   }
   if (slideTime < dt) {
-    const speed = Math.hypot(b.vx, b.vy);
+    const speed = norm(b.vx, b.vy);
     const deceleration = Math.min(speed, MU_R * G * (dt - slideTime));
     if (speed > 1e-12) { b.vx -= deceleration * b.vx / speed; b.vy -= deceleration * b.vy / speed; }
     b.wx = -b.vy / BALL_R; b.wy = b.vx / BALL_R;
@@ -178,7 +179,7 @@ function earliestContact(balls: Ball[], dt: number): Contact | null {
       const c = dx * dx + dy * dy + dz * dz - R2 * R2;
       if (c < 0) {
         // Overlapping: resolve now along line of centers.
-        const d = Math.hypot(dx, dy, dz);
+        const d = norm(dx, dy, dz);
         best = { t: 0, kind: 'bb', a: A.id, b: B.id, nx: d > 1e-9 ? dx / d : 1, ny: d > 1e-9 ? dy / d : 0, nz: d > 1e-9 ? dz / d : 0 };
         continue;
       }
@@ -243,7 +244,7 @@ function earliestContact(balls: Ball[], dt: number): Contact | null {
       if (c < 0) {
         if (A.z > 0.05) continue;
         if (bq >= 0) continue; // already leaving the jaw
-        const d = Math.hypot(dx, dy) || 1e-9;
+        const d = norm(dx, dy) || 1e-9;
         if (!best || 0 < best.t) best = { t: 0, kind: 'jaw', a: A.id, b: -1, nx: dx / d, ny: dy / d };
         continue;
       }
@@ -287,7 +288,7 @@ function resolveBallBall(A: Ball, B: Ball, nx: number, ny: number, ev: ShotEvent
   }
   // Repair penetration even when an impact impulse was just applied. This
   // changes positions only, so resting contacts cannot gain kinetic energy.
-  const distance = Math.hypot(A.x - B.x, A.y - B.y, A.z - B.z);
+  const distance = norm(A.x - B.x, A.y - B.y, A.z - B.z);
   if (distance < BALL_R * 2) {
     const push = (BALL_R * 2 - distance) / 2 + 1e-8;
     A.x += nx * push; A.y += ny * push; A.z = Math.max(0, A.z + nz * push);
@@ -367,19 +368,19 @@ export function step(balls: Ball[], dt: number, ev: ShotEvents, cueId: number, c
     const l2 = dx * dx + dy * dy;
     let t = l2 > 0 ? ((px - x1) * dx + (py - y1) * dy) / l2 : 0;
     t = Math.max(0, Math.min(1, t));
-    return Math.hypot(px - (x1 + dx * t), py - (y1 + dy * t));
+    return norm(px - (x1 + dx * t), py - (y1 + dy * t));
   };
   for (const b of balls) {
     if (b.potted) continue;
     let captured = false;
     const pr = prev.get(b.id);
-    const spd = Math.hypot(b.vx, b.vy);
+    const spd = norm(b.vx, b.vy);
     for (const [pocket, p] of POCKETS.entries()) {
       if (b.z > 0.005) continue;
       const cr = captureRadius(p, spd);
       const d = pr
         ? segDist(pr[0], pr[1], b.x, b.y, p.x, p.y)
-        : Math.hypot(b.x - p.x, b.y - p.y);
+        : norm(b.x - p.x, b.y - p.y);
       if (d < cr) {
         b.potted = true;
         b.asleep = true;
@@ -400,7 +401,7 @@ export function step(balls: Ball[], dt: number, ev: ShotEvents, cueId: number, c
       continue;
     }
     // Pure sidespin cannot move an isolated resting ball; do not hold the turn for its decay.
-    if (!b.potted && b.z <= 1e-9 && b.vz === 0 && Math.hypot(b.vx, b.vy) < SLEEP_V && Math.hypot(b.wx, b.wy) < SLEEP_W) {
+    if (!b.potted && b.z <= 1e-9 && b.vz === 0 && norm(b.vx, b.vy) < SLEEP_V && norm(b.wx, b.wy) < SLEEP_W) {
       b.z = b.vz = b.vx = b.vy = b.wx = b.wy = b.wz = 0;
       b.asleep = true;
     }

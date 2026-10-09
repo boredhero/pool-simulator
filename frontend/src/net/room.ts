@@ -1,9 +1,27 @@
 import type { MatchConfig } from '../sim/config';
 import type { Placement } from '../sim/rules';
+import type { Ball } from '../sim/physics';
 // Room net client: join/create private rooms, shot-event sync.
 // Server is authoritative on rules; we predict locally and reconcile at rest.
 export interface ShotParams { chalkLevel?:number; miscue?:boolean; aim: number; power: number; tipX: number; tipY: number; vmax?: number; elevation?: number; calledBall?: number | null; calledPocket?: number | null }
-export interface ServerBall { id: number; n: number | null; x: number; y: number; potted: boolean }
+export interface ServerBall {
+  id: number; n: number | null; x: number; y: number; potted: boolean;
+  z?: number; vx?: number; vy?: number; vz?: number;
+  wx?: number; wy?: number; wz?: number; asleep?: boolean;
+}
+
+/** Exact server state seeds the next replay. Older snapshots describe resting balls. */
+export function applyServerBalls(balls: Ball[], snapshots: ServerBall[]): void {
+  for (const snapshot of snapshots) {
+    const ball = balls.find(candidate => candidate.id === snapshot.id);
+    if (!ball) continue;
+    Object.assign(ball, snapshot, {
+      z: snapshot.z ?? 0, vx: snapshot.vx ?? 0, vy: snapshot.vy ?? 0, vz: snapshot.vz ?? 0,
+      wx: snapshot.wx ?? 0, wy: snapshot.wy ?? 0, wz: snapshot.wz ?? 0,
+      asleep: snapshot.asleep ?? true,
+    });
+  }
+}
 export interface RoomState {
   chalk?: [number,number];
   return_order: number[];
