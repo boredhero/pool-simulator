@@ -854,9 +854,8 @@ test('practice touch aiming and profile-specific coaching use real controls',asy
   await expect(page.locator('#tutorialbody')).toContainText('one finger');
   await page.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));
   const p=await page.evaluate(()=>{const g=(window as any).__pool;for(let y=220;y<600;y+=20)for(let x=80;x<300;x+=20)if(document.elementFromPoint(x,y)?.id==='game-canvas'&&g.scene.pickFelt(x,y))return{x,y};throw Error('No exposed felt');});
-  await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{...p,id:1}]});
-  await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:p.x+20,y:p.y+15,id:1}]});
-  await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+  // Finish a browser-managed touch gesture before tapping a separate control.
+  await cdp.send('Input.synthesizeScrollGesture',{x:p.x,y:p.y,xDistance:-20,yDistance:-15,speed:200,gestureSourceType:'touch',preventFling:true});
   await expect(page.locator('#tutorialprogress')).toHaveText('Control worked');
   expect(await page.evaluate(()=>(window as any).__pool.mode)).toBe('aim');
   await page.locator('#tutorialnext').tap();await expect(page.locator('#tutorial')).toHaveAttribute('data-step','spin');await page.locator('#tutorialnext').tap();
