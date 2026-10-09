@@ -5,12 +5,79 @@ import json
 import logging
 import logging.handlers
 import os
+import secrets
 import shutil
 import time
 from contextvars import ContextVar
 from pathlib import Path
 
+from starlette.responses import JSONResponse
+
 request_id_context = ContextVar("request_id", default=None)
+
+
+class RequestDiagnostics:
+    """Measure HTTP responses through the final body sent to the ASGI server."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+        request_id = secrets.token_hex(12)
+        token = request_id_context.set(request_id)
+        start = time.perf_counter()
+        status, started, completed = 500, False, False
+        headers_ms = duration_ms = None
+        logger = logging.getLogger("pool.http")
+
+        async def measured_send(message):
+            nonlocal status, started, completed, headers_ms, duration_ms
+            if message["type"] == "http.response.start":
+                status = message["status"]
+                headers_ms = (time.perf_counter() - start) * 1000
+                message = dict(message)
+                message["headers"] = [
+                    (key, value)
+                    for key, value in message.get("headers", [])
+                    if key.lower() != b"x-request-id"
+                ] + [(b"x-request-id", request_id.encode("ascii"))]
+                started = True
+            await send(message)
+            if message["type"] == "http.response.body" and not message.get("more_body", False):
+                completed = True
+                duration_ms = (time.perf_counter() - start) * 1000
+
+        try:
+            await self.app(scope, receive, measured_send)
+        except Exception:
+            logger.exception("request_failed", extra={"request_id": request_id})
+            if started:
+                raise
+            await JSONResponse(
+                status_code=500,
+                content={"detail": "Internal server error", "requestId": request_id},
+            )(scope, receive, measured_send)
+        finally:
+            logger.info(
+                "http_request",
+                extra={
+                    "request_id": request_id,
+                    "method": scope["method"],
+                    "route": getattr(scope.get("route"), "path", "unmatched"),
+                    "status": status,
+                    "duration_ms": round(
+                        duration_ms
+                        if duration_ms is not None
+                        else (time.perf_counter() - start) * 1000,
+                        2,
+                    ),
+                    "headers_duration_ms": round(headers_ms, 2) if headers_ms is not None else None,
+                    "response_complete": completed,
+                },
+            )
+            request_id_context.reset(token)
 
 
 class RetainedLog(logging.handlers.BaseRotatingHandler):
@@ -88,6 +155,8 @@ class JsonLog(logging.Formatter):
             "route",
             "status",
             "duration_ms",
+            "headers_duration_ms",
+            "response_complete",
             "error_type",
             "game_id",
             "reason",

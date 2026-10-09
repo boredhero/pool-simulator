@@ -1,9 +1,6 @@
 """FastAPI entry: serves API + frontend/dist in prod, /healthz."""
 
 import asyncio
-import logging
-import secrets
-import time
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
@@ -85,40 +82,7 @@ async def validation_error(request, exc):
     return await request_validation_exception_handler(request, exc)
 
 
-@app.middleware("http")
-async def diagnostics(request, call_next):
-    request_id = secrets.token_hex(12)
-    context_token = observability.request_id_context.set(request_id)
-    start = time.monotonic()
-    status = 500
-    logger = logging.getLogger("pool.http")
-    try:
-        response = await call_next(request)
-        status = response.status_code
-        response.headers["X-Request-ID"] = request_id
-        return response
-    except Exception:
-        logger.exception("request_failed", extra={"request_id": request_id})
-        return JSONResponse(
-            status_code=500,
-            content={"detail": "Internal server error", "requestId": request_id},
-            headers={"X-Request-ID": request_id},
-        )
-    finally:
-        route = getattr(request.scope.get("route"), "path", "unmatched")
-        if route != "/healthz":
-            logger.info(
-                "http_request",
-                extra={
-                    "request_id": request_id,
-                    "method": request.method,
-                    "route": route,
-                    "status": status,
-                    "duration_ms": round((time.monotonic() - start) * 1000, 2),
-                },
-            )
-
-        observability.request_id_context.reset(context_token)
+app.add_middleware(observability.RequestDiagnostics)
 
 
 @app.middleware("http")

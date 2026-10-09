@@ -124,3 +124,63 @@ def test_nested_service_logs_share_request_id_and_clear_context():
     finally:
         logger.removeHandler(capture)
         app.router.routes.remove(route)
+
+
+def test_request_duration_includes_body_and_health_checks(monkeypatch, caplog):
+    import asyncio
+    from types import SimpleNamespace
+
+    from app.observability import RequestDiagnostics
+
+    clock = [10.0]
+    monkeypatch.setattr("app.observability.time.perf_counter", lambda: clock[0])
+
+    async def endpoint(scope, receive, send):
+        scope["route"] = SimpleNamespace(path="/healthz")
+        clock[0] += 0.1
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        clock[0] += 0.4
+        await send({"type": "http.response.body", "body": b"part", "more_body": True})
+        clock[0] += 0.5
+        await send({"type": "http.response.body", "body": b"done"})
+        # Background work after sending the response is not response latency.
+        clock[0] += 5
+
+    sent = []
+
+    async def send(message):
+        sent.append(message)
+
+    with caplog.at_level(logging.INFO, logger="pool.http"):
+        asyncio.run(RequestDiagnostics(endpoint)({"type": "http", "method": "GET"}, None, send))
+    record = next(r for r in caplog.records if r.msg == "http_request")
+    assert record.route == "/healthz"
+    assert record.duration_ms == 1000
+    assert record.headers_duration_ms == 100
+    assert record.response_complete is True
+    assert (b"x-request-id", record.request_id.encode()) in sent[0]["headers"]
+
+
+def test_interrupted_response_keeps_status_and_logs_duration(caplog):
+    import asyncio
+
+    import pytest
+
+    from app.observability import RequestDiagnostics
+
+    async def endpoint(scope, receive, send):
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        raise ValueError("stream interrupted")
+
+    sent = []
+
+    async def send(message):
+        sent.append(message)
+
+    with caplog.at_level(logging.INFO, logger="pool.http"), pytest.raises(ValueError):
+        asyncio.run(RequestDiagnostics(endpoint)({"type": "http", "method": "GET"}, None, send))
+    record = next(r for r in caplog.records if r.msg == "http_request")
+    assert record.status == 200
+    assert record.duration_ms >= 0
+    assert record.response_complete is False
+    assert len(sent) == 1

@@ -546,7 +546,10 @@ Startup/hourly maintenance and rotation remove archives older than 14 days and
 delete oldest archives first to keep storage below 100 MiB (reserving one active
 10 MiB file). The handler supports the current single-process deployment; multiple
 workers require a dedicated log collector. Request logs use route templates, never
-raw paths, queries, bodies, credentials, or cookies. Health-check access noise is omitted.
+raw paths, queries, bodies, credentials, or cookies. Every application HTTP request, including health checks and failures, records
+`duration_ms` through the final response body and `headers_duration_ms` to response
+headers, plus `response_complete` to distinguish interrupted responses. These are
+server timings, not browser/network latency; WebSocket messages are not HTTP requests.
 The `X-Request-ID` response header correlates HTTP and nested service logs. Jev,
 account, and admin request errors display diagnostic references. Jev fallback
 notices distinguish timeouts, provider throttling/errors, unusable choices, and
