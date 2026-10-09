@@ -15,7 +15,7 @@ for(const mobile of [false,true])test.describe(mobile?'mobile':'desktop',()=>{
       const g=(window as any).__pool;
       if(g&&!g.__capture){
         g.__capture=true;const draw=g.scene.renderer.render.bind(g.scene.renderer);
-        g.scene.renderer.render=(world:any,camera:any)=>{g.__world=world;if(g.__show)draw(world,camera);};
+        g.scene.renderer.render=(world:any,camera:any)=>{g.__world=world;if(g.__show){draw(world,camera);g.__show=false;g.__drawn=true;}};
       }
       cb(time);
     });
@@ -48,7 +48,9 @@ for(const mobile of [false,true])test.describe(mobile?'mobile':'desktop',()=>{
     return result;
   });
   for(const call of calls)expect(call.visible,`${call.mode} ${call.policy}`).toBe(call.policy==='all');
+  // Capture a completed frame instead of saturating software WebGL throughout screenshot capture.
   await page.evaluate(()=>{(window as any).__pool.__show=true;});
+  await page.waitForFunction(()=>(window as any).__pool.__drawn===true);
   await page.screenshot({path:info.outputPath('called-pocket.png')});
   await page.evaluate(()=>{const g=(window as any).__pool;g.__show=false;g.calledPocket=null;g.hud();g.frame();});
   expect(await page.evaluate(()=>Array.from({length:6},(_,i)=>(window as any).__pool.__world.getObjectByName(`called-pocket-${i}`).visible))).toEqual([false,false,false,false,false,false]);
