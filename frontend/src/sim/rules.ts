@@ -10,6 +10,7 @@ export interface ShotContext {
   remaining: number[]; kitchen: boolean; calledBall: number | null; calledPocket: number | null;
 }
 export interface GameState {
+  chalk: [number,number];
   returnOrder: number[];
   balls: Ball[]; current: 0 | 1; groups: [Group, Group]; open: boolean;
   ballInHand: boolean; placement: Placement; kitchenShot: boolean; breakShot: boolean;
@@ -28,7 +29,7 @@ export function newGame(seed = 1, options: MatchConfig = BAR_RULES): GameState {
   const balls = [makeBall(0, null, ...HEAD_SPOT)];
   const order = rackOrder(seed), pos = rackPositions();
   order.forEach((n, i) => balls.push(makeBall(i + 1, n, ...pos[i])));
-  return { returnOrder: [], balls, current: 0, groups: [null, null], open: true, ballInHand: false, placement: 'none', kitchenShot: false, breakShot: true, winner: null, message: 'Player 1 to break', rules: matchConfig(options) };
+  return { chalk:[1,1], returnOrder: [], balls, current: 0, groups: [null, null], open: true, ballInHand: false, placement: 'none', kitchenShot: false, breakShot: true, winner: null, message: 'Player 1 to break', rules: matchConfig(options) };
 }
 export function groupOf(n: number): 'solid' | 'stripe' | 'eight' { return n === 8 ? 'eight' : n < 8 ? 'solid' : 'stripe'; }
 function remaining(gs: GameState): number[] {

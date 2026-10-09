@@ -210,6 +210,11 @@ body:has(#tutorial:not([hidden])) .privacy-notice{display:none}
   <button id="installapp" data-install-app type="button">Install app</button><p id="installappstatus" role="status"></p>
   <a id="viewsource" href="https://github.com/boredhero/pool-simulator" target="_blank" rel="noopener noreferrer" aria-label="View source on GitHub (opens in a new tab)"><img src="/github-mark-white.svg" alt="" width="24" height="24">View source</a>
 </section>
+  <details id="eastereggssettings" class="settings-group" hidden><summary><span>Easter eggs<small>Extra ways to play</small></span></summary><div class="settings-group-body">
+  <label class="chalk-sim-choice"><input id="chalksimenabled" type="checkbox" aria-describedby="chalksimhelp"><span>Chalk-Sim Enabled</span></label>
+  <p id="chalksimhelp" class="guide-note">Chalk your cue to keep your shots accurate. Applies to new games.</p>
+  <p id="chalksimstatus" class="guide-note" role="status"></p>
+  </div></details>
 </div>
 </div>
 <div id="camera-view-actions" hidden>

@@ -1,3 +1,5 @@
+import {norm} from './numeric';
+import {chalkContact} from './chalk';
 // Planar rolling plus 3D flight and spin. Fixed dt=1/240, semi-implicit Euler
 // for friction + swept (analytic TOI) ball-ball / cushion / jaw collisions.
 // Mirror of backend/app/sim/physics.py — keep constants + behavior in sync.
@@ -52,7 +54,10 @@ export function makeBall(id: number, n: number | null, x: number, y: number): Ba
 /** Power [0,1] -> cue-ball speed m/s. Break rips, normal play stays calm. */
 export function shootSpeed(power: number, vmax = VMAX_NORMAL): number {
   const p = Math.min(1, Math.max(0, power));
-  return VMIN + Math.pow(p, 1.55) * (vmax - VMIN);
+  // Match the server's launch-speed calibration to 1 picometre/second.
+  // This removes pow's runtime ULP noise without rounding any ball state.
+  const speed = VMIN + Math.pow(p, 1.55) * (vmax - VMIN);
+  return Math.floor(speed * 1e12 + 0.5) / 1e12;
 }
 
 /** Throw friction falls with closing speed (Dr. Dave fit of Colenso data). */
@@ -63,8 +68,8 @@ export function throwMu(vRel: number): number {
 
 /** Rigid cue impulse + frictional slate rebound. See pooltool's
  * instantaneous_point and frictional_inelastic ball/table models. */
-export function strike(b: Ball, dx: number, dy: number, power: number, tipX: number, tipY: number, vmax = VMAX_NORMAL, elevation = 0): void {
-  const offset = Math.hypot(tipX, tipY);
+export function strike(b: Ball, dx: number, dy: number, power: number, tipX: number, tipY: number, vmax = VMAX_NORMAL, elevation = 0, chalkLevel = 1): void {
+  const offset = norm(tipX, tipY);
   const scale = offset > TIP_MAX ? TIP_MAX / offset : 1;
   const tx = tipX * scale, ty = tipY * scale;
   const theta = Math.max(0, Math.min(Math.PI / 2 - 0.01, elevation));
@@ -79,6 +84,14 @@ export function strike(b: Ball, dx: number, dy: number, power: number, tipX: num
   b.wx = w * (-tx * st * rx - ty * ry);
   b.wy = w * (-tx * st * ry + ty * rx);
   b.wz = -w * tx * ct;
+  const {h,grip}=chalkContact(chalkLevel,tx,ty);
+  if(grip<1){
+    const forward=h*h+grip*(1-h*h),side=-h*tx*(1-grip),up=-h*ty*(1-grip);
+    b.vx=v*(forward*rx*ct-side*ry+up*rx*st);
+    b.vy=v*(forward*ry*ct+side*rx+up*ry*st);
+    b.vz=v*(-forward*st+up*ct);
+    b.wx*=grip;b.wy*=grip;b.wz*=grip;
+  }
   b.asleep = false;
   if (b.z <= 1e-9 && b.vz < 0) land(b);
 }
@@ -89,7 +102,7 @@ export function land(b: Ball): void {
   if (b.vz >= 0) return;
   const normal = -1.5 * b.vz; // slate restitution 0.5 (tunable approximation)
   const ux = b.vx - BALL_R * b.wy, uy = b.vy + BALL_R * b.wx;
-  const slip = Math.hypot(ux, uy);
+  const slip = norm(ux, uy);
   if (slip > 1e-12) {
     const impulse = Math.min(2 * slip / 7, MU_S * normal);
     const ix = -impulse * ux / slip, iy = -impulse * uy / slip;
@@ -113,11 +126,11 @@ function advance(b: Ball, dt: number, ev: ShotEvents, cueId: number): void {
 
 function friction(b: Ball, dt: number): void {
   // Pocket lip gravity: overhanging slow balls get pulled in, never rest on air.
-  const spd0 = Math.hypot(b.vx, b.vy);
+  const spd0 = norm(b.vx, b.vy);
   if (spd0 < 1.5) {
     for (const p of POCKETS) {
       const dx = p.x - b.x, dy = p.y - b.y;
-      const d = Math.hypot(dx, dy);
+      const d = norm(dx, dy);
       const cr = captureRadius(p, spd0);
       if (d < cr + BALL_R && d > 1e-6) {
         const a = 0.5 + 3.0 * (1 - d / (cr + BALL_R));
@@ -128,7 +141,7 @@ function friction(b: Ball, dt: number): void {
   }
   const ux = b.vx - BALL_R * b.wy;
   const uy = b.vy + BALL_R * b.wx;
-  const s = Math.hypot(ux, uy);
+  const s = norm(ux, uy);
   // Solid-sphere contact slip decays at (1 + 5/2)*mu*g. Stop the
   // sliding impulse exactly at zero slip, then roll for the remaining time.
   const slideTime = Math.min(dt, s / (3.5 * MU_S * G));
@@ -139,7 +152,7 @@ function friction(b: Ball, dt: number): void {
     b.wy += 2.5 * impulse * ux / (BALL_R * s);
   }
   if (slideTime < dt) {
-    const speed = Math.hypot(b.vx, b.vy);
+    const speed = norm(b.vx, b.vy);
     const deceleration = Math.min(speed, MU_R * G * (dt - slideTime));
     if (speed > 1e-12) { b.vx -= deceleration * b.vx / speed; b.vy -= deceleration * b.vy / speed; }
     b.wx = -b.vy / BALL_R; b.wy = b.vx / BALL_R;
@@ -169,7 +182,7 @@ function earliestContact(balls: Ball[], dt: number): Contact | null {
       const c = dx * dx + dy * dy + dz * dz - R2 * R2;
       if (c < 0) {
         // Overlapping: resolve now along line of centers.
-        const d = Math.hypot(dx, dy, dz);
+        const d = norm(dx, dy, dz);
         best = { t: 0, kind: 'bb', a: A.id, b: B.id, nx: d > 1e-9 ? dx / d : 1, ny: d > 1e-9 ? dy / d : 0, nz: d > 1e-9 ? dz / d : 0 };
         continue;
       }
@@ -196,8 +209,13 @@ function earliestContact(balls: Ball[], dt: number): Contact | null {
         const lineY = cu.y1;
         const target = lineY === 0 ? BALL_R : TABLE_H - BALL_R;
         if ((lineY === 0 && A.vy >= 0) || (lineY === TABLE_H && A.vy <= 0)) continue;
-        const t = (target - A.y) / A.vy;
-        if (t < 0 || t > dt || (best && t >= best.t)) continue;
+        // Ball-ball separation can push a rail-frozen ball slightly past the
+        // inset contact plane. Recover grounded overlaps only: airborne balls
+        // may already have legitimately cleared the nose on an earlier step.
+        const crossing = (target - A.y) / A.vy;
+        if (crossing < 0 && (A.z > 1e-9 || A.vz !== 0)) continue;
+        const t = Math.max(0, crossing);
+        if (A.y < 0 || A.y > TABLE_H || t > dt || (best && t >= best.t)) continue;
         const cx = A.x + A.vx * t;
         const lo = Math.min(cu.x1, cu.x2) - 1e-6, hi = Math.max(cu.x1, cu.x2) + 1e-6;
         if (cx < lo || cx > hi || A.z + A.vz * t - 0.5 * G * t * t > 0.05) continue;
@@ -207,8 +225,10 @@ function earliestContact(balls: Ball[], dt: number): Contact | null {
         const lineX = cu.x1;
         const target = lineX === 0 ? BALL_R : TABLE_W - BALL_R;
         if ((lineX === 0 && A.vx >= 0) || (lineX === TABLE_W && A.vx <= 0)) continue;
-        const t = (target - A.x) / A.vx;
-        if (t < 0 || t > dt || (best && t >= best.t)) continue;
+        const crossing = (target - A.x) / A.vx;
+        if (crossing < 0 && (A.z > 1e-9 || A.vz !== 0)) continue;
+        const t = Math.max(0, crossing);
+        if (A.x < 0 || A.x > TABLE_W || t > dt || (best && t >= best.t)) continue;
         const cy = A.y + A.vy * t;
         const lo = Math.min(cu.y1, cu.y2) - 1e-6, hi = Math.max(cu.y1, cu.y2) + 1e-6;
         if (cy < lo || cy > hi || A.z + A.vz * t - 0.5 * G * t * t > 0.05) continue;
@@ -227,7 +247,7 @@ function earliestContact(balls: Ball[], dt: number): Contact | null {
       if (c < 0) {
         if (A.z > 0.05) continue;
         if (bq >= 0) continue; // already leaving the jaw
-        const d = Math.hypot(dx, dy) || 1e-9;
+        const d = norm(dx, dy) || 1e-9;
         if (!best || 0 < best.t) best = { t: 0, kind: 'jaw', a: A.id, b: -1, nx: dx / d, ny: dy / d };
         continue;
       }
@@ -271,7 +291,7 @@ function resolveBallBall(A: Ball, B: Ball, nx: number, ny: number, ev: ShotEvent
   }
   // Repair penetration even when an impact impulse was just applied. This
   // changes positions only, so resting contacts cannot gain kinetic energy.
-  const distance = Math.hypot(A.x - B.x, A.y - B.y, A.z - B.z);
+  const distance = norm(A.x - B.x, A.y - B.y, A.z - B.z);
   if (distance < BALL_R * 2) {
     const push = (BALL_R * 2 - distance) / 2 + 1e-8;
     A.x += nx * push; A.y += ny * push; A.z = Math.max(0, A.z + nz * push);
@@ -327,7 +347,16 @@ export function step(balls: Ball[], dt: number, ev: ShotEvents, cueId: number, c
     const byId = (id: number) => balls.find((b) => b.id === id)!;
     if (c.kind === 'bb') resolveBallBall(byId(c.a), byId(c.b), c.nx, c.ny, ev, cueId, c.nz ?? 0);
     else if (c.kind === 'floor') land(byId(c.a));
-    else resolveRail(byId(c.a), c.nx, c.ny, ev, contactMade);
+    else {
+      const ball = byId(c.a);
+      if (c.kind === 'rail') {
+        if (c.nx > 0) ball.x = Math.max(ball.x, BALL_R);
+        else if (c.nx < 0) ball.x = Math.min(ball.x, TABLE_W - BALL_R);
+        if (c.ny > 0) ball.y = Math.max(ball.y, BALL_R);
+        else if (c.ny < 0) ball.y = Math.min(ball.y, TABLE_H - BALL_R);
+      }
+      resolveRail(ball, c.nx, c.ny, ev, contactMade);
+    }
   }
   if (remaining > 1e-9) {
     for (const b of balls) {
@@ -342,19 +371,19 @@ export function step(balls: Ball[], dt: number, ev: ShotEvents, cueId: number, c
     const l2 = dx * dx + dy * dy;
     let t = l2 > 0 ? ((px - x1) * dx + (py - y1) * dy) / l2 : 0;
     t = Math.max(0, Math.min(1, t));
-    return Math.hypot(px - (x1 + dx * t), py - (y1 + dy * t));
+    return norm(px - (x1 + dx * t), py - (y1 + dy * t));
   };
   for (const b of balls) {
     if (b.potted) continue;
     let captured = false;
     const pr = prev.get(b.id);
-    const spd = Math.hypot(b.vx, b.vy);
+    const spd = norm(b.vx, b.vy);
     for (const [pocket, p] of POCKETS.entries()) {
       if (b.z > 0.005) continue;
       const cr = captureRadius(p, spd);
       const d = pr
         ? segDist(pr[0], pr[1], b.x, b.y, p.x, p.y)
-        : Math.hypot(b.x - p.x, b.y - p.y);
+        : norm(b.x - p.x, b.y - p.y);
       if (d < cr) {
         b.potted = true;
         b.asleep = true;
@@ -375,7 +404,7 @@ export function step(balls: Ball[], dt: number, ev: ShotEvents, cueId: number, c
       continue;
     }
     // Pure sidespin cannot move an isolated resting ball; do not hold the turn for its decay.
-    if (!b.potted && b.z <= 1e-9 && b.vz === 0 && Math.hypot(b.vx, b.vy) < SLEEP_V && Math.hypot(b.wx, b.wy) < SLEEP_W) {
+    if (!b.potted && b.z <= 1e-9 && b.vz === 0 && norm(b.vx, b.vy) < SLEEP_V && norm(b.wx, b.wy) < SLEEP_W) {
       b.z = b.vz = b.vx = b.vy = b.wx = b.wy = b.wz = 0;
       b.asleep = true;
     }

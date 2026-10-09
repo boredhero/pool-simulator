@@ -6,8 +6,10 @@ Golden behavior is cross-checked by pytest/vitest suites, not bit-identical.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 
+from app.sim.numeric import norm
 from app.sim.table import BALL_R, POCKETS, TABLE_H, TABLE_W, capture_radius, cushions, jaws
 
 DT = 1.0 / 240.0
@@ -63,12 +65,13 @@ class ShotEvents:
 
 def shoot_speed(power: float, vmax: float = VMAX_NORMAL) -> float:
     p = min(1.0, max(0.0, power))
-    return VMIN + (p**1.55) * (vmax - VMIN)
+    # Canonicalize only the derived launch-speed calibration, never ball state.
+    # libm pow differs by an ULP across V8 versions; dense racks amplify it.
+    speed = VMIN + (p**1.55) * (vmax - VMIN)
+    return math.floor(speed * 1e12 + 0.5) / 1e12
 
 
 def throw_mu(v_rel: float) -> float:
-    import math
-
     return max(0.02, min(0.235, 0.016 + 0.219 * math.exp(-0.691 * abs(v_rel))))
 
 
@@ -81,11 +84,10 @@ def strike(
     tip_y: float,
     vmax: float = VMAX_NORMAL,
     elevation: float = 0.0,
+    chalk_level: float = 1.0,
 ) -> None:
     """Rigid cue impulse, then slate rebound; mirrors the browser model."""
-    import math
-
-    offset = math.hypot(tip_x, tip_y)
+    offset = norm(tip_x, tip_y)
     scale = TIP_MAX / offset if offset > TIP_MAX else 1.0
     tx, ty = tip_x * scale, tip_y * scale
     theta = max(0.0, min(math.pi / 2 - 0.01, elevation))
@@ -99,6 +101,18 @@ def strike(
     b.wx = w * (-tx * st * rx - ty * ry)
     b.wy = w * (-tx * st * ry + ty * rx)
     b.wz = -w * tx * ct
+    from app.sim.chalk import contact
+
+    _, _, h, grip = contact(chalk_level, tx, ty)
+    if grip < 1:
+        forward = h * h + grip * (1 - h * h)
+        side, up = -h * tx * (1 - grip), -h * ty * (1 - grip)
+        b.vx = v * (forward * rx * ct - side * ry + up * rx * st)
+        b.vy = v * (forward * ry * ct + side * rx + up * ry * st)
+        b.vz = v * (-forward * st + up * ct)
+        b.wx *= grip
+        b.wy *= grip
+        b.wz *= grip
     b.asleep = False
     if b.z <= 1e-9 and b.vz < 0:
         land(b)
@@ -106,14 +120,13 @@ def strike(
 
 def land(b: Ball) -> None:
     """Restitution plus Coulomb-limited friction at the bottom contact."""
-    import math
 
     b.z = 0.0
     if b.vz >= 0:
         return
     normal = -1.5 * b.vz
     ux, uy = b.vx - BALL_R * b.wy, b.vy + BALL_R * b.wx
-    slip = math.hypot(ux, uy)
+    slip = norm(ux, uy)
     if slip > 1e-12:
         impulse = min(2 * slip / 7, MU_S * normal)
         ix, iy = -impulse * ux / slip, -impulse * uy / slip
@@ -141,13 +154,11 @@ def _advance(b: Ball, dt: float, ev: ShotEvents, cue_id: int) -> None:
 
 
 def _friction(b: Ball, dt: float) -> None:
-    import math
-
-    speed = math.hypot(b.vx, b.vy)
+    speed = norm(b.vx, b.vy)
     if speed < 1.5:
         for px, py, radius, _ in POCKETS:
             dx, dy = px - b.x, py - b.y
-            distance = math.hypot(dx, dy)
+            distance = norm(dx, dy)
             capture = capture_radius(radius, speed)
             if 1e-6 < distance < capture + BALL_R:
                 acceleration = 0.5 + 3 * (1 - distance / (capture + BALL_R))
@@ -155,7 +166,7 @@ def _friction(b: Ball, dt: float) -> None:
                 b.vy += acceleration * dy / distance * dt
     ux = b.vx - BALL_R * b.wy
     uy = b.vy + BALL_R * b.wx
-    s = (ux**2 + uy**2) ** 0.5
+    s = norm(ux, uy)
     # Exact solid-sphere slip transition; never reverse friction past zero slip.
     slide_time = min(dt, s / (3.5 * MU_S * G))
     if s > 1e-12:
@@ -165,7 +176,7 @@ def _friction(b: Ball, dt: float) -> None:
         b.wx -= 2.5 * impulse * uy / (BALL_R * s)
         b.wy += 2.5 * impulse * ux / (BALL_R * s)
     if slide_time < dt:
-        speed = math.hypot(b.vx, b.vy)
+        speed = norm(b.vx, b.vy)
         deceleration = min(speed, MU_R * G * (dt - slide_time))
         if speed > 1e-12:
             b.vx -= deceleration * b.vx / speed
@@ -189,7 +200,7 @@ def _earliest_contact(balls: list[Ball], dt: float):
             qb = 2 * (dx * dvx + dy * dvy + dz * dvz)
             qc = dx * dx + dy * dy + dz * dz - r2 * r2
             if qc < 0:
-                d = (dx * dx + dy * dy + dz * dz) ** 0.5
+                d = norm(dx, dy, dz)
                 nx, ny = (dx / d, dy / d) if d > 1e-9 else (1.0, 0.0)
                 best = (0.0, "bb", a.id, b.id, nx, ny, dz / d if d > 1e-9 else 0.0)
                 continue
@@ -198,7 +209,7 @@ def _earliest_contact(balls: list[Ball], dt: float):
             disc = qb * qb - 4 * qa * qc
             if disc < 0:
                 continue
-            t = (-qb - disc**0.5) / (2 * qa)
+            t = (-qb - math.sqrt(disc)) / (2 * qa)
             if 0 <= t <= dt and (best is None or t < best[0]):
                 best = (
                     t,
@@ -211,7 +222,7 @@ def _earliest_contact(balls: list[Ball], dt: float):
                 )
     for a in live:
         if a.z > 0 or a.vz != 0:
-            t = (a.vz + (a.vz * a.vz + 2 * G * max(0, a.z)) ** 0.5) / G
+            t = (a.vz + math.sqrt(a.vz * a.vz + 2 * G * max(0, a.z))) / G
             if 0 <= t <= dt and (best is None or t < best[0]):
                 best = (t, "floor", a.id, -1, 0.0, 0.0)
         for cu in _CUSHIONS:
@@ -222,8 +233,14 @@ def _earliest_contact(balls: list[Ball], dt: float):
                 target = BALL_R if y1 == 0 else TABLE_H - BALL_R
                 if (y1 == 0 and a.vy >= 0) or (y1 == TABLE_H and a.vy <= 0):
                     continue
-                t = (target - a.y) / a.vy
-                if t < 0 or t > dt or (best is not None and t >= best[0]):
+                # Ball-ball separation can push a rail-frozen ball past the
+                # inset plane. Airborne balls may already have legitimately
+                # cleared that nose on an earlier step; recover grounded ones.
+                crossing = (target - a.y) / a.vy
+                if crossing < 0 and (a.z > 1e-9 or a.vz != 0):
+                    continue
+                t = max(0.0, crossing)
+                if a.y < 0 or a.y > TABLE_H or t > dt or (best is not None and t >= best[0]):
                     continue
                 cx = a.x + a.vx * t
                 if (
@@ -238,8 +255,11 @@ def _earliest_contact(balls: list[Ball], dt: float):
                 target = BALL_R if x1 == 0 else TABLE_W - BALL_R
                 if (x1 == 0 and a.vx >= 0) or (x1 == TABLE_W and a.vx <= 0):
                     continue
-                t = (target - a.x) / a.vx
-                if t < 0 or t > dt or (best is not None and t >= best[0]):
+                crossing = (target - a.x) / a.vx
+                if crossing < 0 and (a.z > 1e-9 or a.vz != 0):
+                    continue
+                t = max(0.0, crossing)
+                if a.x < 0 or a.x > TABLE_W or t > dt or (best is not None and t >= best[0]):
                     continue
                 cy = a.y + a.vy * t
                 if (
@@ -263,7 +283,7 @@ def _earliest_contact(balls: list[Ball], dt: float):
                     continue
                 if qb >= 0:  # Already leaving the jaw.
                     continue
-                d = (dx * dx + dy * dy) ** 0.5 or 1e-9
+                d = norm(dx, dy) or 1e-9
                 if best is None or 0 < best[0]:
                     best = (0.0, "jaw", a.id, -1, dx / d, dy / d)
                 continue
@@ -272,7 +292,7 @@ def _earliest_contact(balls: list[Ball], dt: float):
             disc = qb * qb - 4 * qa * qc
             if disc < 0:
                 continue
-            t = (-qb - disc**0.5) / (2 * qa)
+            t = (-qb - math.sqrt(disc)) / (2 * qa)
             if 0 <= t <= dt and (best is None or t < best[0]):
                 if a.z + a.vz * t - 0.5 * G * t * t <= 0.05:
                     best = (t, "jaw", a.id, -1, (dx + a.vx * t) / rr, (dy + a.vy * t) / rr)
@@ -307,7 +327,7 @@ def _resolve_bb(
             ev.first_contact = other.n
             ev.first_contact_x = other.x
     # Position-only correction, including impacts and coincident centers.
-    distance = ((a.x - b.x) ** 2 + (a.y - b.y) ** 2 + (a.z - b.z) ** 2) ** 0.5
+    distance = norm(a.x - b.x, a.y - b.y, a.z - b.z)
     if distance < BALL_R * 2:
         push = (BALL_R * 2 - distance) / 2 + 1e-8
         a.x += nx * push
@@ -366,7 +386,17 @@ def step(balls: list[Ball], dt: float, ev: ShotEvents, cue_id: int, contact_made
         elif c[1] == "floor":
             land(by_id[c[2]])
         else:
-            _resolve_rail(by_id[c[2]], c[4], c[5], ev, contact_made)
+            ball = by_id[c[2]]
+            if c[1] == "rail":
+                if c[4] > 0:
+                    ball.x = max(ball.x, BALL_R)
+                elif c[4] < 0:
+                    ball.x = min(ball.x, TABLE_W - BALL_R)
+                if c[5] > 0:
+                    ball.y = max(ball.y, BALL_R)
+                elif c[5] < 0:
+                    ball.y = min(ball.y, TABLE_H - BALL_R)
+            _resolve_rail(ball, c[4], c[5], ev, contact_made)
     if remaining > 1e-9:
         for b in balls:
             if not b.potted and not b.asleep:
@@ -379,14 +409,14 @@ def step(balls: list[Ball], dt: float, ev: ShotEvents, cue_id: int, contact_made
         l2 = dx * dx + dy * dy
         t = ((px - x1) * dx + (py - y1) * dy) / l2 if l2 > 0 else 0.0
         t = max(0.0, min(1.0, t))
-        return ((px - (x1 + dx * t)) ** 2 + (py - (y1 + dy * t)) ** 2) ** 0.5
+        return norm(px - (x1 + dx * t), py - (y1 + dy * t))
 
     for b in balls:
         if b.potted:
             continue
         captured = False
         pr = prev.get(b.id)
-        spd = (b.vx**2 + b.vy**2) ** 0.5
+        spd = norm(b.vx, b.vy)
         for pocket, p in enumerate(POCKETS):
             if b.z > 0.005:
                 continue
@@ -394,7 +424,7 @@ def step(balls: list[Ball], dt: float, ev: ShotEvents, cue_id: int, contact_made
             if pr is not None:
                 d = seg_dist(pr[0], pr[1], b.x, b.y, p[0], p[1])
             else:
-                d = ((b.x - p[0]) ** 2 + (b.y - p[1]) ** 2) ** 0.5
+                d = norm(b.x - p[0], b.y - p[1])
             if d < cr:
                 b.potted = True
                 b.asleep = True
@@ -420,8 +450,8 @@ def step(balls: list[Ball], dt: float, ev: ShotEvents, cue_id: int, contact_made
             not b.potted
             and b.z <= 1e-9
             and b.vz == 0
-            and (b.vx**2 + b.vy**2) ** 0.5 < SLEEP_V
-            and (b.wx**2 + b.wy**2) ** 0.5 < SLEEP_W
+            and norm(b.vx, b.vy) < SLEEP_V
+            and norm(b.wx, b.wy) < SLEEP_W
         ):
             b.z = b.vz = b.vx = b.vy = b.wx = b.wy = b.wz = 0.0
             b.asleep = True

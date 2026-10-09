@@ -21,9 +21,9 @@ flowchart LR
 ```
 
 The browser predicts player shots immediately. In online and Jev games, only the
-server resolves turns, fouls and results. Both simulators use shared golden vectors
-in `contracts/golden/`; this checks parity for those cases, not every possible
-trajectory. Ball flight, spin, cushions and pockets are approximations rather than
+server resolves turns, fouls and results. Both simulators use shared fixtures in `contracts/`; these check agreement for
+the covered cases, not every possible trajectory. See [simulation synchronization](docs/simulation-sync.md)
+for snapshot precision and replay checks. Ball flight, spin, cushions and pockets are approximations rather than
 a calibrated professional billiards model. See [planner evaluation and limitations](docs/planner-research.md).
 
 - `frontend/src/`: rendering, input, local simulation and interface.
@@ -527,3 +527,6 @@ References: [Google server-side verification](https://developers.google.com/iden
 For a field-level map of stored data, deletion, provider disclosures and implementation references,
 see [Data inventory](docs/data-inventory.md). The public notice describes current application behavior;
 host log and backup retention are separate operational settings.
+
+
+Optional account-unlocked [Chalk-Sim](docs/chalk-sim.md) supports local, online, and Jev games. Signed-in visual/control preferences are stored in SQLite; guest preferences remain device-local. Terms acceptance remains account- and content-version-bound.

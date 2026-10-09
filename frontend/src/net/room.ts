@@ -1,10 +1,29 @@
 import type { MatchConfig } from '../sim/config';
 import type { Placement } from '../sim/rules';
+import type { Ball } from '../sim/physics';
 // Room net client: join/create private rooms, shot-event sync.
 // Server is authoritative on rules; we predict locally and reconcile at rest.
-export interface ShotParams { aim: number; power: number; tipX: number; tipY: number; vmax?: number; elevation?: number; calledBall?: number | null; calledPocket?: number | null }
-export interface ServerBall { id: number; n: number | null; x: number; y: number; potted: boolean }
+export interface ShotParams { chalkLevel?:number; miscue?:boolean; aim: number; power: number; tipX: number; tipY: number; vmax?: number; elevation?: number; calledBall?: number | null; calledPocket?: number | null }
+export interface ServerBall {
+  id: number; n: number | null; x: number; y: number; potted: boolean;
+  z?: number; vx?: number; vy?: number; vz?: number;
+  wx?: number; wy?: number; wz?: number; asleep?: boolean;
+}
+
+/** Exact server state seeds the next replay. Older snapshots describe resting balls. */
+export function applyServerBalls(balls: Ball[], snapshots: ServerBall[]): void {
+  for (const snapshot of snapshots) {
+    const ball = balls.find(candidate => candidate.id === snapshot.id);
+    if (!ball) continue;
+    Object.assign(ball, snapshot, {
+      z: snapshot.z ?? 0, vx: snapshot.vx ?? 0, vy: snapshot.vy ?? 0, vz: snapshot.vz ?? 0,
+      wx: snapshot.wx ?? 0, wy: snapshot.wy ?? 0, wz: snapshot.wz ?? 0,
+      asleep: snapshot.asleep ?? true,
+    });
+  }
+}
 export interface RoomState {
+  chalk?: [number,number];
   return_order: number[];
   names?:string[]; ready?:boolean; busy?:boolean; registered?:boolean[];
   code: string; balls: ServerBall[]; current: number;
@@ -69,8 +88,9 @@ export class RoomClient {
   close():void {this.closed=true;clearTimeout(this.connectingTimer);this.ws?.close();this.ws=null;}
   send(o: object): void { if(this.ws?.readyState===WebSocket.OPEN)this.ws.send(JSON.stringify(o)); }
   create(name: string, rules: MatchConfig): void { this.send({ t: 'create', name, rules }); }
-  join(code: string, name: string): void { this.send({ t: 'join', code, name }); }
+  join(code: string, name: string, chalkSim=false): void { this.send({ t: 'join', code, name, chalkSim }); }
   shot(s: ShotParams): void { this.send({ t: 'shot', shot: s, revision: this.revision }); }
   done(balls: ServerBall[], ev: ShotEventsWire): void { this.send({ t: 'done', balls, ev }); }
+  chalk():void {this.send({t:'chalk',revision:this.revision});}
   place(x: number, y: number): void { this.send({ t: 'place', x, y, revision: this.revision }); }
 }

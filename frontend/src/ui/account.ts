@@ -7,7 +7,7 @@ import './accountIdentity.css';
 import './mobileHud.css';
 import {acceptTerms,termsStatus,type TermsStatus} from './terms';
 import { AdminPanel } from './admin';
-export interface Account {id:string;username:string;usernameChangedAt?:number|null;usernameChangeAvailableAt?:number|null;hasPassword?:boolean;createdAt:number;premium:boolean;simEnabled?:boolean;isAdmin:boolean}
+export interface Account {id:string;username:string;usernameChangedAt?:number|null;usernameChangeAvailableAt?:number|null;hasPassword?:boolean;createdAt:number;premium:boolean;simEnabled?:boolean;easterEggsEnabled?:boolean;chalkSim?:boolean;settings?:Record<string,string>;isAdmin:boolean}
 interface Stats {matches:number;wins:number;losses:number;abandoned:number;shots:number;ballsPocketed:number;scratches:number;fouls:number;shotStatsComplete?:boolean;byMode?:Record<string,{matches:number;wins:number;losses:number}>;recent:Array<{id:string;opponent:string;status:string;result:string|null;mode?:string;shotStatsComplete?:boolean}>}
 const el=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 
@@ -71,6 +71,22 @@ export class AccountPanel {
     const data=await response.json();
     if(!response.ok)throw new Error(typeof data.detail==='string'?data.detail:'Please check the form and try again.');
     return data;
+  }
+  async savePreferences(patch:{chalkSim?:boolean;settings?:Record<string,string>}):Promise<Account|null> {
+    if(!this.account||this.busy||this.agreementBusy||this.recoveryPending)return null;
+    const accountId=this.account.id,revision=++this.accountRevision;
+    const data=await this.request('/preferences',patch);
+    if(revision!==this.accountRevision||this.account?.id!==accountId||data.account?.id!==accountId)return null;
+    this.account=data.account;this.changed(this.account);this.render();
+    return this.account;
+  }
+  async unlockEasterEggs():Promise<Account|null> {
+    if(!this.account||this.busy||this.agreementBusy||this.recoveryPending)return null;
+    const accountId=this.account.id,revision=++this.accountRevision;
+    const data=await this.request('/easter-eggs/unlock',{});
+    if(revision!==this.accountRevision||this.account?.id!==accountId||data.account?.id!==accountId)return null;
+    this.account=data.account;this.changed(this.account);this.render();
+    return this.account;
   }
   async refresh() {
     if(this.recoveryPending||this.busy||this.agreementBusy)return;

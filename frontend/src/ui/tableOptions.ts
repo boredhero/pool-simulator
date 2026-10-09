@@ -1,3 +1,4 @@
+import { accountPreferences } from './accountPreferences';
 import { matchConfig, rulesName, type MatchConfig } from '../sim/config';
 const el = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const select = (id: string) => el<HTMLSelectElement>(id);
@@ -8,13 +9,19 @@ export class TableOptions {
   fastForward = false;
   autoCamera = false;
   constructor(start: (rules: MatchConfig) => void) {
-    let savedCamera:string|null=null;try{savedCamera=localStorage.getItem('pool:auto-camera');}catch{}
+    let savedCamera:string|null=null;try{savedCamera=accountPreferences.getItem('pool:auto-camera');}catch{}
     this.autoCamera=savedCamera===null?(matchMedia('(pointer: coarse)').matches||matchMedia('(max-width: 700px)').matches):savedCamera==='1';
     input('autocamera').checked=this.autoCamera;
-    input('autocamera').addEventListener('change',()=>{this.autoCamera=input('autocamera').checked;try{localStorage.setItem('pool:auto-camera',this.autoCamera?'1':'0');}catch{}});
-    try { this.fastForward = localStorage.getItem('pool:fast-forward') === '1'; } catch { /* private storage */ }
+    input('autocamera').addEventListener('change',()=>{this.autoCamera=input('autocamera').checked;try{accountPreferences.setItem('pool:auto-camera',this.autoCamera?'1':'0');}catch{}});
+    try { this.fastForward = accountPreferences.getItem('pool:fast-forward') === '1'; } catch { /* private storage */ }
     input('fastforward').checked = this.fastForward;
-    input('fastforward').addEventListener('change', () => { this.fastForward = input('fastforward').checked; try { localStorage.setItem('pool:fast-forward', this.fastForward ? '1' : '0'); } catch { /* private storage */ } });
+    input('fastforward').addEventListener('change', () => { this.fastForward = input('fastforward').checked; try { accountPreferences.setItem('pool:fast-forward', this.fastForward ? '1' : '0'); } catch { /* private storage */ } });
+    accountPreferences.subscribe(()=>{
+      const camera=accountPreferences.getItem('pool:auto-camera');
+      this.autoCamera=camera===null?(matchMedia('(pointer: coarse)').matches||matchMedia('(max-width: 700px)').matches):camera==='1';
+      this.fastForward=accountPreferences.getItem('pool:fast-forward')==='1';
+      input('autocamera').checked=this.autoCamera;input('fastforward').checked=this.fastForward;
+    });
     let dismissed = false;
     try { dismissed = localStorage.getItem('pool:help-dismissed') === '1'; } catch { /* private storage */ }
     select('rulespreset').addEventListener('change', () => this.write(matchConfig({ preset: select('rulespreset').value as MatchConfig['preset'] }),this.context));

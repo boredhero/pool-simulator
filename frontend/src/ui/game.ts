@@ -1,3 +1,6 @@
+import { accountPreferences, mountPreferenceStatus } from './accountPreferences';
+import {EasterEggsPanel} from './easterEggs';
+import {chalkContact,wearChalk} from '../sim/chalk';
 import {SimControls, type SimMode} from './simControls';
 import {touchAimAngle} from '../render/touchAim';
 import {CoinToss,randomBreaker} from './coinToss';
@@ -23,7 +26,7 @@ import { jevRequest } from '../sim/jev';
 import { Sfx } from './sfx';
 import { POCKETS, TABLE_H, TABLE_W } from '../sim/table';
 import { init, type SceneHandle } from '../render/scene';
-import { RoomClient, type RoomState } from '../net/room';
+import { applyServerBalls, RoomClient, type RoomState } from '../net/room';
 
 type Mode = 'aim' | 'rolling' | 'place' | 'over' | 'wait';
 
@@ -49,6 +52,11 @@ const freshEv = (): ShotEvents => ({
 });
 
 export class Game {
+  easterEggs?:EasterEggsPanel;
+  private chalkPending=0;
+  private chalkButton=document.createElement('button');
+  private chalkInfo=document.createElement('span');
+  private chalkBar=document.createElement('div');
   tutorial = new Tutorial();
   coin:CoinToss;
   private lastCoinStatus='';
@@ -117,13 +125,15 @@ export class Game {
         'roominfo', 'chargefill', 'spin', 'cpubtn', 'jevbtn', 'opponentstatus', 'rack', 'settingsbtn', 'settingspanel',
         'feltsw', 'woodsw', 'feltcustom', 'woodcustom', 'scorecard'].map((id) => [id, document.getElementById(id)!]),
     );
-    this.applyTheme(localStorage.getItem('pool:felt') ?? FELTS[0], localStorage.getItem('pool:wood') ?? WOODS[0], false);
+    this.applyTheme(accountPreferences.getItem('pool:felt') ?? FELTS[0], accountPreferences.getItem('pool:wood') ?? WOODS[0], false);
     this.options = new TableOptions(rules => {if(this.jevGame&&this.account?.premium)void this.startJev(true,rules);else this.reset(rules);});
     this.buildThemePanel();
+    mountPreferenceStatus();
     this.wire(canvas);
     this.simControls=new SimControls(mode=>this.startSimulation(mode));
     this.accountPanel=new AccountPanel(()=>!!this.room,account=>{
-      this.account=account;
+      this.account=account;this.easterEggs?.update();
+      accountPreferences.bind(account, patch=>this.accountPanel.savePreferences(patch));
       this.simControls.setEnabled(!!account?.simEnabled);
       if(this.simMode&&!account?.simEnabled){this.cpuOpponent=false;this.reset();}
       if (!account && this.jevOpponent) {
@@ -139,6 +149,15 @@ export class Game {
       if(account)input.value=account.username;
       document.getElementById('onlineidentity')!.textContent=account?`Signed in as ${account.username}. Private matches count toward unranked casual stats.`:'Playing as a guest. Create an account to keep lifetime online stats.';
     });
+    this.easterEggs=new EasterEggsPanel({getAccount:()=>this.account,
+      unlockAccount:()=>this.accountPanel.unlockEasterEggs(),getEnabled:()=>!!this.account?.chalkSim,
+      onToggle:async enabled=>{if(!await this.accountPanel.savePreferences({chalkSim:enabled}))throw new Error('Could not save. Try again.');this.syncLocalChalk();},
+    });
+    this.chalkBar.id='chalkcontrols';this.chalkBar.hidden=true;
+    this.chalkButton.type='button';this.chalkButton.id='rechalk';this.chalkButton.textContent='Rechalk';
+    this.chalkInfo.id='chalkstatus';this.chalkInfo.setAttribute('role','status');
+    this.chalkBar.append(this.chalkInfo,this.chalkButton);this.el.opponentstatus.after(this.chalkBar);
+    this.chalkButton.addEventListener('click',()=>void this.rechalk());
     const invitation=new URLSearchParams(location.hash.slice(1)).get('join')??new URLSearchParams(location.search).get('join');
     if(invitation&&/^[A-Z2-9]{8}$/i.test(invitation)){
       (this.el.rcode as HTMLInputElement).value=invitation.toUpperCase();
@@ -240,6 +259,7 @@ export class Game {
   reset(rules: MatchConfig = this.gs.rules,toss=true): void {
     if(this.tutorial.active)this.tutorial.close();
     if (this.room) return;
+    this.chalkPending=0;
     this.simMode=null;
     document.getElementById('resumejev')?.remove();
     this.cancelOpponent();this.pendingNetwork=[];
@@ -266,8 +286,28 @@ export class Game {
     this.pulling=false;this.touchAim=false;this.pressPt=null;this.placementPress=null;this.cpuTimer=0;
   }
 
+  private chalkPreference():boolean {return !!this.account?.easterEggsEnabled&&!!this.account.chalkSim;}
+  private syncLocalChalk():void {
+    if(this.room||this.jevGame||this.jevRequest||this.opponentAction||this.mode==='rolling'||this.tutorial.active)return;
+    const enabled=this.chalkPreference();
+    if(!!this.gs.rules.chalkSim!==enabled){this.gs.rules.chalkSim=enabled;this.gs.chalk=[1,1];}
+  }
+  async rechalk():Promise<void> {
+    if(!this.gs.rules.chalkSim||!this.humanCueControls()||this.pulling||this.pointers.size>1)return;
+    this.pulling=false;this.pressPt=null;this.chalkPending=performance.now()+5000;
+    if(this.room){this.room.chalk();return;}
+    if(this.jevGame){
+      const game=this.jevGame,controller=new AbortController();this.jevRequest=controller;
+      try{const response=await jevRequest(`/games/${game.id}/chalk`,{revision:game.revision},controller.signal);
+        if(!controller.signal.aborted&&this.jevGame===game)this.applyJevState(response.state);
+      }catch(error){if(!controller.signal.aborted)this.el.opponentstatus.textContent=error instanceof Error?error.message:'Could not chalk. Try again.';}
+      finally{if(this.jevRequest===controller)this.jevRequest=null;this.chalkPending=0;}
+    }else{this.gs.chalk[this.gs.current]=1;this.chalkPending=0;}
+    this.hud();
+  }
+
   humanCueControls():boolean {
-    return !this.simMode&&!this.coinPending()&&!this.opponentAction&&!this.jevRequest&&this.gs.winner===null
+    return performance.now()>=this.chalkPending&&!this.simMode&&!this.coinPending()&&!this.opponentAction&&!this.jevRequest&&this.gs.winner===null
       && (this.mode==='aim'||this.mode==='place')
       && (this.room?this.room.ready&&this.seat===this.gs.current:!this.cpuOpponent||this.gs.current===0);
   }
@@ -298,8 +338,8 @@ export class Game {
   applyTheme(felt: string, wood: string, save = true): void {
     this.scene.setTheme(felt, wood);
     if (save) {
-      localStorage.setItem('pool:felt', felt);
-      localStorage.setItem('pool:wood', wood);
+      accountPreferences.setItem('pool:felt', felt);
+      accountPreferences.setItem('pool:wood', wood);
     }
     for (const [id, list, cur] of [['feltsw', FELTS, felt], ['woodsw', WOODS, wood]] as Array<[string, string[], string]>) {
       const box = this.el[id];
@@ -310,8 +350,8 @@ export class Game {
         d.className = 'swatch' + (c.toLowerCase() === cur.toLowerCase() ? ' sel' : '');
         d.style.background = c;
         d.addEventListener('click', () => {
-          const f = id === 'feltsw' ? c : localStorage.getItem('pool:felt') ?? FELTS[0];
-          const w = id === 'woodsw' ? c : localStorage.getItem('pool:wood') ?? WOODS[0];
+          const f = id === 'feltsw' ? c : accountPreferences.getItem('pool:felt') ?? FELTS[0];
+          const w = id === 'woodsw' ? c : accountPreferences.getItem('pool:wood') ?? WOODS[0];
           this.applyTheme(f, w);
         });
         box.appendChild(d);
@@ -323,21 +363,26 @@ export class Game {
 
   buildThemePanel(): void {
     const cueSelect=document.getElementById('cueappearance') as HTMLSelectElement;
-    let savedCue:string|null=null;try{savedCue=localStorage.getItem('pool:cue-style');}catch{}
+    let savedCue:string|null=null;try{savedCue=accountPreferences.getItem('pool:cue-style');}catch{}
     cueSelect.value=cueStyle(savedCue);this.scene.setCueStyle(cueStyle(savedCue));
-    cueSelect.addEventListener('change',()=>{const style=cueStyle(cueSelect.value);this.scene.setCueStyle(style);try{localStorage.setItem('pool:cue-style',style);}catch{}});
+    cueSelect.addEventListener('change',()=>{const style=cueStyle(cueSelect.value);this.scene.setCueStyle(style);try{accountPreferences.setItem('pool:cue-style',style);}catch{}});
     const railSelect = document.getElementById('railsights') as HTMLSelectElement;
-    railSelect.value = sightStyle(localStorage.getItem('pool:sights'));
+    railSelect.value = sightStyle(accountPreferences.getItem('pool:sights'));
     this.scene.setSights(sightStyle(railSelect.value));
     railSelect.addEventListener('change', () => {
-      const style = sightStyle(railSelect.value); this.scene.setSights(style); localStorage.setItem('pool:sights', style);
+      const style = sightStyle(railSelect.value); this.scene.setSights(style); accountPreferences.setItem('pool:sights', style);
     });
-    this.applyTheme(localStorage.getItem('pool:felt') ?? FELTS[0], localStorage.getItem('pool:wood') ?? WOODS[0], false);
+    this.applyTheme(accountPreferences.getItem('pool:felt') ?? FELTS[0], accountPreferences.getItem('pool:wood') ?? WOODS[0], false);
+    accountPreferences.subscribe(()=>{
+      cueSelect.value=cueStyle(accountPreferences.getItem('pool:cue-style'));this.scene.setCueStyle(cueStyle(cueSelect.value));
+      railSelect.value=sightStyle(accountPreferences.getItem('pool:sights'));this.scene.setSights(sightStyle(railSelect.value));
+      this.applyTheme(accountPreferences.getItem('pool:felt')??FELTS[0],accountPreferences.getItem('pool:wood')??WOODS[0],false);
+    });
     (this.el.feltcustom as HTMLInputElement).addEventListener('input', (e) => {
-      this.applyTheme((e.target as HTMLInputElement).value, localStorage.getItem('pool:wood') ?? WOODS[0]);
+      this.applyTheme((e.target as HTMLInputElement).value, accountPreferences.getItem('pool:wood') ?? WOODS[0]);
     });
     (this.el.woodcustom as HTMLInputElement).addEventListener('input', (e) => {
-      this.applyTheme(localStorage.getItem('pool:felt') ?? FELTS[0], (e.target as HTMLInputElement).value);
+      this.applyTheme(accountPreferences.getItem('pool:felt') ?? FELTS[0], (e.target as HTMLInputElement).value);
     });
   }
 
@@ -449,6 +494,7 @@ export class Game {
     canvas.addEventListener('pointerdown', (e) => {
       if(!document.querySelector('dialog[open]'))canvas.focus({preventScroll:true});
       this.sfx.unlock();
+      if(e.button===0&&this.gs.rules.chalkSim&&this.scene.pickChalk(e.clientX,e.clientY)){e.preventDefault();e.stopImmediatePropagation();void this.rechalk();return;}
       this.pointers.add(e.pointerId);
       if(this.cameraMode || this.scene.cameraRig.interacting || this.pointers.size>1){this.cameraGesture=true;this.touchAim=false;this.pulling=false;this.pressPt=null;this.placementPress=null;return;}
       if(this.cameraGesture)return;
@@ -635,7 +681,7 @@ export class Game {
     if(this.jevRequest)return;
     this.cancelOpponent();
     const controller=new AbortController();this.jevRequest=controller;
-    const requestedRules=matchConfig(rules);
+    const requestedRules=matchConfig({...rules,chalkSim:this.chalkPreference()});
     this.el.opponentstatus.textContent=fresh?'Starting a new Jev game…':'Opening your Jev game…';
     try {
       const game=await jevRequest('/games',{rules:requestedRules,...(fresh?{new_game:true}:{}),...(simulation&&simulation!=='cpu-cpu'?{simulation}:{})},controller.signal);
@@ -719,7 +765,7 @@ export class Game {
     }
   }
 
-  fire(power: number, vmax = this.gs.breakShot ? this.gs.rules.breakMax : this.gs.rules.normalMax, authoritativeElevation?:number, shotSpin?:{tipX:number;tipY:number}): void {
+  fire(power: number, vmax = this.gs.breakShot ? this.gs.rules.breakMax : this.gs.rules.normalMax, authoritativeElevation?:number, shotSpin?:{tipX:number;tipY:number;chalkLevel?:number}): void {
     if (!this.canShoot() || (this.tutorial.active&&this.tutorial.action!=='shot')) return;
     document.querySelector('.hint')?.classList.add('gone');
     try { localStorage.setItem('pool:seen', '1'); } catch { /* private mode */ }
@@ -734,10 +780,13 @@ export class Game {
     if(!shotSpin)this.power = power;
     const {tipX,tipY}=shotSpin??this;
     const elevation = authoritativeElevation??cueElevation(c.x, c.y, this.angle, 0, this.gs.balls,tipX,tipY);
+    const chalkLevel=this.gs.rules.chalkSim?(shotSpin?.chalkLevel??this.gs.chalk[this.gs.current]):1;
+    if(this.gs.rules.chalkSim)this.gs.chalk[this.gs.current]=wearChalk(chalkLevel,power,tipX,tipY);
     beginShot(this.gs, this.calledBall, this.calledPocket);
     const params = { aim: this.angle, power, tipX, tipY, vmax, elevation, calledBall: this.calledBall, calledPocket: this.calledPocket };
     if(!this.cpuOpponent||this.gs.current===0)this.tutorial.record('shot');
-    strike(c, Math.cos(this.angle), Math.sin(this.angle), power, tipX, tipY, vmax, elevation);
+    strike(c, Math.cos(this.angle), Math.sin(this.angle), power, tipX, tipY, vmax, elevation,chalkLevel);
+    if(this.gs.rules.chalkSim&&chalkContact(chalkLevel,tipX,tipY).grip<1)this.el.opponentstatus.textContent='Miscue · chalk the cue before using strong spin';
     this.ev = freshEv();
     this.contact = { v: false };
     this.whoShot = this.seat;
@@ -751,6 +800,7 @@ export class Game {
     if(this.coinPending()||this.jevRequest||this.opponentAction||!this.cpuOpponent||(!this.simMode&&this.gs.current!==1)
       ||this.room||this.gs.winner!==null||!['aim','place'].includes(this.mode))return;
     if(this.jevGame){await this.playJevTurn();return;}
+    if(this.gs.rules.chalkSim&&this.gs.chalk[this.gs.current]<.45)this.gs.chalk[this.gs.current]=1;
     const state=this.gs,generation=this.opponentGeneration,action=this.beginOpponent();
     const valid=()=>this.opponentAction===action&&!action.controller.signal.aborted
       &&this.gs===state&&this.opponentGeneration===generation&&this.cpuOpponent&&!this.jevGame&&!this.room;
@@ -773,6 +823,15 @@ export class Game {
   private practiceCameraPose:number[]=[];
   lastTutorialCameraRevision = 0;
   frame(): void {
+    this.syncLocalChalk();
+    this.scene.setChalk(!!this.gs.rules.chalkSim,this.gs.chalk,this.gs.current);
+    this.chalkBar.hidden=!this.gs.rules.chalkSim||this.tutorial.active;
+    if(!this.chalkBar.hidden){
+      const seat=this.simMode?this.gs.current:this.room?(this.seat??0):this.cpuOpponent?0:this.gs.current;
+      const text=`${this.playerName(seat)} · Chalk ${Math.round(this.gs.chalk[seat]*100)}%${this.room?' · Shared match rule':''}`;
+      if(this.chalkInfo.textContent!==text)this.chalkInfo.textContent=text;
+      this.chalkButton.disabled=!this.humanCueControls()||this.pulling;
+    }
     if(this.scene.cameraRig.revision!==this.lastTutorialCameraRevision){
       this.lastTutorialCameraRevision=this.scene.cameraRig.revision;
       const pose=[...this.scene.controls.object.position.toArray(),...this.scene.controls.target.toArray()];
@@ -1025,17 +1084,11 @@ export class Game {
   }
 
   applyServerState(s: RoomState): void {
+    this.chalkPending=0;this.gs.chalk=s.chalk?[...s.chalk]:[1,1];
     this.cancelOpponent();
     const wasPlacing=this.gs.ballInHand;
     const placementCamera=this.pendingPlacementCamera;this.pendingPlacementCamera=null;
-    for (const sb of s.balls) {
-      const b = this.gs.balls.find((q) => q.id === sb.id);
-      if (!b) continue;
-      b.n = sb.n; b.z = b.vz = 0;
-      b.x = sb.x; b.y = sb.y; b.potted = sb.potted;
-      b.vx = b.vy = b.wx = b.wy = b.wz = 0;
-      b.asleep = true;
-    }
+    applyServerBalls(this.gs.balls, s.balls);
     if(s.names)this.roomNames=s.names;
     this.gs.current = s.current === 1 ? 1 : 0;
     this.gs.groups = [(s.groups[0] ?? null) as never, (s.groups[1] ?? null) as never];
@@ -1100,7 +1153,8 @@ export class Game {
       beginShot(this.gs, shot.calledBall, shot.calledPocket);
       // Server is authoritative on break speed; ignore client-claimed vmax.
       const vmax = this.gs.breakShot ? this.gs.rules.breakMax : this.gs.rules.normalMax;
-      strike(c, Math.cos(shot.aim), Math.sin(shot.aim), shot.power, shot.tipX, shot.tipY, vmax, shot.elevation ?? 0);
+      strike(c, Math.cos(shot.aim), Math.sin(shot.aim), shot.power, shot.tipX, shot.tipY, vmax, shot.elevation ?? 0, this.gs.rules.chalkSim?(shot.chalkLevel??this.gs.chalk[by]):1);
+      if(this.gs.rules.chalkSim)this.gs.chalk[by]=wearChalk(shot.chalkLevel??this.gs.chalk[by],shot.power,shot.tipX,shot.tipY);
       this.ev = freshEv();
       this.contact = { v: false };
       this.whoShot = by;
@@ -1112,7 +1166,7 @@ export class Game {
     rc.onError = (e) => {if(this.room!==rc)return;if(!rc.code)this.leaveRoom(e);else this.el.msg.textContent=e;this.el.roominfo.textContent=e;};
     rc.onClose = message=>{if(this.room===rc)this.leaveRoom(message);};
     rc.onJoined = (names) => { if(this.room!==rc)return;this.roomNames = names; this.hud(); };
-    rc.onOpen = () => {if(this.room!==rc)return;create ? rc.create(name, this.gs.rules) : rc.join(code, name);};
+    rc.onOpen = () => {if(this.room!==rc)return;create ? rc.create(name, matchConfig({...this.gs.rules,chalkSim:this.chalkPreference()})) : rc.join(code, name,this.chalkPreference());};
     rc.connect();
     this.hud();
   }

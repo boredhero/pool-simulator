@@ -3,3 +3,4 @@
 #installappdialog::backdrop{background:#000a}#installappdialog h2{margin:0 0 12px;font-size:24px}#installappdialog p,#installappdialog li{font-size:16px;line-height:1.5}#installappdialog ol{padding-left:24px}#installappdialog li+li{margin-top:12px}#installappdialog button{min-height:44px}
 .app-installed #welcomeinstall{display:none}
 #welcomeinstall{justify-self:start;min-height:44px;font-size:15px}
+html:not(.touch-input) [data-install-app],html:not(.touch-input) #installappstatus{display:none!important}

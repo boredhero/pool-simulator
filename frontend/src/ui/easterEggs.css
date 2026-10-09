@@ -1,0 +1,15 @@
+#eastereggssettings[hidden]{display:none}
+#eastereggssettings .chalk-sim-choice{display:flex;align-items:center;gap:12px;min-height:44px}
+#chalksimenabled{width:22px;min-height:22px;flex:none;accent-color:#a7c989}
+#eastereggsdialog{box-sizing:border-box;width:min(460px,calc(100vw - 24px));max-height:calc(100dvh - 24px);padding:30px 28px;border:1px solid #aa8b50;border-radius:22px;background:radial-gradient(ellipse at top,#405139,#211e18 70%);color:#f4ecd9;box-shadow:0 24px 100px #0009;text-align:center}
+#eastereggsdialog::backdrop{background:#0009;backdrop-filter:blur(4px)}
+#eastereggstitle{font-size:clamp(26px,5vw,36px);line-height:1.15;margin:14px 0}
+#eastereggsdialog p{font-size:16px;line-height:1.5;color:#dfd2ba}
+.easter-eggs-emblem{font-size:58px;color:#efcc7e;line-height:1}
+.easter-eggs-actions{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:22px}
+.easter-eggs-actions button{min-height:44px;font-size:15px;padding:10px 18px}
+#eastereggsopen{background:#45603a;border-color:#adca8c}
+
+#chalkcontrols{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px;font-size:13px;color:#c8d8be}
+#chalkcontrols[hidden]{display:none}
+#rechalk{min-height:40px;padding:6px 12px;font-size:13px}

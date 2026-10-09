@@ -1,5 +1,6 @@
 export type CuePhase = 'planning' | 'aiming' | 'pulling' | 'striking';
 export interface SelectedShot {
+  chalkLevel?:number; miscue?:boolean;
   aim:number; power:number; tipX:number; tipY:number;
   calledBall:number|null; calledPocket:number|null;
   placement:{x:number;y:number}; vmax?:number; elevation?:number;
