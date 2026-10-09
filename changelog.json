@@ -1,5 +1,22 @@
 [
   {
+    "version": "1.4.0",
+    "date": "2026-10-08",
+    "title": "Account experience, cue clearance, and smarter shots",
+    "changes": [
+      "Reorganized account and settings panels with clearer sign-in, profile, and game settings flows.",
+      "Focused Google and cancellable passkey prompts, clearer recovery, saved privacy choices, and safer admin budget actions.",
+      "Corrected cue clearance near rails and pocket jaws using cushion profiles and a tapered shaft.",
+      "Added firm glancing cluster-development options and outcome-based Jev guidance for useful attacking shots.",
+      "Raised the default maximum break speed from 8.5 to 9.5 m/s; normal shots and custom speed settings are unchanged.",
+      "Winner actions follow the game mode; Restart simulation preserves the selected AI pairing.",
+      "Kept opponent power separate from human controls, tightened the idle cue gap, and ignored callbacks from departed online rooms.",
+      "Simplified turn status with one player label and capitalized action text, while preserving Jev shot-strategy details.",
+      "Updated the Privacy Notice and data inventory for current account, sign-in, usage, and retention behavior.",
+      "Corrected Terms to describe monthly Jev allowances; existing users will be asked to accept the updated Terms."
+    ]
+  },
+  {
     "version": "1.3.0",
     "date": "2026-10-08",
     "title": "Optional Google sign-in",
@@ -271,9 +288,9 @@
     "changes": [
       "Settings now has a fixed title bar and close button that stay visible while scrolling, with Escape dismissal and keyboard focus restored to the Table button.",
       "Automatic framing uses a lower, closer playing view and tighter bounds around the visible balls. Cue alignment remains adjustable and never overrides a shot being pulled.",
-      "Automatic camera framing now swings behind the cue toward the majority of the current player’s legal targets, including the final 8-Ball, with the idle cue facing forward from the new view.",
+      "Automatic camera framing now swings behind the cue toward the majority of the current player\u2019s legal targets, including the final 8-Ball, with the idle cue facing forward from the new view.",
       "Bar house rules now keep the layout after an empty break instead of automatically reracking. Players alternate until a legal pot assigns groups; pots made with a scratch stay down without assigning a group.",
-      "Turn, foul, and result messages use the CPU opponent’s name consistently. Illegal-break reracks now explain the missing pocket and four-rail requirement.",
+      "Turn, foul, and result messages use the CPU opponent\u2019s name consistently. Illegal-break reracks now explain the missing pocket and four-rail requirement.",
       "Once groups are assigned, player cards show the 8-Ball after their group, highlighted when it becomes the final target.",
       "Desktop tables open from behind the cue, looking toward the fresh rack.",
       "Pocketed balls visibly fall into deeper pocket wells before entering the return, while scoring updates immediately.",

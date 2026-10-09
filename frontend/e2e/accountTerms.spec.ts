@@ -63,6 +63,6 @@ test('opening account reloads combined Jev results with honest historical shot l
  await page.route('**/api/privacy/terms',r=>r.fulfill({json:{version:TERMS_VERSION,accepted:true,authenticated:true,accountId:account.id}}));
  let losses=1;
  await page.route('**/api/account',r=>r.fulfill({json:{account,stats:{...stats,matches:3,losses,shotStatsComplete:false,recent:[{id:'j',opponent:'Jev AI',status:'completed',result:'loss',mode:'jev',shotStatsComplete:false}]}}}));
- await openAccount(page);await expect(page.locator('#accountstats')).toContainText('Online + Jev matches');await expect(page.locator('#accountstats')).toContainText('Recorded shots');await expect(page.locator('#accountstatsnote')).toContainText('earlier shot details are unavailable');await expect(page.locator('#accountmatches')).toContainText('Jev AI · loss');await expect(page.locator('#accountrefresh')).toHaveCount(0);
+ await openAccount(page);await expect(page.locator('#accountstats')).toContainText('Matches');await expect(page.locator('#accountstats')).toContainText('Shots');await expect(page.locator('#accountstatsnote')).toContainText('earlier shot details are unavailable');await expect(page.locator('#accountmatches')).toContainText('Jev AI · loss');await expect(page.locator('#accountrefresh')).toHaveCount(0);
  await page.locator('#accountclose').click();losses=2;await page.locator('#accountidentity').click();await expect(page.locator('#accountstats div').filter({has:page.locator('dt',{hasText:/^Losses$/})}).locator('dd')).toHaveText('2');
 });

@@ -27,9 +27,9 @@ async function prepare(page:Page){
 }
 for(const mobile of [false,true])test.describe(mobile?'mobile Google':'desktop Google',()=>{
  if(mobile)test.use({viewport:{width:390,height:844},hasTouch:true,isMobile:true});
- test('signup accepts Terms, retries conflicts, saves recovery and offers passkey',async({page})=>{
-  const state=await prepare(page);await expect(page.locator('#googlelogin')).toBeVisible();expect(state.scripts).toBe(0);
-  await page.locator('#googlelogin').click();await page.getByText('Choose test Google account',{exact:true}).click();await expect(page.locator('#googlesignup')).toBeVisible();
+ test('signup accepts Terms, retries conflicts, saves recovery and offers passkey',async({page},testInfo)=>{
+  const state=await prepare(page);await expect(page.locator('#googlelogin')).toBeVisible();expect(state.scripts).toBe(0);await page.screenshot({path:testInfo.outputPath('signin.png')});
+  await page.locator('#googlelogin').click();await page.getByText('Choose test Google account',{exact:true}).click();await expect(page.locator('#googlesignup')).toBeVisible();await page.screenshot({path:testInfo.outputPath('google-signup.png')});
   expect(await page.evaluate(()=>(window as any).googleOptions.nonce)).toBe('test-nonce');
   await page.locator('#googleusername').fill('Taken');await page.locator('#googleadult').check();await page.getByRole('button',{name:'Create account with Google',exact:true}).click();await expect(page.locator('#accountstatus')).toContainText('already in use');
   await page.locator('#googleusername').fill('NewPlayer');await page.getByRole('button',{name:'Create account with Google',exact:true}).click();await expect(page.locator('#recoverypanel')).toBeVisible();await expect(page.locator('#accountclose')).toBeDisabled();
@@ -39,12 +39,12 @@ for(const mobile of [false,true])test.describe(mobile?'mobile Google':'desktop G
  });
  test('login preserves identity and linking/unlinking requires deliberate actions',async({page})=>{
   const state=await prepare(page);state.finish='login';await page.locator('#googlelogin').click();await page.getByText('Choose test Google account',{exact:true}).click();await expect(page.locator('#accountname')).toHaveText('Returning');await expect(page.locator('#accountpremium')).toBeVisible();
-  state.finish='link';await page.locator('#googlelink').click();await page.getByText('Choose test Google account',{exact:true}).click();await expect(page.locator('#googleunlink')).toBeVisible();expect(state.account.id).toBe('same-account');
+  state.finish='link';await page.locator('#account-tab-signin').click();await page.locator('#googlelink').click();await page.getByText('Choose test Google account',{exact:true}).click();await expect(page.locator('#googleunlink')).toBeVisible();expect(state.account.id).toBe('same-account');
   await page.locator('#googleunlink').click();await expect(page.locator('#googleunlinkconfirm')).toBeVisible();expect(state.linked).toBe(true);await page.locator('#googleunlinkyes').click();await expect(page.locator('#googlelink')).toBeVisible();expect(state.linked).toBe(false);
  });
 });
 test('cancelled callback cannot change the account',async({page})=>{
- const state=await prepare(page);await page.locator('#googlelogin').click();await expect(page.getByText('Choose test Google account',{exact:true})).toBeVisible();await page.locator('#googlecancel').click();await page.evaluate(()=>(window as any).googleCallback({credential:'late'}));expect(state.finishes).toBe(0);await expect(page.locator('#accountauth')).toBeVisible();
+ const state=await prepare(page);await page.locator('#googlelogin').click();await expect(page.getByText('Choose test Google account',{exact:true})).toBeVisible();await page.locator('#googlecancel').click();await expect(page.locator('#googlelogin')).toBeFocused();await page.evaluate(()=>(window as any).googleCallback({credential:'late'}));expect(state.finishes).toBe(0);await expect(page.locator('#accountauth')).toBeVisible();
 });
 test('script failure keeps password login usable',async({page})=>{
  await prepare(page);await page.route('https://accounts.google.com/gsi/client',r=>r.abort());await page.locator('#googlelogin').click();await expect(page.locator('#accountstatus')).toContainText('Google could not load');await expect(page.locator('#accountsubmit')).toBeEnabled();await page.locator('#googlecancel').click();await page.locator('#accountusername').fill('PasswordUser');await expect(page.locator('#accountpassword')).toBeVisible();
@@ -54,5 +54,5 @@ test('Google-only accounts receive a usable reauthentication instruction',async(
  const state=await prepare(page);await expect(page.locator('#googlelogin')).toBeVisible();await page.locator('#accountclose').click();
  state.account={id:'google-only',username:'GoogleOnly',hasPassword:false,createdAt:1,premium:false,isAdmin:false};state.linked=true;
  await page.route('**/api/account/passkeys',r=>r.fulfill({json:{passkeys:[],recentlyVerified:false}}));
- await page.locator('#accountidentity').click();await expect(page.locator('#accountname')).toHaveText('GoogleOnly');await page.locator('#passkeyadd').click();await expect(page.locator('#passkeystatus')).toContainText('sign back in with Google');await expect(page.locator('#passkeyverifyform')).toBeHidden();
+ await page.locator('#accountidentity').click();await expect(page.locator('#accountname')).toHaveText('GoogleOnly');await page.locator('#account-tab-signin').click();await page.locator('#passkeyadd').click();await expect(page.locator('#passkeystatus')).toContainText('sign back in with Google');await expect(page.locator('#passkeyverifyform')).toBeHidden();
 });

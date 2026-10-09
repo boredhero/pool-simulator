@@ -42,7 +42,7 @@ Usage counting is backend-owned. The account's lifetime attempt count advances
 before a provider call; completion advances only after a valid offered selection.
 Daily game admission uses database uniqueness constraints; the emergency provider-call budget is a separate durable counter. Neither is supplied by the browser.
 
-## Daily-game and legal changes
+## Historical daily-game and legal changes (superseded by 1.1.0)
 
 The initial per-selection account allowance was replaced before release by one
 persistent authoritative game per account and source network per UTC day. The
@@ -100,7 +100,8 @@ on an invalid answer is still included in input/output totals and estimated cost
 Missing or invalid usage leaves the attempt marked unmetered, including timeouts
 whose billing is unknown. No provider retries are added in this release; failure
 continues the rack with a local plan. Each provider attempt remains subject to the
-existing global emergency budget, independent of Premium game admission.
+then-existing global emergency budget, independent of Premium game admission.
+That budget was removed by the later monthly-allowance implementation described below.
 
 Research checked against official live docs on October 8, 2026:
 
@@ -129,3 +130,26 @@ win rate with uncertainty, run length, fallback rate, p50/p95 planning and provi
 latency, and measured cost per rack. Geometry improvement and Jev improvement must
 be measured separately. CI uses deterministic fixtures and mocked provider
 contracts; live paid comparisons require a separately budgeted evaluation run.
+
+
+## Current accounting and provider data (1.1.0 onward)
+
+The historical daily account/network limits and global paid-call cap above are no longer
+active. Admission uses the account's monthly USD allowance (default $0.15, configurable),
+optional per-account overrides, current-month top-ups, and pending/unknown reservations.
+Premium bypasses this allowance. Each Jev request in a simulation uses the same ledger;
+CPU-only simulation does not call the provider. Admitted racks have $0.02 completion grace,
+then CPU fallback. The four-active-turn capacity bound remains.
+
+The ledger is calculated from provider-reported input tokens and the configured token rate,
+not from a per-request provider billing receipt. Output tokens are recorded but currently
+priced at zero. Unknown usage is reserved rather than treated as free. The provider credit
+balance displayed to the administrator is separate from per-player ledger accounting.
+
+The current `decision_context` and `describe_plan` functions send rule settings, game phase,
+groups/legal targets, kitchen/placement/eight-ball constraints, opponent remaining count,
+and shot-plan consequences, including legality, scratches, continuation and next-shot
+opportunities. The old numeric-candidates-only description above is historical. Account IDs,
+usernames, browser IPs, credentials, and player-written text are not model input. A server
+API credential authorizes requests; the provider still receives server connection metadata.
+See [data inventory](data-inventory.md) for retention and deletion details.

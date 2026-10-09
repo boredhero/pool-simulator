@@ -18,3 +18,23 @@
 .admin-delete-confirm input{max-width:340px;min-height:44px;box-sizing:border-box;border:1px solid #87714f;border-radius:8px;background:#171411;color:#f5eddf;padding:8px;font:inherit}
 .admin-delete-confirm button{margin-right:8px;min-height:44px}
 .budget-form{display:flex;align-items:end;flex-wrap:wrap;gap:8px;margin:12px 0}.budget-form label{display:flex;flex-direction:column;gap:6px}.budget-form input{min-height:44px;max-width:150px;border:1px solid var(--border,#786549);border-radius:8px;padding:8px;background:#211d18;color:#eee2cb}.budget-form button{min-height:44px}.budget-account{overflow-wrap:anywhere;border-top:1px solid #786549;margin-top:12px}.budget-account p{line-height:1.5}
+
+/* Account management uses the same spacing and action hierarchy as player settings. */
+#admindialog .admin-header h2{font-size:23px;letter-spacing:-.3px}
+#admindialog .admin-header .eyebrow{font-size:11px;letter-spacing:.1em}
+#admindialog button{border-radius:8px;font-size:14px;min-height:44px}
+#admindialog input:focus-visible,#admindialog button:focus-visible,#admindialog select:focus-visible{outline:2px solid #e7c384;outline-offset:3px}
+#admindialog .budget-default{padding:16px 18px;border:1px solid #514637;border-radius:12px;background:#211d17}
+#admindialog .budget-default>p{font-size:13px;color:#c7bca9;line-height:1.5;margin:12px 0 0}
+#admindialog a{color:#c9dfa8;text-underline-offset:3px}
+#admindialog .budget-form{display:grid;grid-template-columns:minmax(160px,1fr) auto;gap:10px 12px;max-width:520px;margin:14px 0}
+#admindialog .budget-form label{font-size:14px;line-height:1.5}
+#admindialog .budget-form input{font:inherit;font-size:16px;width:100%;max-width:none;box-sizing:border-box;background:#191611;border-color:#736247}
+#admindialog .budget-form button{background:#465e37;border-color:#80936a;color:#fff;padding:8px 16px}
+#admindialog .budget-status{grid-column:1/-1;font-size:13px;line-height:1.5;color:#dccba9;overflow-wrap:anywhere}
+#admindialog .budget-status:empty{display:none}
+#admindialog .budget-account{padding-top:12px;margin-top:20px;border-color:#514637}
+#admindialog .budget-account>p{font-size:14px;line-height:1.65;max-width:75ch}
+#admindialog .admin-delete-confirm{border-left:3px solid #b87564}
+#admindialog .admin-delete-confirm>p{max-width:65ch;line-height:1.6}
+@media(max-width:480px){#admindialog .budget-form{grid-template-columns:1fr}#admindialog .budget-form button{width:100%}#admindialog .admin-header{align-items:flex-start}#admindialog .admin-header .row{gap:6px}}

@@ -139,7 +139,7 @@ test('kitchen guide and locally persisted sight shape', async ({page})=>{
   await openGame(page);
   expect(await page.locator('#railsights').inputValue()).toBe('diamonds');
   await page.locator('#settingsbtn').click();
-  await page.locator('#railsights').selectOption('double-diamonds');
+  await page.locator('summary').filter({hasText:'Appearance'}).click();await page.locator('#railsights').selectOption('double-diamonds');
   await openGame(page, true);
   expect(await page.locator('#railsights').inputValue()).toBe('double-diamonds');
   await page.evaluate(()=>{const g=(window as any).__pool;g.gs.ballInHand=true;g.gs.placement='kitchen';g.gs.kitchenShot=true;g.mode='place';g.frame();});
@@ -172,7 +172,7 @@ test('dismissal and independent playback preference survive reload',async({page}
   await expect(page.locator('#helppanel')).toBeHidden();
   await page.locator('#helpbtn').click();await expect(page.locator('#helppanel')).toBeVisible();
   await page.locator('#settingsbtn').click();await expect(page.locator('#fastforward')).not.toBeChecked();
-  await page.locator('#fastforward').check();await page.locator('#rulespreset').selectOption('custom');
+  await page.locator('summary').filter({hasText:'Camera & playback'}).click();await page.locator('#fastforward').check();await page.locator('#rulespreset').selectOption('custom');
   await expect(page.locator('#fastforward')).toBeChecked();await openGame(page, true);
   await expect(page.locator('#helppanel')).toBeHidden();
   expect(await page.evaluate(()=>(window as any).__pool.options.fastForward)).toBe(true);
@@ -226,6 +226,7 @@ test('close zoom cannot orbit the camera inside the table',async({page})=>{
 test('cue ball markings persist without changing the physical ball state',async({page})=>{
   await openGame(page);await page.locator('#settingsbtn').click();
   const before=await page.evaluate(()=>JSON.stringify((window as any).__pool.gs.balls));
+  await page.locator('summary').filter({hasText:'Appearance'}).click();
   for(const style of ['red-ring','blue-dot','black-triangles','plain','red-spots'])await page.locator('#cueappearance').selectOption(style);
   expect(await page.evaluate(()=>JSON.stringify((window as any).__pool.gs.balls))).toBe(before);
   await openGame(page,true);
@@ -287,7 +288,7 @@ test('camera preferences adapt to mobile and persist an explicit override',async
   await page.keyboard.press('Escape');
   expect(await page.evaluate(()=>(window as any).__pool.cameraMode)).toBe(false);
   await page.locator('#settingsbtn').click();
-  await page.locator('#autocamera').uncheck();
+  await page.locator('summary').filter({hasText:'Camera & playback'}).click();await page.locator('#autocamera').uncheck();
   await openGame(page,true);
   await expect(page.locator('#autocamera')).not.toBeChecked();
 });
@@ -345,7 +346,7 @@ test('CPU name appears in turn, foul, rolling, and winner messages',async({page}
   await openGame(page);
   for(const [mode,message,expected] of [
     ['place','Foul: No contact · Player 2, place anywhere','Foul: No contact · CPU, place anywhere'],
-    ['rolling','Player 2 to shoot','CPU · shot in motion'],
+    ['rolling','Player 2 to shoot','Shot in motion'],
     ['over','Player 2 wins!','CPU wins!'],
   ]) {
     const state=await page.evaluate(({mode,message})=>{const g=(window as any).__pool;g.cpuOpponent=true;g.gs.current=1;g.gs.message=message;g.mode=mode;g.hud();return{turn:document.getElementById('turn')!.textContent,message:document.getElementById('msg')!.textContent};},{mode,message});
@@ -662,7 +663,7 @@ test('CPU presents its immutable cue, locks human controls, and strikes once in 
   await openGame(page);
   const result=await page.evaluate(async()=>{
     const g=(window as any).__pool;g.cpuOpponent=true;g.gs.current=1;g.mode='aim';
-    g.angle=.4;g.targetAngle=.8;
+    g.angle=.4;g.targetAngle=.8;g.power=.23;g.tipX=.12;g.tipY=-.08;
     const rendered:any[]=[],fire=g.fire.bind(g),setCue=g.scene.setCue.bind(g.scene);
     g.scene.setCue=(...args:any[])=>{rendered.push(args);setCue(...args);};
     const strikes:any[]=[];
@@ -679,10 +680,11 @@ test('CPU presents its immutable cue, locks human controls, and strikes once in 
     const power=document.getElementById('touchpower') as HTMLInputElement;power.value='99';power.dispatchEvent(new Event('input'));
     const after={angle:g.targetAngle,tip:g.tipX,ball:g.calledBall,power:g.humanPower,x:g.placeX};
     g.frame();const visible=rendered.at(-1);await pending;
-    return {hidden,before,after,visible,selected,strikes,mode:g.mode,
+    return {hidden,before,after,visible,selected,strikes,mode:g.mode,humanSettings:{power:g.power,tipX:g.tipX,tipY:g.tipY},
       cueAngles:rendered.filter(x=>x[0]).map(x=>x[3]),pulls:rendered.filter(x=>x[0]).map(x=>x[4])};
   });
   expect(result.hidden).toBe(true);expect(result.after).toEqual(result.before);
+  expect(result.humanSettings).toEqual({power:.23,tipX:.12,tipY:-.08});
   expect(result.visible[0]).toBe(true);expect(result.visible[3]).toBe(result.selected.aim);
   expect(result.strikes).toHaveLength(1);expect(result.strikes[0].angle).toBe(result.selected.aim);
   expect(result.strikes[0].target).toBe(result.selected.aim);expect(result.mode).toBe('rolling');
@@ -707,7 +709,7 @@ test('Jev cue presentation uses authoritative placement and strike before final 
   await openGame(page);
   const state=await page.evaluate(()=>{
     const g=(window as any).__pool;g.cpuOpponent=true;g.jevOpponent=true;g.jevGame={id:'cue-test',revision:0};
-    g.gs.current=1;g.gs.ballInHand=true;g.gs.placement='kitchen';g.gs.kitchenShot=true;g.mode='place';
+    g.gs.current=1;g.gs.ballInHand=true;g.gs.placement='kitchen';g.gs.kitchenShot=true;g.mode='place';g.power=.23;
     return {balls:g.gs.balls,return_order:[],current:0,groups:[null,null],open:true,ball_in_hand:false,
       break_shot:false,placement:'none',kitchen_shot:false,rules:g.gs.rules,revision:1,winner:null,message:'Player 1 to shoot'};
   });
@@ -723,10 +725,11 @@ test('Jev cue presentation uses authoritative placement and strike before final 
     await g.playJevTurn();const mode=g.mode;
     g.cpuOpponent=false;
     for(let i=0;i<220&&g.mode==='rolling';i++){g.accumulator+=.25;g.frame();}
-    return {cues,strikes,mode,revision:g.jevGame.revision,current:g.gs.current};
+    return {cues,strikes,mode,humanPower:g.power,revision:g.jevGame.revision,current:g.gs.current};
   });
-  expect(result.mode).toBe('rolling');expect(result.strikes).toHaveLength(1);
-  expect(result.strikes[0]).toEqual({aim:shot.aim,tipX:0,tipY:.1,x:.3,y:.4,args:[.35,3.5,.12]});
+  expect(result.mode).toBe('rolling');expect(result.strikes).toHaveLength(1);expect(result.humanPower).toBe(.23);
+  // Opponent spin travels in the immutable shot, leaving the human's HUD unchanged.
+  expect(result.strikes[0]).toEqual({aim:shot.aim,tipX:0,tipY:0,x:.3,y:.4,args:[.35,3.5,.12,{...shot,placement:{x:.3,y:.4}}]});
   expect(result.cues.length).toBeGreaterThan(2);
   expect(result.cues.every((c:any[])=>c[1]===.3&&c[2]===.4&&c[3]===shot.aim&&c[7]===shot.elevation)).toBe(true);
   expect(result.revision).toBe(1);expect(result.current).toBe(0);
@@ -1004,4 +1007,65 @@ test('mobile circular touch aiming rotates repeatedly both ways without a foregr
     await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
     expect(await page.evaluate(()=>{const g=(window as any).__pool;return{mode:g.mode,speed:Math.hypot(g.cue().vx,g.cue().vy)};})).toEqual({mode:'aim',speed:0});
   }
+});
+
+for(const [simulation,seat,name] of [['jev-cpu',1,'CPU'],['jev-cpu',0,'Jev AI'],['jev-jev',1,'Jev AI 2']] as const)test(`pending ${simulation} seat ${seat} names the actual planner`,async({page})=>{
+  await openGame(page);
+  await page.route('**/api/opponents/jev/games/status-test/turn',route=>route.abort());
+  const status=await page.evaluate(({simulation,seat})=>{
+    const g=(window as any).__pool;g.coin.cancel();g.cancelOpponent();g.simMode=simulation;g.cpuOpponent=true;g.jevOpponent=true;
+    g.jevGame={id:'status-test',revision:0};g.gs.current=seat;g.mode='aim';
+    void g.playJevTurn();
+    return {name:document.getElementById('turn')!.textContent,primary:document.getElementById('msg')?.textContent,secondary:document.getElementById('opponentstatus')!.textContent};
+  },{simulation,seat});
+  expect(status).toEqual({name,primary:'Choosing a shot',secondary:''});
+});
+
+test('departed room callbacks cannot overwrite local play or a replacement room',async({page})=>{
+  await page.addInitScript(()=>{
+    class TestSocket {
+      static OPEN=1;readyState=1;onopen:any=null;onmessage:any=null;onclose:any=null;
+      send(){}close(){this.readyState=3;}
+    }
+    (window as any).WebSocket=TestSocket;
+  });
+  await openGame(page);
+  const result=await page.evaluate(()=>{
+    const g=(window as any).__pool;g.coin.cancel();g.connectRoom(true);
+    const old=g.room;old.seat=0;old.code='ABCD2345';
+    const state={code:old.code,balls:structuredClone(g.gs.balls),current:1,groups:['solid','stripe'],open:false,ball_in_hand:false,winner:null,message:'STALE ROOM',break_shot:false,placement:'anywhere',kitchen_shot:false,rules:structuredClone(g.gs.rules),revision:3,return_order:[],names:['Stale A','Stale B'],ready:false};
+    const shot={aim:1,power:.7,tipX:0,tipY:0};
+    g.mode='rolling';old.onState(state);old.onShot(1,shot);
+    const queued=g.pendingNetwork.splice(0);const queuedCount=queued.length;
+    g.leaveRoom('Local game');g.coin.cancel();
+    const snapshot=()=>JSON.stringify({state:g.gs,mode:g.mode,seat:g.seat,names:g.roomNames,message:g.el.msg.textContent,roomInfo:g.el.roominfo.textContent,link:(document.getElementById('roomlink') as HTMLInputElement).value,pending:g.pendingNetwork.length});
+    let openCalls=0;old.create=()=>openCalls++;
+    const stale=()=>{old.onState(state);old.onShot(1,shot);old.onJoined(state.names);old.onOpen();old.onError('OLD ERROR');old.onClose('OLD CLOSED');for(const callback of queued)callback();};
+    const localBefore=snapshot();stale();const localPreserved=localBefore===snapshot()&&g.room===null;
+    g.connectRoom(true);const current=g.room;g.coin.cancel();
+    const replacementBefore=snapshot();old.code='';stale();const replacementPreserved=replacementBefore===snapshot()&&g.room===current;
+    current.seat=0;current.code='EFGH2345';current.onState({...state,message:'CURRENT ROOM',names:['Current A','Current B']});
+    const currentAccepted=g.gs.message==='CURRENT ROOM'&&g.seat===0&&g.roomNames[0]==='Current A';
+    g.leaveRoom('Done');
+    return {queuedCount,localPreserved,replacementPreserved,currentAccepted,openCalls};
+  });
+  expect(result).toEqual({queuedCount:2,localPreserved:true,replacementPreserved:true,currentAccepted:true,openCalls:0});
+});
+
+test('idle cue stays close to a touching cluster regardless of prior shot power',async({page})=>{
+  await openGame(page);
+  const values=await page.evaluate(async()=>{
+    const g=(window as any).__pool;g.coin.cancel();g.cancelOpponent();g.cpuOpponent=false;g.jevOpponent=false;g.simMode=null;g.mode='aim';g.gs.current=0;g.gs.breakShot=false;g.tipX=g.tipY=0;g.angle=g.targetAngle=0;
+    for(const b of g.gs.balls)b.potted=true;
+    Object.assign(g.gs.balls[0],{x:1.27,y:.635,potted:false,asleep:true});
+    [Math.PI/3,2*Math.PI/3,Math.PI,4*Math.PI/3,5*Math.PI/3].forEach((a,i)=>Object.assign(g.gs.balls[i+1],{x:1.27+.05715*Math.cos(a),y:.635+.05715*Math.sin(a),potted:false,asleep:true}));
+    const original=g.scene.setCue;let last:any[]=[];
+    g.scene.setCue=(...args:any[])=>{last=args;return original(...args);};
+    const result=[];
+    for(const power of [.1,.5,1]){g.power=power;g.pulling=false;g.frame();result.push({visible:last[0],pull:last[4]});}
+    g.pulling=true;const originalPower=g.pullPower;g.pullPower=()=>1;g.frame();result.push({visible:last[0],pull:last[4]});g.pulling=false;g.pullPower=originalPower;g.scene.setCue=original;
+    return result;
+  });
+  for(const v of values.slice(0,3)){expect(v.visible).toBe(true);expect(v.pull).toBeCloseTo(.012,10);}
+  expect(values[3].visible).toBe(true);expect(values[3].pull).toBeCloseTo(.192,10);
 });

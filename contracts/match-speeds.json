@@ -1,0 +1,7 @@
+[
+  {"input":{},"normalMax":3.5,"breakMax":9.5},
+  {"input":{"preset":"tournament"},"normalMax":3.5,"breakMax":9.5},
+  {"input":{"preset":"custom"},"normalMax":3.5,"breakMax":9.5},
+  {"input":{"preset":"custom","normalMax":4,"breakMax":8.5},"normalMax":4,"breakMax":8.5},
+  {"input":{"preset":"custom","normalMax":99,"breakMax":99},"normalMax":8.5,"breakMax":12}
+]

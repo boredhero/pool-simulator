@@ -132,7 +132,7 @@ def test_break_separation_every_step():
     for seed in (1, 7, 42):
         balls = new_game(seed).balls
         balls[0].asleep = False
-        balls[0].vx = 8.5
+        balls[0].vx = new_game(seed).rules["breakMax"]
         ev, contact = _ev(), _cm()
         smallest_gap = float("inf")
         for _ in range(240 * 45):
@@ -145,4 +145,5 @@ def test_break_separation_every_step():
                         distance = ((a.x - b.x) ** 2 + (a.y - b.y) ** 2) ** 0.5
                         smallest_gap = min(smallest_gap, distance)
         assert smallest_gap >= 2 * BALL_R - 1e-7, (seed, smallest_gap)
+        assert not ev.off_table
         assert all_asleep(balls)

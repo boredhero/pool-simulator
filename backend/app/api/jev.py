@@ -84,7 +84,7 @@ class RuleSettings(BaseModel):
     assignOnBreak: bool = True
     strictBreak: bool = False
     normalMax: float = Field(default=3.5, ge=1, le=8.5, allow_inf_nan=False)
-    breakMax: float = Field(default=8.5, ge=1, le=12, allow_inf_nan=False)
+    breakMax: float = Field(default=9.5, ge=1, le=12, allow_inf_nan=False)
 
 
 class StartGame(BaseModel):
@@ -302,6 +302,7 @@ def describe_plan(plan: dict) -> dict:
         else "no direct option found",
         "cue_region": ev.get("cueRegion", "unknown"),
         "pace": plan.get("pace", "controlled"),
+        "contact_style": plan.get("contactStyle", "planned contact"),
         "development_result": "congestion opened with new direct shot options"
         if ev.get("clusterLinksOpened", 0) and ev.get("newTargetsAvailable", 0)
         else "nearby balls separated, without new direct shot options"
@@ -330,6 +331,14 @@ async def evaluate(payload: Selection, key: str) -> Evaluation:
     random.Random(json.dumps(payload.state, sort_keys=True)).shuffle(ordered)
     criteria = {plan["id"]: describe_plan(plan) for plan in ordered}
     families = list(dict.fromkeys(plan["family"] for plan in ordered))
+    development_goal = (
+        "When choosing between legal plans with comparable pot and defensive outcomes, "
+        "prefer measured progress: newly shootable targets and useful cluster openings "
+        "over a soft tap that leaves the position blocked. A strong or glancing shot is "
+        "useful only when its preview supports that progress; avoid gratuitous power, "
+        "scratches, early eight-ball losses, and opening an easier table for the opponent. "
+        "Keep controlled pace for an easy pot or a genuinely stronger safety. "
+    )
     instructions = (
         "Choose the offered executable pool plan that best advances winning this rack. "
         "Respect the supplied canonical rules and current kitchen/eight-ball state; "
@@ -338,14 +347,16 @@ async def evaluate(payload: Selection, key: str) -> Evaluation:
         "continuations; consider defense when an attack leaves the opponent an easy reply. "
         "A settled preview is one deterministic outcome, not a success probability. "
         "No direct option found does not prove a snooker. Geometry-only plans are unverified. "
-        "Do not calculate aim, speed or spin. Pocket 1 and 4 are side pockets."
+        + development_goal
+        + "Do not calculate aim, speed or spin. Pocket 1 and 4 are side pockets."
     )
     questions = {}
     if len(families) > 1:
         questions["tactic"] = {
             "type": "choice",
             "instructions": "Which offered shot family best serves this turn? Compare its "
-            "provided plans, including defense, continuation and immediate rack outcomes.",
+            "provided plans, including defense, continuation and immediate rack outcomes. "
+            + development_goal,
             "criteria": {
                 family: {pid: plan for pid, plan in criteria.items() if plan["family"] == family}
                 for family in families

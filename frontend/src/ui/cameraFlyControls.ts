@@ -57,7 +57,13 @@ export function setupCameraFly(rig: CameraRig): void {
   moveButton.textContent = 'Move Camera';
   moveButton.setAttribute('aria-controls', 'camera-fly-hud');
   document.getElementById('morecontrols')!.before(moveButton);
-  moveButton.addEventListener('click', () => modeButton.click());
+  moveButton.addEventListener('click', () => {
+    modeButton.click();
+    // The shot tray disappears on phones; focus its replacement after the mode observer runs.
+    if (mobile.matches) queueMicrotask(() => {
+      if (modeButton.getAttribute('aria-pressed') === 'true') toggle.focus();
+    });
+  });
   const syncMobileMode = () => {
     const active = mobile.matches && modeButton.getAttribute('aria-pressed') === 'true';
     document.body.classList.toggle('mobile-camera-active', active);
@@ -155,7 +161,7 @@ export function setupCameraFly(rig: CameraRig): void {
     pad.append(button);
   }
   toggle.addEventListener('click', () => {
-    if (mobile.matches) { stop(); modeButton.click(); moveButton.focus(); return; }
+    if (mobile.matches) { stop(); modeButton.click(); queueMicrotask(() => moveButton.focus()); return; }
     pad.hidden = !pad.hidden;
     toggle.setAttribute('aria-expanded', String(!pad.hidden));
     toggle.setAttribute('aria-label',pad.hidden?'Show camera controls':'Hide camera controls');

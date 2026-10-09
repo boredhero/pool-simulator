@@ -165,7 +165,7 @@ export class AdminPanel {
       remove.addEventListener('click',()=>{
         remove.disabled=true;
         const confirmation=node('tr'),cell=node('td','','admin-detail admin-delete-confirm');cell.colSpan=5;
-        cell.append(node('h3',`Delete ${user.username}?`),node('p','This permanently removes the account, sign-in credentials, sessions and Jev usage records. Match history is anonymized. This cannot be undone.'));
+        cell.append(node('h3',`Delete ${user.username}?`),node('p','This permanently removes the account, sign-in credentials, sessions and Jev usage records. Shared match history remains with the account link cleared and name replaced. Limited security audit records remain. This cannot be undone.'));
         const label=node('label',`Type ${user.username} to confirm`),input=node('input');input.type='text';input.autocomplete='off';label.append(input);
         const submit=node('button','Permanently delete','admin-delete-button'),cancel=node('button','Cancel');submit.type=cancel.type='button';submit.disabled=true;
         input.addEventListener('input',()=>{submit.disabled=input.value!==user.username;});

@@ -1,3 +1,4 @@
+import {setupAccountSections,showAccountSection,setAccountSectionsBusy} from './accountSections';
 import {GooglePanel} from './google';
 import {UsernameControls} from './usernameControls';
 import {PasskeyPanel} from './passkeys';
@@ -27,21 +28,22 @@ export class AccountPanel {
   private agreementRevision=0;
   private admin=new AdminPanel(()=>void this.refresh());
   constructor(private playing:()=>boolean,private changed:(account:Account|null)=>void) {
-    this.passkeys=new PasskeyPanel(account=>{this.account=account;this.changed(account);this.passwords.reset();this.render();void this.refreshAgreement();},()=>this.playing()||this.busy||this.agreementBusy||this.recoveryPending,busy=>{this.busy=busy;++this.accountRevision;el<HTMLButtonElement>('accountsubmit').disabled=busy;el<HTMLButtonElement>('accountclose').disabled=busy;el<HTMLButtonElement>('accountlogout').disabled=busy||this.playing();if(!busy)void this.refresh();});
+    setupAccountSections();
+    this.passkeys=new PasskeyPanel(account=>{this.account=account;this.changed(account);this.passwords.reset();this.render();void this.refreshAgreement();},()=>this.playing()||this.busy||this.agreementBusy||this.recoveryPending,busy=>{setAccountSectionsBusy(busy);this.busy=busy;++this.accountRevision;el<HTMLButtonElement>('accountsubmit').disabled=busy;el<HTMLButtonElement>('accountclose').disabled=busy;el<HTMLButtonElement>('accountlogout').disabled=busy||this.playing();if(!busy)void this.refresh();});
     this.google=new GooglePanel(data=>{
       if(!data.account)return;
       this.account=data.account;this.changed(this.account);this.passwords.reset();this.offerPasskey=!!data.recovery;
       if(data.recovery){this.recoveryPending=true;el<HTMLInputElement>('recoveryvalue').value=data.recovery;el('recoverypanel').hidden=false;}
       this.status('');this.render();void this.refreshAgreement();
     },()=>this.playing()||this.busy||this.agreementBusy||this.recoveryPending,busy=>{
-      this.busy=busy;++this.accountRevision;++this.agreementRevision;
+      setAccountSectionsBusy(busy);this.busy=busy;++this.accountRevision;++this.agreementRevision;
       if(busy)this.passkeys.close();
       el<HTMLButtonElement>('accountsubmit').disabled=busy;el<HTMLButtonElement>('accountclose').disabled=busy||this.recoveryPending;el<HTMLButtonElement>('accountlogout').disabled=busy||this.playing();
       if(!busy)void this.refresh();
     });
     this.usernames=new UsernameControls(name=>this.rename(name));
-    el('settingspasskeys').addEventListener('click',()=>{this.opener=el('settingspasskeys');el<HTMLDialogElement>('accountdialog').showModal();void this.refresh();el('passkeys').scrollIntoView({block:'start'});el('passkeystitle').setAttribute('tabindex','-1');el('passkeystitle').focus();});
-    for(const id of ['accountbtn','accountidentity'])el(id).addEventListener('click',()=>{this.opener=el(id);el<HTMLDialogElement>('accountdialog').showModal();void this.refresh();});
+    el('settingspasskeys').addEventListener('click',()=>{this.opener=el('settingspasskeys');showAccountSection('signin');el<HTMLDialogElement>('accountdialog').showModal();void this.refresh();el('passkeys').scrollIntoView({block:'start'});el('passkeystitle').setAttribute('tabindex','-1');el('passkeystitle').focus();});
+    for(const id of ['accountbtn','accountidentity'])el(id).addEventListener('click',()=>{this.opener=el(id);showAccountSection('overview');el<HTMLDialogElement>('accountdialog').showModal();void this.refresh();});
     el('accountdialog').addEventListener('keydown',e=>e.stopPropagation());
     el('accountclose').addEventListener('click',()=>el<HTMLDialogElement>('accountdialog').close());
     el('accountdialog').addEventListener('cancel',e=>{if(this.recoveryPending||this.busy||this.agreementBusy)e.preventDefault();});
@@ -57,7 +59,7 @@ export class AccountPanel {
       el<HTMLButtonElement>('accountclose').disabled=false;this.render();
       this.status(this.account?'Your account is ready.':'Password reset. Sign in with your new password.');
       if(!this.account)this.setMode('login');
-      if(this.offerPasskey&&this.account){this.offerPasskey=false;this.passkeys.offer();}
+      if(this.offerPasskey&&this.account){this.offerPasskey=false;showAccountSection('signin');this.passkeys.offer();}
       void this.refresh();
     });
     window.setInterval(()=>{if(this.account&&!document.hidden)void this.request('/activity',{}).catch(()=>{});},60_000);
@@ -111,6 +113,11 @@ export class AccountPanel {
     this.passwords.setRequired(mode!=='login');
     for(const name of ['login','register','recover'])el('account-'+name).setAttribute('aria-pressed',String(name===mode));
     el('accountrecoverylabel').hidden=mode!=='recover';
+    el('recovery-consequences').hidden=mode!=='recover';
+    el('auth-mode-title').textContent=mode==='login'?'Welcome back':mode==='register'?'Create your account':'Recover your account';
+    el('account-recover').hidden=mode==='recover';
+    el('accountauth').classList.toggle('recover-mode',mode==='recover');
+    el('accountauth').classList.toggle('signin-mode',mode==='login');
     el('registerterms').hidden=mode!=='register';
     el<HTMLInputElement>('registeradult').required=mode==='register';
     const recovery=el<HTMLInputElement>('accountrecovery');recovery.required=mode==='recover';recovery.disabled=mode!=='recover';
@@ -141,7 +148,7 @@ export class AccountPanel {
     }
     if(stats){
       const list=el('accountstats');list.replaceChildren();
-      for(const [label,value] of [['Online + Jev matches',stats.matches],['Wins',stats.wins],['Losses',stats.losses],['Recorded shots',stats.shots],['Recorded balls pocketed',stats.ballsPocketed],['Recorded scratches',stats.scratches],['Recorded fouls',stats.fouls],['Matches left',stats.abandoned]]){
+      for(const [label,value] of [['Matches',stats.matches],['Wins',stats.wins],['Losses',stats.losses],['Shots',stats.shots],['Balls pocketed',stats.ballsPocketed],['Scratches',stats.scratches],['Fouls',stats.fouls],['Left early',stats.abandoned]]){
         const div=document.createElement('div'),dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=String(label);dd.textContent=String(value);div.append(dt,dd);list.append(div);
       }
       let note=document.getElementById('accountstatsnote');
@@ -163,7 +170,7 @@ export class AccountPanel {
       const u=data.usage;
       el('accountjev').textContent=data.available
         ? u.unlimited
-          ? 'Premium · Unlimited Jev AI games. Resume your game or use New rack while playing Jev to start another.'
+          ? 'Jev AI · Unlimited games'
           : `Jev AI: $${(u.budget.remainingNano/1e9).toFixed(4)} remaining of $${(u.budget.limitNano/1e9).toFixed(2)} this month. ${u.budget.unknownRequests?`${u.budget.unknownRequests} pending/unknown requests have reserved allowance. `:''}Your current rack can finish, using CPU if its completion grace runs out. Resets ${new Date(u.resetsAt*1000).toLocaleString()}.`
         : 'Jev AI is not configured on this server.';
     } catch {

@@ -15,13 +15,13 @@ for(const mobile of [false,true])test.describe(mobile?'mobile username':'desktop
    const now=Math.floor(Date.now()/1000);account={...account,username:name,usernameChangedAt:now,usernameChangeAvailableAt:now+365*86400};
    return r.fulfill({json:{account}});
   });
-  await page.goto('/');await page.locator('#accountidentity').click();
+  await page.goto('/');await page.locator('#accountidentity').click();await page.locator('#account-tab-profile').click();
   await page.locator('#newusername').fill('Taken');await expect(page.locator('#usernameavailability')).toHaveText('That username is already taken.');
   await page.locator('#usernamechange').click();await expect(page.locator('#accountstatus')).toContainText('already taken');await expect(page.locator('#usernamechange')).toBeEnabled();
   await page.locator('#newusername').fill('After');await expect(page.locator('#usernameavailability')).toHaveText('Available.');
   await page.locator('#usernamechange').click();await expect(page.locator('#accountname')).toHaveText('After');await expect(page.locator('#usernamechange')).toBeDisabled();await expect(page.locator('#usernamecooldown')).toContainText('again on');
   await expect(page.locator('#accountpremium')).toBeVisible();expect(account.id).toBe('same-account');
-  await page.locator('#accountclose').click();await expect(page.locator('#accountidentityname')).toHaveText('After');await page.locator('#accountidentity').click();await expect(page.locator('#newusername')).toBeDisabled();
+  await page.locator('#accountclose').click();await expect(page.locator('#accountidentityname')).toHaveText('After');await page.locator('#accountidentity').click();await page.locator('#account-tab-profile').click();await expect(page.locator('#newusername')).toBeDisabled();
   const width=mobile?390:1280;expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
  });
 });

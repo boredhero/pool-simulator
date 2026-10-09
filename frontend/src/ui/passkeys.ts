@@ -7,26 +7,30 @@ type Key={id:string;name:string;createdAt:number;lastUsedAt:number|null;backedUp
 export class PasskeyPanel {
   private account:Account|null=null;
   private keys:Key[]=[];
+  private renderedKeys='';
   private fresh=false;
   private busy=false;
   private revision=0;
   private conditional=0;
   private timer:ReturnType<typeof setTimeout>|undefined;
   private loginActive=false;
+  private loginCancelled=false;
   private loginOptionsFlight:Promise<any>|null=null;
   private pending:(()=>Promise<void>)|null=null;
+  private pendingOpener:HTMLElement|null=null;
   private supported=window.isSecureContext&&browserSupportsWebAuthn();
   constructor(private signedIn:(account:Account)=>void,private blocked:()=>boolean,private setBusy:(busy:boolean)=>void){
     el('passkeylogin').hidden=!this.supported;
     el('passkeyunsupported').hidden=this.supported;
     el('passkeyadd').hidden=!this.supported;
     el('passkeylogin').addEventListener('click',()=>void this.login());
+    el('passkey-login-cancel').addEventListener('click',()=>{this.loginCancelled=true;WebAuthnAbortService.cancelCeremony();el('accountstatus').textContent='Returning to sign-in…';});
     el('passkeyadd').addEventListener('click',()=>void this.authorize(()=>this.add()));
     el('passkeyofferadd').addEventListener('click',()=>void this.authorize(()=>this.add()));
     el('passkeyskip').addEventListener('click',()=>{el('passkeyoffer').hidden=true;el('passkeyadd').focus();});
     el('passkeyverifyform').addEventListener('submit',e=>{e.preventDefault();void this.reverify(false);});
     el('passkeyverifykey').addEventListener('click',()=>void this.reverify(true));
-    el('passkeyverifycancel').addEventListener('click',()=>{this.pending=null;this.clearVerify();el('passkeyadd').focus();});
+    el('passkeyverifycancel').addEventListener('click',()=>{const opener=this.pendingOpener;this.pending=null;this.clearVerify();if(opener?.isConnected)opener.focus();else el('passkeystatus').focus();});
     el('passkeypasswordeye').addEventListener('click',()=>{
       const field=el<HTMLInputElement>('passkeypassword'),shown=field.type==='password';field.type=shown?'text':'password';
       el('passkeypasswordeye').setAttribute('aria-pressed',String(shown));el('passkeypasswordeye').setAttribute('aria-label',shown?'Hide verification password':'Show verification password');
@@ -51,7 +55,7 @@ export class PasskeyPanel {
     finally{this.busy=false;this.setBusy(false);el('passkeys').setAttribute('aria-busy','false');buttons.forEach(b=>b.disabled=false);}
   }
   update(account:Account|null,loginActive:boolean){
-    if(this.account?.id!==account?.id){this.revision++;this.keys=[];this.fresh=false;this.clearVerify();el('passkeyoffer').hidden=true;this.status('');}
+    if(this.account?.id!==account?.id){this.revision++;this.keys=[];this.renderedKeys='';this.fresh=false;this.clearVerify();el('passkeyoffer').hidden=true;this.status('');}
     this.account=account;
     el('passkeyverifyform').hidden=account?.hasPassword===false;
     el('settingspasskeys').hidden=!account;
@@ -65,6 +69,7 @@ export class PasskeyPanel {
   close(){this.loginActive=false;this.cancelAutofill();this.pending=null;this.clearVerify();el('passkeyoffer').hidden=true;}
   cancelAutofill(){this.conditional=0;this.revision++;clearTimeout(this.timer);WebAuthnAbortService.cancelCeremony();}
   private clearVerify(){
+    this.pendingOpener=null;
     el('passkeyverify').hidden=true;el<HTMLInputElement>('passkeypassword').value='';el<HTMLInputElement>('passkeypassword').type='password';
     el('passkeypasswordeye').setAttribute('aria-pressed','false');el('passkeypasswordeye').setAttribute('aria-label','Show verification password');
   }
@@ -74,6 +79,8 @@ export class PasskeyPanel {
     catch{if(this.account?.id===accountId)this.status('Could not load passkeys. Reopen your account to retry.');}
   }
   private render(){
+    // Account refreshes must not discard an open rename or removal confirmation.
+    const signature=JSON.stringify(this.keys);if(signature===this.renderedKeys)return;this.renderedKeys=signature;
     const list=el('passkeylist');list.replaceChildren();
     el('passkeyempty').hidden=this.keys.length>0;
     for(const key of this.keys){
@@ -86,7 +93,7 @@ export class PasskeyPanel {
       const editor=document.createElement('form');editor.hidden=true;editor.className='passkey-edit';
       const label=document.createElement('label');label.textContent='Passkey name';const input=document.createElement('input');input.value=key.name;input.maxLength=64;input.required=true;label.append(input);
       const save=document.createElement('button');save.type='submit';save.textContent='Save name';editor.append(label,save);
-      editor.addEventListener('submit',e=>{e.preventDefault();void this.authorize(async()=>{await this.request('/'+key.id,{name:input.value.trim()||'My passkey'},'PATCH');await this.refresh();this.status('Passkey renamed.');});});
+      editor.addEventListener('submit',e=>{e.preventDefault();void this.authorize(async()=>{await this.request('/'+key.id,{name:input.value.trim()||'My passkey'},'PATCH');await this.refresh();this.status('Passkey renamed.');el('passkeystatus').focus();});});
       rename.addEventListener('click',()=>{editor.hidden=!editor.hidden;if(!editor.hidden)input.focus();});
       const confirm=document.createElement('div');confirm.hidden=true;confirm.className='passkey-remove';
       const warning=document.createElement('p');warning.textContent='Remove this passkey? Other sessions will be signed out. Your other sign-in methods still work. You must keep at least one. Also remove it from your password manager if no longer needed.';
@@ -98,17 +105,18 @@ export class PasskeyPanel {
   }
   private async authorize(action:()=>Promise<void>){
     if(this.busy||this.blocked())return;
+    const opener=document.activeElement instanceof HTMLElement?document.activeElement:null;
     await this.refresh();
     if(!this.fresh){
       if(this.account?.hasPassword===false&&!this.keys.length){this.status('Sign out and sign back in with Google, then add your passkey.');return;}
-      this.pending=action;el('passkeyverify').hidden=false;el('passkeyverifykey').hidden=!this.keys.length||!this.supported;
+      this.pending=action;this.pendingOpener=opener;el('passkeyverify').hidden=false;el('passkeyverifykey').hidden=!this.keys.length||!this.supported;
       el(this.account?.hasPassword===false?'passkeyverifykey':'passkeypassword').focus();return;
     }
     await this.run(action);
   }
   private async reverify(passkey:boolean){
     await this.run(async()=>{
-      if(passkey){const options=await this.request('/reauth/options',{});const credential=await startAuthentication({optionsJSON:options.options});await this.request('/reauth/verify',{ceremony:options.ceremony,credential});}
+      if(passkey){const {options,credential}=await this.providerPrompt('Verify your identity',async()=>{const options=await this.request('/reauth/options',{});if(this.loginCancelled)throw new DOMException('Cancelled','AbortError');const credential=await startAuthentication({optionsJSON:options.options});return {options,credential};});await this.request('/reauth/verify',{ceremony:options.ceremony,credential});}
       else await this.request('/reauth/password',{password:el<HTMLInputElement>('passkeypassword').value});
       this.fresh=true;this.clearVerify();const pending=this.pending;this.pending=null;if(pending)await pending();
     });
@@ -116,13 +124,19 @@ export class PasskeyPanel {
   }
   private async add(){
     this.status('Follow your device’s instructions to save a passkey.');
-    const options=await this.request('/register/options',{});
-    const credential=await startRegistration({optionsJSON:options.options});
+    const {options,credential}=await this.providerPrompt('Save a passkey',async()=>{const options=await this.request('/register/options',{});if(this.loginCancelled)throw new DOMException('Cancelled','AbortError');const credential=await startRegistration({optionsJSON:options.options});return {options,credential};});
     const name=el<HTMLInputElement>('passkeyname').value.trim()||'My passkey';
     await this.request('/register/verify',{ceremony:options.ceremony,credential,name});
     el('passkeyoffer').hidden=true;el<HTMLInputElement>('passkeyname').value='';
     await this.refresh();this.status('Passkey added. You can use it to sign in next time.');
     el('passkeystatus').focus();
+  }
+  private async providerPrompt<T>(title:string,action:()=>Promise<T>):Promise<T>{
+    this.loginCancelled=false;el('accountdialog').classList.add('passkey-active');el('passkey-waiting').hidden=false;
+    el('passkey-waiting-title').textContent=title;el('passkey-waiting-instructions').textContent='Continue in your device or password manager. You can cancel and return to your sign-in settings at any time.';
+    el('passkey-login-cancel').textContent='Cancel';el<HTMLButtonElement>('passkey-login-cancel').disabled=false;el('passkey-waiting').focus();
+    try{const value=await action();if(this.loginCancelled)throw new DOMException('Cancelled','AbortError');return value;}
+    finally{el('accountdialog').classList.remove('passkey-active');el('passkey-waiting').hidden=true;el('passkeystatus').focus();}
   }
   private loginOptions(){
     // Share an in-flight options request when switching from autofill to the button.
@@ -131,13 +145,25 @@ export class PasskeyPanel {
     return this.loginOptionsFlight;
   }
   private async login(){
+    let started=false;
     await this.run(async()=>{
-      el('accountstatus').textContent='Follow your device’s instructions to sign in.';
+      started=true;this.loginCancelled=false;el('passkey-waiting-title').textContent='Sign in with your passkey';el('passkey-waiting-instructions').textContent='Continue in your device or password manager to unlock your saved passkey.';el('passkey-login-cancel').textContent='Back to sign-in';
+      el('accountdialog').classList.add('passkey-active');el('passkey-waiting').hidden=false;
+      el<HTMLButtonElement>('passkey-login-cancel').disabled=false;el('passkey-waiting').focus();el('accountstatus').textContent='';
       const options=await this.loginOptions();
+      if(this.loginCancelled)return;
       const credential=await startAuthentication({optionsJSON:options.options});
+      if(this.loginCancelled)return;
+      el<HTMLButtonElement>('passkey-login-cancel').disabled=true;
       const data=await this.request('/login/verify',{ceremony:options.ceremony,credential});
       this.signedIn(data.account);el('accountstatus').textContent='Signed in with your passkey.';
     });
+    if(started){
+      el('accountdialog').classList.remove('passkey-active');el('passkey-waiting').hidden=true;
+      if(this.loginCancelled)el('accountstatus').textContent='';
+      if(!this.account)el('passkeylogin').focus();
+      else{el('accountname').tabIndex=-1;el('accountname').focus();}
+    }
   }
   private async autofill(){
     if(!this.supported||!this.loginActive)return;

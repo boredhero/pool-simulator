@@ -36,13 +36,18 @@ for(const mobile of [false,true])test.describe(mobile?'mobile passkeys':'desktop
   await page.locator('#passkeyname').fill('Second device');await page.locator('#passkeyadd').click();
   await expect(page.locator('.passkey-item')).toHaveCount(2);
   await page.getByRole('button',{name:'Rename Second device',exact:true}).click();
-  await page.locator('.passkey-edit:visible input').fill('Work laptop');await page.getByRole('button',{name:'Save name',exact:true}).click();
+  await page.locator('.passkey-edit:visible input').fill('Work laptop');
+  const refresh=page.waitForResponse(r=>r.url().endsWith('/api/account/passkeys')&&r.request().method()==='GET');
+  await page.evaluate(()=>(window as any).__pool.accountPanel.refresh());await refresh;
+  await expect(page.locator('#account-tab-signin')).toHaveAttribute('aria-selected','true');
+  await expect(page.locator('.passkey-edit:visible input')).toHaveValue('Work laptop');
+  await page.getByRole('button',{name:'Save name',exact:true}).click();
   await expect(page.locator('#passkeylist')).toContainText('Work laptop');
   await page.locator('#passkeys').scrollIntoViewIfNeeded();await page.screenshot({path:testInfo.outputPath('passkey-settings.png')});
   await page.locator('#accountlogout').click();await expect(page.locator('#passkeylogin')).toBeVisible();
   await expect(page.locator('#accountusername')).toHaveAttribute('autocomplete','username webauthn');
   await page.locator('#accountusername').fill('');await page.locator('#passkeylogin').click();
-  await expect(page.locator('#accountprofile')).toBeVisible();
+  await expect(page.locator('#accountprofile')).toBeVisible();await page.locator('#account-tab-signin').click();
   await expect(page.locator('#passkeylist')).toContainText('Last used');
   await page.getByRole('button',{name:'Remove First device',exact:true}).click();
   await page.getByRole('button',{name:'Confirm removal',exact:true}).click();await expect(page.locator('.passkey-item')).toHaveCount(1);
@@ -105,4 +110,23 @@ test('switching from pending autofill to the button shares browser-binding optio
  expect(requests).toBe(1);
  await page.evaluate(()=>{PublicKeyCredential.isConditionalMediationAvailable=async()=>false;(window as any).__cancelNative();});
  await expect(page.locator('#accountsubmit')).toBeEnabled();
+});
+
+
+test('explicit passkey prompt has a focused cancel flow without the password form',async({page})=>{
+ await prepare(page);
+ await page.addInitScript(()=>{navigator.credentials.get=(options:any)=>new Promise((_resolve,reject)=>{options.signal?.addEventListener('abort',()=>reject(new DOMException('Cancelled','AbortError')));});});
+ await page.goto('/');await page.locator('#accountidentity').click();await page.locator('#passkeylogin').click();
+ await expect(page.locator('#passkey-waiting')).toBeVisible();await expect(page.locator('#accountauth')).toBeHidden();
+ await page.locator('#passkey-login-cancel').click();await expect(page.locator('#passkey-waiting')).toBeHidden();await expect(page.locator('#accountauth')).toBeVisible();await expect(page.locator('#passkeylogin')).toBeFocused();await expect(page.locator('#accountsubmit')).toBeEnabled();
+});
+
+
+test('passkey setup can be cancelled before credential verification',async({page})=>{
+ await prepare(page);let verifies=0;
+ await page.route('**/api/account/passkeys/register/verify',route=>{verifies++;return route.continue();});
+ await page.addInitScript(()=>{navigator.credentials.create=(options:any)=>new Promise((_resolve,reject)=>{options.signal?.addEventListener('abort',()=>reject(new DOMException('Cancelled','AbortError')));});});
+ await signup(page);await page.locator('#passkeyofferadd').click();
+ await expect(page.locator('#passkey-waiting-title')).toHaveText('Save a passkey');await expect(page.locator('#accountprofile')).toBeHidden();
+ await page.locator('#passkey-login-cancel').click();await expect(page.locator('#passkey-waiting')).toBeHidden();await expect(page.locator('#accountprofile')).toBeVisible();await expect(page.locator('#passkeystatus')).toBeFocused();expect(verifies).toBe(0);await expect(page.locator('.passkey-item')).toHaveCount(0);
 });

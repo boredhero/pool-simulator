@@ -26,13 +26,13 @@ export class GooglePanel {
   constructor(private completed:(data:Result)=>void,private blocked:()=>boolean,private setBusy:(busy:boolean)=>void){
     el('googlelogin').addEventListener('click',()=>void this.begin());
     el('googlelink').addEventListener('click',()=>void this.begin());
-    el('googlecancel').addEventListener('click',()=>this.close());
+    el('googlecancel').addEventListener('click',()=>{this.close();this.message('');el(this.account?'googlelink':'googlelogin').focus();});
     el('googlesignup').addEventListener('submit',e=>{e.preventDefault();void this.signup();});
     el('googleunlink').addEventListener('click',()=>{el('googleunlinkconfirm').hidden=false;el('googleunlinkyes').focus();});
     el('googleunlinkno').addEventListener('click',()=>{el('googleunlinkconfirm').hidden=true;el('googleunlink').focus();});
     el('googleunlinkyes').addEventListener('click',()=>void this.run(async()=>{await this.request('/unlink',{});el('googleunlinkconfirm').hidden=true;await this.refresh();this.message('Google unlinked. Other sessions have been signed out.');}));
   }
-  private message(text:string){el('googlestatus').textContent=text;el('accountstatus').textContent=text;}
+  private message(text:string){el('googlestatus').textContent='';el('accountstatus').textContent=text;}
   private async request(path:string,body?:object){
     const r=await fetch('/api/account/google'+path,{method:body?'POST':'GET',credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(12000),headers:body?{'X-Pool-Request':'1','Content-Type':'application/json'}:undefined,body:body?JSON.stringify(body):undefined});
     const data=await r.json();if(!r.ok)throw Error(typeof data.detail==='string'?data.detail:'Google sign-in is unavailable. Please try again.');return data;
@@ -52,6 +52,7 @@ export class GooglePanel {
     }catch{el('googlelogin').hidden=true;el('googlemanage').hidden=true;}
   }
   close(){
+    el('accountdialog').classList.remove('google-active');
     ++this.revision;this.active=false;this.flow='';this.terms='';api()?.cancel();
     el('googlebox').hidden=true;el('googlebutton').replaceChildren();el('googlesignup').hidden=true;el('googleunlinkconfirm').hidden=true;
     el<HTMLFormElement>('googlesignup').reset();
@@ -64,7 +65,7 @@ export class GooglePanel {
     finally{this.busy=false;buttons.forEach(b=>b.disabled=false);this.setBusy(false);}
   }
   private async begin(){await this.run(async()=>{
-    this.close();const revision=this.revision;this.active=true;el('googlebox').hidden=false;this.message('Loading Google sign-in…');
+    this.close();const revision=this.revision;this.active=true;el('accountdialog').classList.add('google-active');el('googlebox').hidden=false;el('googlebox').tabIndex=-1;el('googlebox').focus();this.message('Loading Google sign-in…');
     const [flow]=await Promise.all([this.request('/start',{purpose:this.account?'link':'login'}),loadGoogle()]);
     if(revision!==this.revision)return;
     api()!.initialize({client_id:flow.clientId,nonce:flow.nonce,auto_select:false,button_auto_select:false,use_fedcm_for_button:true,ux_mode:'popup',callback:(result:{credential:string})=>{if(revision===this.revision&&this.active)void this.finish(flow.flow,result.credential,revision);}});

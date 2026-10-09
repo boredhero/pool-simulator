@@ -224,6 +224,11 @@ async def test_provider_contract_validates_selection_and_usage(monkeypatch):
         assert body["model"] == "jev-1.13.0"
         assert set(body["questions"]) == {"tactic", "shot_direct", "shot_safety"}
         assert set(body["questions"]["shot_safety"]["criteria"]) == {"s1"}
+        # Questions are evaluated independently: tactic selection needs the
+        # same useful-energy priorities as the within-family shot choice.
+        for question in body["questions"].values():
+            assert "newly shootable targets" in question["instructions"]
+            assert "Keep controlled pace" in question["instructions"]
         assert "power" not in body["questions"]["shot_safety"]["criteria"]["s1"]
         assert "username" not in request.content.decode()
         assert (

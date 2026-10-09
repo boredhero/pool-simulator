@@ -100,8 +100,8 @@ Accounts are optional and usernames are 3–20 ASCII letters, digits, or undersc
 unique without regard to case. Passwords are 15–128 characters. Passwords and
 recovery codes are salted Argon2id hashes (19 MiB, two passes, one lane), never
 reversibly encrypted. The 160-bit recovery code is shown once; successful recovery
-rotates it, invalidates all sessions, and removes saved passkeys. Accounts support optional
-passkey sign-in in addition to passwords. There is no administrative bypass or email recovery. Opaque session cookies
+rotates it, invalidates all sessions, and removes saved passkeys and Google links. Accounts support
+password, optional passkey, and optional Google sign-in; Google signup does not set a password. There is no administrative bypass or email recovery. Opaque session cookies
 are HttpOnly, SameSite=Lax, expire after 30 days, and are Secure in production.
 Only token hashes are stored in the database; credentials are not kept in browser
 storage. Auth mutations require a same-origin request and a custom request header.
@@ -324,8 +324,12 @@ removes that session and its events. Older unlinked sessions expire through rete
 Essential sign-in, security limits and Jev billing/allowance records are independent
 of analytics consent. Terms acceptance never implies analytics consent.
 
-Hourly maintenance removes analytics inactive for 30 days and detailed Jev games
-inactive for 90 days. Preserve the existing `pool_data` volume. New tables are
+Startup/hourly maintenance removes analytics sessions inactive for 30 days, detailed Jev games
+inactive for 90 days, requests 90 days after their start, and budget adjustments 90 days after
+their timestamp. Shared match/shot history and account-lifecycle audit records have no automatic
+expiry. Deletion clears shared match account links and replaces names with Deleted player;
+lifecycle audits retain opaque actor/target IDs, actions and timestamps. Authentication expiry
+and physical cleanup are separate: expired records are purged during later auth operations. Preserve the existing `pool_data` volume. New tables are
 additive. Account access/export/deletion requests go to the public contact address;
 verify ownership without asking for a password or recovery code. Production host
 logs and backup rotation must be managed separately from application retention.
@@ -343,7 +347,7 @@ or hide ball details; there is no floating Show balls button.
 Set `ADMIN_ACCOUNT_ID` in the deployment environment to the existing owner's
 immutable account ID. An unset value disables administration. Usernames do not
 grant privileges, and registration cannot assign admin status. The owner sees
-**Admin settings** in Settings. Disable/re-enable revokes sessions and controls account access, including password recovery. Permanent deletion requires the exact username, removes private account and Jev records, and anonymizes shared match history. The configured owner cannot be disabled or deleted. Lifecycle actions are audited; deleting an account waits until any active Jev shot has finished. Every `/api/admin/*` endpoint checks the active
+**Admin settings** in Settings. Disable/re-enable revokes sessions and controls account access, including password recovery. Permanent deletion requires the exact username, removes private account and Jev records, and clears account links/replaces display names in shared match history. Shared shot/match rows and limited lifecycle audits remain. The configured owner cannot be disabled or deleted. Lifecycle actions are audited; deleting an account waits until any active Jev shot has finished. Every `/api/admin/*` endpoint checks the active
 server session and configured ID; other callers receive 404. Premium mutations
 require the same origin/request header protection as account mutations and
 record an audit entry.
@@ -518,3 +522,8 @@ and physical iOS/macOS behavior require a smoke test on the authorized deployed 
 References: [Google server-side verification](https://developers.google.com/identity/gsi/web/guides/verify-google-id-token),
 [GIS setup and security headers](https://developers.google.com/identity/gsi/web/guides/get-google-api-clientid),
 [GIS JavaScript reference](https://developers.google.com/identity/gsi/web/reference/js-reference).
+
+
+For a field-level map of stored data, deletion, provider disclosures and implementation references,
+see [Data inventory](docs/data-inventory.md). The public notice describes current application behavior;
+host log and backup retention are separate operational settings.
