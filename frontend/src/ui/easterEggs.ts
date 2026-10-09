@@ -15,6 +15,7 @@ export class EasterEggsPanel {
   private sequence=new KonamiSequence();
   private accountId:string|null=null;
   private pending=false;
+  private retryUnlock=false;
   private saving=false;
   private opener:HTMLElement|null=null;
   private dialog=document.createElement('dialog');
@@ -27,6 +28,7 @@ export class EasterEggsPanel {
     el('eastereggsclose').addEventListener('click',()=>this.dialog.close());
     el('eastereggsopen').addEventListener('click',()=>{
       this.dialog.close();
+      if(this.retryUnlock){void this.unlock();return;}
       if(!this.options.getAccount()?.easterEggsEnabled){el('accountidentity').click();return;}
       if(!el('settingspanel').classList.contains('open'))el('settingsbtn').click();
       el<HTMLDetailsElement>('eastereggssettings').open=true;
@@ -59,8 +61,8 @@ export class EasterEggsPanel {
     finally{this.saving=false;this.update();}
   }
   private keydown(event:KeyboardEvent){
-    if(event.repeat)return;
-    if(event.isComposing||event.altKey||event.ctrlKey||event.metaKey||event.shiftKey||this.pending||document.querySelector('dialog[open]')||(event.target instanceof HTMLElement&&event.target.closest('input,textarea,select,button,a,summary,[contenteditable],[role="dialog"],[role="button"]'))){this.sequence.reset();return;}
+    if(event.repeat||event.key==='Shift')return;
+    if(event.isComposing||event.altKey||event.ctrlKey||event.metaKey||this.pending||document.querySelector('dialog[open]')||(event.target instanceof HTMLElement&&event.target.closest('input,textarea,select,[contenteditable],[role="dialog"]'))){this.sequence.reset();return;}
     const result=this.sequence.push(event.key);
     if(result.consume){event.preventDefault();event.stopImmediatePropagation();}
     if(result.complete)void this.unlock();
@@ -71,14 +73,16 @@ export class EasterEggsPanel {
     this.pending=true;
     try{
       const account=await this.options.unlockAccount();
-      if(!account?.easterEggsEnabled||account.id!==accountId||this.options.getAccount()?.id!==accountId)return;
+      if(this.options.getAccount()?.id!==accountId)return;
+      if(!account?.easterEggsEnabled||account.id!==accountId)throw new Error('Unlock not confirmed');
       this.update();
       this.show('Easter eggs unlocked','Go to Settings to try them out','Open Settings');
     }catch{
-      // No local unlock: the sequence can be retried when the service recovers.
+      if(this.options.getAccount()?.id===accountId)this.show('Could not save the unlock','Check your connection and try again.','Try again',true);
     }finally{this.pending=false;}
   }
-  private show(title:string,detail:string,action:string){
+  private show(title:string,detail:string,action:string,retry=false){
+    this.retryUnlock=retry;
     el('eastereggstitle').textContent=title;el('eastereggsdetail').textContent=detail;el('eastereggsopen').textContent=action;
     this.opener=document.activeElement instanceof HTMLElement?document.activeElement:null;
     this.dialog.showModal();el('eastereggsopen').focus();

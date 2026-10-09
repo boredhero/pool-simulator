@@ -452,6 +452,29 @@ export class Game {
   }
 
   wire(canvas: HTMLCanvasElement): void {
+    const cancelPull = () => { this.touchAim=false; this.pulling=false; this.pressPt=null; };
+    let cancelledPull=false;
+    const cancelWithSecondary=(event:PointerEvent)=>{
+      if(event.pointerType!=='mouse')return;
+      // Chorded buttons arrive as pointermove, not a second pointerdown.
+      if(this.pulling&&((event.buttons&2)!==0||event.button===2)){
+        cancelledPull=true;cancelPull();this.placementPress=null;
+      }
+      if(cancelledPull){
+        if(event.buttons===0){cancelledPull=false;return;}
+        event.preventDefault();event.stopImmediatePropagation();
+      }
+    };
+    canvas.addEventListener('pointerdown',cancelWithSecondary,true);
+    canvas.addEventListener('pointermove',cancelWithSecondary,true);
+    canvas.addEventListener('contextmenu',event=>{
+      if(!this.pulling&&!cancelledPull)return;
+      cancelledPull=true;cancelPull();this.placementPress=null;
+      event.preventDefault();event.stopImmediatePropagation();
+    },true);
+    // Let pointerup reach the camera controls so their pointer capture is freed.
+    addEventListener('pointerup',event=>{if(event.pointerType==='mouse'&&event.buttons===0)cancelledPull=false;},true);
+    addEventListener('blur',()=>{cancelledPull=false;cancelPull();this.pointers.clear();});
     const aimAt = (cx: number, cy: number) => {
       if(!this.humanCueControls())return;
       if (this.mode === 'place') {
@@ -491,7 +514,7 @@ export class Game {
       if (!this.pulling && (e.pointerType === 'mouse' || this.touchAim)) aimAt(p[0], p[1]); // aim locks once the pull starts
     });
     canvas.tabIndex=0;
-    canvas.setAttribute('aria-label','Pool table. Enter takes a shot; Space raises the camera, Left Shift lowers it.');
+    canvas.setAttribute('aria-label','Pool table. Secondary click cancels a drawn-back shot. Enter takes a shot; Space raises the camera, Left Shift lowers it.');
     canvas.addEventListener('pointerdown', (e) => {
       if(!document.querySelector('dialog[open]'))canvas.focus({preventScroll:true});
       this.sfx.unlock();
@@ -534,7 +557,6 @@ export class Game {
         this.hoverPt = p;
       }
     });
-    const cancelPull = () => { this.touchAim=false; this.pulling = false; this.pressPt = null; };
     this.scene.controls.addEventListener('start',()=>{cancelPull();this.placementPress=null;});
     canvas.addEventListener('pointerup', (e) => {
       this.pointers.delete(e.pointerId);

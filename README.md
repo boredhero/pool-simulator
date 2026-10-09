@@ -529,4 +529,4 @@ see [Data inventory](docs/data-inventory.md). The public notice describes curren
 host log and backup retention are separate operational settings.
 
 
-Optional account-unlocked [Chalk-Sim](docs/chalk-sim.md) supports local, online, and Jev games. Signed-in visual/control preferences are stored in SQLite; guest preferences remain device-local. Terms acceptance remains account- and content-version-bound.
+Added Easter eggs. Signed-in visual/control preferences are stored in SQLite; guest preferences remain device-local. Terms acceptance remains account- and content-version-bound.

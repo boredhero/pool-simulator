@@ -5,17 +5,17 @@
     "title": "Clearer turns and called pockets",
     "changes": [
       "Clear Jev shot-strategy text when that shot finishes, so it does not linger on the next player\u2019s turn.",
-      "Make the selected pocket stand out with a bold gold target, dark outline, and a Called marker."
+      "Make the selected pocket stand out with a bold gold target, dark outline, and a Called marker.",
+      "Cancel a drawn-back shot with a secondary click, then press the primary button again when ready.",
+      "Added Easter eggs."
     ]
   },
   {
     "version": "1.5.0",
     "date": "2026-10-08",
-    "title": "Chalk-Sim and account preferences",
+    "title": "Easter eggs and account preferences",
     "changes": [
-      "Unlock Easter eggs with the Konami code, then optionally enable Chalk-Sim in Settings. Unlock and preference are saved to your account.",
-      "Rechalk from either table-side cube; chalk wears separately per player and low grip can cause miscues on off-center shots. CPU and Jev can rechalk too.",
-      "Online matches share Chalk-Sim when either participant has it selected, without changing the other account\u2019s preferences.",
+      "Added Easter eggs.",
       "Signed-in appearance, camera input, auto-camera, and playback settings now follow your account across devices. Guest preferences remain local.",
       "Install app controls are shown only in mobile mode.",
       "Fixed grounded object balls passing through cushions after another ball pushed them slightly into the rail.",
