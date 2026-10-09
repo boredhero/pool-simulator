@@ -4,6 +4,8 @@
     "date": "2026-10-09",
     "title": "Called-pocket consistency and browser checks",
     "changes": [
+      "Select or change a called pocket directly on the table, without a floating overlay. Custom all-ball rules keep a compact ball selector in the shot controls.",
+      "Keep tutorial touch controls responsive without rebuilding guidance on every touch.",
       "Hide app installation controls throughout the desktop interface, including touch-capable desktop layouts.",
       "Keep called-pocket indicators tied to the rules at the start of the shot, including the last group ball in bar rules.",
       "Repair remaining browser checks for current account, settings, and new-game flows."

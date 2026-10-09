@@ -33,6 +33,7 @@ for(const mobile of [false,true])test.describe(mobile?'mobile':'desktop',()=>{
     const targets=Array.from({length:6},(_,i)=>g.__world.getObjectByName(`called-pocket-${i}`));
     return targets.map((t:any)=>({visible:t.visible,label:t.children.some((c:any)=>c.isSprite)}));
   });
+  await expect(page.locator('#callpanel')).toBeHidden();
   expect(selected.map(t=>t.visible)).toEqual([false,false,true,false,false,false]);
   expect(selected[2].label).toBe(true);
   expect(await page.evaluate(()=>{const g=(window as any).__pool;g.mode='wait';g.frame();const visible=g.__world.getObjectByName('called-pocket-2').visible;g.mode='aim';return visible;})).toBe(true);
@@ -54,6 +55,16 @@ for(const mobile of [false,true])test.describe(mobile?'mobile':'desktop',()=>{
   await page.screenshot({path:info.outputPath('called-pocket.png')});
   await page.evaluate(()=>{const g=(window as any).__pool;g.__show=false;g.calledPocket=null;g.hud();g.frame();});
   expect(await page.evaluate(()=>Array.from({length:6},(_,i)=>(window as any).__pool.__world.getObjectByName(`called-pocket-${i}`).visible))).toEqual([false,false,false,false,false,false]);
+  await page.evaluate(()=>{const g=(window as any).__pool;g.gs.rules.calls='all';for(const b of g.gs.balls)if(b.n===1||b.n===2)b.potted=false;g.hud();});
+  await expect(page.locator('.control-tray #callpanel')).toBeVisible();
+  await expect(page.locator('#callpanel')).toHaveCSS('position','static');
+  await page.locator('#callball').selectOption('2');
+  await expect(page.locator('#msg')).toContainText('Select a pocket for ball 2');
+  expect(await page.evaluate(()=>{const g=(window as any).__pool;return[g.calledBall,g.calledPocket];})).toEqual([2,null]);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.evaluate(()=>{const g=(window as any).__pool;g.gs.rules.calls='none';g.hud();});
+  await expect(page.locator('#callpanel')).toBeHidden();
+
 });
 
 });

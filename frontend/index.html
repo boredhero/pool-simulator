@@ -73,17 +73,16 @@ button.on{background:#264e38;border-color:#88ba91}
 select,input[type=number]{width:100%;min-height:44px;border:1px solid #80705c;background:#151310;color:#fff8ed;border-radius:9px;padding:8px 10px;font-size:15px}
 button:disabled,fieldset:disabled{opacity:.55;cursor:default}fieldset{border:0;padding:0;margin:0;display:flex;flex-direction:column;gap:10px}fieldset label{margin-top:6px}.check{display:flex;gap:10px;align-items:center}.check input{width:20px;height:20px;accent-color:#b3cf97}h2{font-size:23px;letter-spacing:-.03em;margin:0 0 4px}hr{border:0;border-top:1px solid #635747;width:100%}
 #helppanel{position:fixed;right:24px;top:126px;width:280px;padding:20px;border:1px solid #75634a;border-radius:16px;background:rgba(30,26,21,.96);box-shadow:0 12px 40px #0005;z-index:4;max-height:calc(100dvh - 260px);overflow:auto;display:none}#helppanel.open{display:block}.guide-heading{display:flex;align-items:center;justify-content:space-between}.eyebrow{font-size:10px;letter-spacing:.16em;color:#d9b97e;font-weight:750}#closehelp{border:0;background:none;padding:0;min-height:32px;width:32px;font-size:24px}.guide-tabs{display:flex;gap:4px;background:#12110e;padding:4px;border-radius:10px;margin:15px 0}.guide-tabs button{min-height:36px;border:0;background:transparent;flex:1;font-size:13px}.guide-tabs button[aria-pressed=true]{background:#4c4333;color:#ffe2aa}dl{margin:0}dt{font-weight:700;font-size:14px;color:#f6ead1;margin-top:14px}dd{font-size:13px;line-height:1.55;margin:4px 0 0;color:#c9c0b3}.guide-note{font-size:12px;line-height:1.55;color:#c9c0b3;margin:12px 0 0}.guide-note strong{color:#f0dfc0}.rules-summary{margin-top:16px;padding-top:14px;border-top:1px solid #635747;font-size:12px;line-height:1.6;color:#d8c29c}
-#callpanel{position:fixed;bottom:136px;left:50%;transform:translateX(-50%);display:flex;gap:12px;align-items:center;background:#211d18;border:1px solid #c8ad79;border-radius:14px;padding:12px 16px;z-index:3;max-width:calc(100vw - 24px)}#callpanel[hidden]{display:none}#callpanel label{white-space:nowrap;font-size:14px;color:#e2cfaa}#callball{width:100px}#callstatus{font-size:13px;min-width:120px}#clearcall{font-size:12px;min-height:40px;padding:0 10px}
-@media(max-width:1100px){#helppanel{width:260px}}@media(max-width:600px){.settings-label{display:none}#helppanel{top:126px;left:12px;right:12px;width:auto;max-height:calc(100dvh - 150px)}#callpanel{bottom:184px;flex-wrap:wrap;gap:8px;width:calc(100vw - 24px)}#callpanel label{flex:1}#callstatus{flex:1}#callball{width:90px}.hint{display:none}}
+@media(max-width:1100px){#helppanel{width:260px}}@media(max-width:600px){.settings-label{display:none}#helppanel{top:126px;left:12px;right:12px;width:auto;max-height:calc(100dvh - 150px)}.hint{display:none}}
 
 #helpbtn{display:grid;place-items:center;padding:0;width:48px;flex:none}
 @media(min-width:900px){#settingspanel{width:min(540px,calc(100vw - 320px));padding:26px;gap:14px}#rulefields{display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:12px 20px}#rulefields>label:not(.check){margin:0}#rulefields>.check{grid-column:1 / -1}#settingspanel h2{font-size:26px}}
 
-button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{font-size:24px}.pcard .grp{font-size:17px}.pcard{padding:16px}#scorecard{width:280px}.control-label{font-size:16px}.control-help,.hint{font-size:16px}.spin-control .control-label{font-size:16px}#helppanel{width:320px}#helppanel h2{font-size:28px}.eyebrow{font-size:13px}dt{font-size:19px}dd,.guide-note,.rules-summary{font-size:16px;line-height:1.5}#settingspanel label,#onlinepanel label{font-size:18px}select,input[type=number],#roominfo{font-size:18px}#callpanel label,#callstatus,#clearcall{font-size:17px}.pball{width:30px;height:30px}.pball span{width:19px;height:19px;font-size:14px}#version{font-size:16px}
+button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{font-size:24px}.pcard .grp{font-size:17px}.pcard{padding:16px}#scorecard{width:280px}.control-label{font-size:16px}.control-help,.hint{font-size:16px}.spin-control .control-label{font-size:16px}#helppanel{width:320px}#helppanel h2{font-size:28px}.eyebrow{font-size:13px}dt{font-size:19px}dd,.guide-note,.rules-summary{font-size:16px;line-height:1.5}#settingspanel label,#onlinepanel label{font-size:18px}select,input[type=number],#roominfo{font-size:18px}.pball{width:30px;height:30px}.pball span{width:19px;height:19px;font-size:14px}#version{font-size:16px}
 @media(min-width:901px){#version{position:fixed;left:24px;bottom:24px;background:#211d18;border:1px solid #635747;border-radius:12px;padding:12px 16px;color:#ddd0b9;box-shadow:0 6px 20px #0003;line-height:1.3}#version::before{content:'POOL SIMULATOR';display:block;font-size:12px;letter-spacing:.12em;color:#b6a27e;margin-bottom:4px}.control-tray{max-width:900px;left:160px;right:24px}}
 @media(max-width:1100px) and (min-width:901px){#helppanel{width:290px}.control-tray{gap:14px}.spin-control{padding-left:14px}}
 @media(max-width:900px){#scorecard{width:auto}.pcard .pname{font-size:20px}.pcard .grp{font-size:16px}}
-@media(max-width:600px){#msg{font-size:21px}#turn{font-size:14px}#version{font-size:13px}.toolbar button{font-size:16px;padding:0 9px}.topbar{gap:10px}.pcard{padding:10px}.pcard .pname{font-size:20px}.pcard .grp{font-size:15px}.pball{width:25px;height:25px}.pball span{font-size:12px;width:17px;height:17px}.control-label,.spin-control .control-label{font-size:15px}.control-help{font-size:15px}.control-tray{gap:10px}#helppanel{width:auto}.status-meta{gap:6px}#callpanel{bottom:190px}#callpanel label,#callstatus,#clearcall{font-size:16px}}
+@media(max-width:600px){#msg{font-size:21px}#turn{font-size:14px}#version{font-size:13px}.toolbar button{font-size:16px;padding:0 9px}.topbar{gap:10px}.pcard{padding:10px}.pcard .pname{font-size:20px}.pcard .grp{font-size:15px}.pball{width:25px;height:25px}.pball span{font-size:12px;width:17px;height:17px}.control-label,.spin-control .control-label{font-size:15px}.control-help{font-size:15px}.control-tray{gap:10px}#helppanel{width:auto}.status-meta{gap:6px}}
 #scorecard,#helppanel,#settingspanel,#onlinepanel{top:var(--below-header,136px)}
 .kitchen-guide{position:fixed;z-index:3;transform:translate(-50%,-100%);pointer-events:none;padding:10px 16px;background:#211d18f5;border:1px solid #efd395;border-radius:12px;text-align:center;box-shadow:0 5px 20px #0005;max-width:280px}.kitchen-guide[hidden]{display:none}.kitchen-guide strong{display:block;font-size:20px;color:#ffe1a6}.kitchen-guide span{display:block;font-size:16px;line-height:1.3;color:#f2e7d2}.kitchen-guide::after{content:'';position:absolute;top:100%;left:50%;width:2px;height:30px;background:#efd395}
 @media(max-width:600px){.kitchen-guide{max-width:235px;width:235px;padding:8px 12px}.kitchen-guide strong{font-size:18px}}
@@ -110,7 +109,7 @@ button{font-size:18px}#msg{font-size:26px}#turn{font-size:16px}.pcard .pname{fon
  #scorecard.expanded .balls{display:flex;flex-wrap:wrap}#scorecard.expanded .live-pots{display:block;font-size:12px}.pcard.active{border-left-width:4px}
  .control-tray{bottom:max(8px,env(safe-area-inset-bottom));left:10px;right:10px;padding:8px 10px;display:flex;flex-wrap:wrap;gap:8px}
  .control-tray .power-control,.touch-input .control-tray .touch-shot{order:0;flex:1 0 100%}.control-help{font-size:12px}.control-tray .spin-control{order:1;display:flex;flex:0 0 auto;align-items:center;gap:10px;padding:0;border:0;margin-right:auto}.control-tray .actions{display:none;order:3}.control-tray.expanded .actions{display:flex;flex:1 0 100%;padding:0;border:0}
- #morecontrols{order:2;display:block;padding:0 12px;min-height:44px;font-size:14px}.touch-shot{flex:1}#hint{display:none}#callpanel{bottom:var(--above-controls,166px);max-width:calc(100vw - 24px)}
+ #morecontrols{order:2;display:block;padding:0 12px;min-height:44px;font-size:14px}.touch-shot{flex:1}#hint{display:none}
  #settingspanel,#onlinepanel,#helppanel{top:var(--below-header,120px);max-height:calc(100dvh - var(--below-header,120px) - 16px);overflow-y:auto;z-index:10}
 }
 #opponentstatus{margin:6px 0 0;font-size:14px;line-height:1.4;color:#ddcba7}#opponentstatus:empty{display:none}.actions{flex-wrap:wrap}
@@ -129,6 +128,12 @@ body:has(#tutorial:not([hidden])) .privacy-notice{display:none}
 @media(min-width:901px) and (pointer:fine){
   #helppanel{width:min(520px,calc(100vw - 48px));padding:24px;box-sizing:border-box}
 }
+</style>
+<style>
+.control-tray:has(#callpanel:not([hidden])){flex-wrap:wrap}
+.control-tray #callpanel{display:flex;align-items:center;gap:8px;flex:0 0 100%;grid-column:1/-1;order:-1}
+.control-tray #callpanel[hidden]{display:none}
+#callpanel label{font-size:13px;color:#e2cfaa}#callball{width:100px;min-height:44px}
 </style>
 </head>
 <body>
@@ -149,6 +154,7 @@ body:has(#tutorial:not([hidden])) .privacy-notice{display:none}
   </div>
   <div class="hint" id="hint">Aim on the felt · pull back and release to shoot · right-drag to orbit</div>
   <div class="control-tray">
+    <div id="callpanel" hidden><label for="callball">Call ball</label><select id="callball" aria-label="Called ball" title="Choose a ball, then select its pocket on the table"></select></div>
     <div class="touch-shot"><label id="touchpowerlabel" for="touchpower">Power 50%</label><input id="touchpower" type="range" min="4" max="100" value="50" aria-label="Shot power"><button id="touchshoot">Shoot</button></div>
     <button id="morecontrols" aria-expanded="false" aria-controls="shotextras">New Game</button>
     <div class="power-control"><span class="control-label">Shot power <span id="playbackstate" role="status"></span></span><div id="chargebar"><div id="chargefill"></div></div><div class="control-help">Pull farther for a stronger shot</div></div>
@@ -170,7 +176,7 @@ body:has(#tutorial:not([hidden])) .privacy-notice{display:none}
   <p id="kitchenhelp" class="guide-note"><strong>Head string &amp; kitchen</strong> · After a scratch, place the cue ball in the shaded area behind the dashed line. It must leave the kitchen before contacting a ball inside it.</p>
   <div id="rulesummary" class="rules-summary"></div>
 </aside>
-<div id="callpanel" hidden><label for="callball">Call your shot</label><select id="callball" aria-label="Called ball"></select><span id="callstatus">Tap a pocket on the table</span><button id="clearcall">Change pocket</button></div>
+
 <div id="settingspanel" role="dialog" aria-labelledby="settings-title">
   <header class="settings-header"><h2 id="settings-title">Settings <span id="settingspremium" class="premium-badge" hidden>Premium</span></h2><button class="icon-close" id="closesettings" type="button" aria-label="Close settings" title="Close settings">×</button></header>
   <div class="settings-body">
