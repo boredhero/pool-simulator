@@ -313,10 +313,28 @@ export class Game {
       && (this.room?this.room.ready&&this.seat===this.gs.current:!this.cpuOpponent||this.gs.current===0);
   }
 
+  private frameOpponentShot(aim:number,cue:{x:number;y:number}):void {
+    const rig=this.scene.cameraRig;
+    if(!this.options.autoCamera||this.cameraMode||rig.interacting||this.pointers.size||this.tutorial.active)return;
+    const camera=this.scene.controls.object,target=this.scene.controls.target;
+    const facing=Math.atan2(target.z-camera.position.z,target.x-camera.position.x);
+    const delta=Math.atan2(Math.sin(aim-facing),Math.cos(aim-facing));
+    if(Math.abs(delta)<Math.PI/6)return;
+    const dx=Math.cos(aim),dy=Math.sin(aim);
+    // Follow the selected stroke, including banks, rather than an inferred target ball.
+    const distances=[1.2];
+    if(Math.abs(dx)>1e-8)distances.push(((dx>0?TABLE_W:0)-cue.x)/dx);
+    if(Math.abs(dy)>1e-8)distances.push(((dy>0?TABLE_H:0)-cue.y)/dy);
+    const distance=Math.max(.08,Math.min(...distances.filter(d=>d>=0)));
+    const ahead={x:cue.x+dx*distance,y:cue.y+dy*distance};
+    rig.frame([cue,ahead],cue,[],Math.atan2(-dx,-dy));
+  }
+
   async showOpponentShot(shot:SelectedShot,valid:()=>boolean):Promise<boolean> {
     const action=this.opponentAction;
     if(!action||!valid())return false;
     action.shot=freezeShot(shot);action.elapsed=0;action.phase='aiming';this.hud();
+    this.frameOpponentShot(shot.aim,shot.placement);
     const done=await animateOpponentCue(action.controller.signal,action.reduced,elapsed=>{
       if(!valid()){action.controller.abort();return;}
       action.elapsed=elapsed;
@@ -1180,6 +1198,7 @@ export class Game {
       if (this.room!==rc || by === this.seat) return;
       const c = this.cue();
       if (c.potted) return;
+      this.frameOpponentShot(shot.aim,c);
       beginShot(this.gs, shot.calledBall, shot.calledPocket);
       // Server is authoritative on break speed; ignore client-claimed vmax.
       const vmax = this.gs.breakShot ? this.gs.rules.breakMax : this.gs.rules.normalMax;

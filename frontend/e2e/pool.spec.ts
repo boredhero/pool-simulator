@@ -1082,3 +1082,42 @@ test('idle cue stays close to a touching cluster regardless of prior shot power'
   for(const v of values.slice(0,3)){expect(v.visible).toBe(true);expect(v.pull).toBeCloseTo(.012,10);}
   expect(values[3].visible).toBe(true);expect(values[3].pull).toBeCloseTo(.192,10);
 });
+
+test('opponent shot camera follows the stroke without changing human aim and yields to manual controls',async({page})=>{
+  await openGame(page);
+  const result=await page.evaluate(()=>{
+    const g=(window as any).__pool,rig=g.scene.cameraRig,camera=g.scene.controls.object;
+    g.options.autoCamera=true;g.cameraMode=false;g.targetAngle=.37;g.tipX=.2;g.tipY=-.1;
+    g.scene.controls.target.set(0,0,0);camera.position.set(0,1,2);camera.lookAt(g.scene.controls.target);
+    const calls:any[]=[];rig.frame=(...args:any[])=>calls.push(args);
+    const cue={x:1,y:.6};
+    g.frameOpponentShot(-Math.PI/2,cue);const aligned=calls.length;
+    g.frameOpponentShot(0,cue);const shot=calls[0];
+    g.options.autoCamera=false;g.frameOpponentShot(Math.PI,cue);
+    g.options.autoCamera=true;g.cameraMode=true;g.frameOpponentShot(Math.PI,cue);
+    g.cameraMode=false;g.pointers.add(1);g.frameOpponentShot(Math.PI,cue);g.pointers.clear();
+    rig.setFlyInput(1,0);g.frameOpponentShot(Math.PI,cue);rig.setFlyInput(0,0);
+    return {aligned,count:calls.length,shot,angle:g.targetAngle,spin:[g.tipX,g.tipY]};
+  });
+  expect(result).toEqual({aligned:0,count:1,shot:[[{x:1,y:.6},{x:2.2,y:.6}],{x:1,y:.6},[],-Math.PI/2],angle:.37,spin:[.2,-.1]});
+});
+
+test('AI presentation and remote shots request camera framing while local online shots do not',async({page})=>{
+  await page.addInitScript(()=>{class Socket{static OPEN=1;readyState=1;send(){}close(){this.readyState=3;}}(window as any).WebSocket=Socket;});
+  await openGame(page);
+  const result=await page.evaluate(async()=>{
+    const g=(window as any).__pool,calls:any[]=[];
+    g.frameOpponentShot=(aim:number,cue:any)=>calls.push({aim,cue:{x:cue.x,y:cue.y}});
+    const action=g.beginOpponent();action.reduced=true;
+    const shot={aim:.8,power:.4,tipX:0,tipY:0,calledBall:null,calledPocket:null,placement:{x:.4,y:.5}};
+    const shown=await g.showOpponentShot(shot,()=>true);g.cancelOpponent();
+    g.connectRoom(true);g.coin.cancel();g.seat=0;g.mode='aim';g.pendingNetwork=[];
+    const cue={x:g.cue().x,y:g.cue().y};
+    g.room.onShot(0,shot);const afterOwn=calls.length;
+    g.room.onShot(1,shot);
+    return {shown,afterOwn,calls,cue,mode:g.mode};
+  });
+  expect(result.shown).toBe(true);expect(result.afterOwn).toBe(1);
+  expect(result.calls).toEqual([{aim:.8,cue:{x:.4,y:.5}},{aim:.8,cue:result.cue}]);
+  expect(result.mode).toBe('rolling');
+});
