@@ -50,6 +50,9 @@
   .topbar #scorecard .grp{font-size:10px;line-height:14px;white-space:normal}
   .topbar #msg{font-size:13px;line-height:16px;padding-top:0}
   .topbar #opponentstatus{font-size:11px;line-height:14px}
+  .topbar #chalkcontrols{order:2;flex:1 0 100%;min-width:0;margin:0;gap:4px 8px;font-size:11px;line-height:14px}
+  .topbar #chalkstatus{flex:1;min-width:0;overflow-wrap:anywhere}
+  .topbar #rechalk{flex:none;min-width:44px;min-height:44px;padding:0 10px;font-size:12px}
   #mobile-settings-about{border-top:1px solid #635747;padding-top:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
   #mobile-settings-about h2{flex-basis:100%;margin:0;font-size:18px}
   #mobile-settings-about #version{position:static;min-height:44px;font-size:13px;padding:0 10px}

@@ -1,5 +1,11 @@
 [
   {
+    "version": "1.5.4",
+    "date": "2026-10-09",
+    "title": "Mobile header layout",
+    "changes": ["Keep the mobile account button readable when additional game controls are visible."]
+  },
+  {
     "version": "1.5.3",
     "date": "2026-10-09",
     "title": "Called-pocket consistency and browser checks",
