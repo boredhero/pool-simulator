@@ -180,7 +180,7 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          source: "docker-compose.prod.yml,scripts/check-deploy.sh"
+          source: "docker-compose.prod.yml,scripts/check-deploy.sh,scripts/google-client-id.py"
           target: /tmp/pool-simulator-deploy/
 
       - name: Deploy
@@ -204,6 +204,8 @@ jobs:
             echo "${GHCR_TOKEN:-$GITHUB_TOKEN_ENV}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker pull "${IMAGE}:${DEPLOY_SHA}"
             docker tag "${IMAGE}:${DEPLOY_SHA}" "${IMAGE}:latest"
+            POOL_MARTINOSPIZZA_DEV_OAUTH_CLIENT_ID=$(python3 /tmp/pool-simulator-deploy/scripts/google-client-id.py)
+            export POOL_MARTINOSPIZZA_DEV_OAUTH_CLIENT_ID
             cd ~/pool-simulator && docker compose up -d --force-recreate --remove-orphans && docker compose ps
             sh /tmp/pool-simulator-deploy/scripts/check-deploy.sh
             rm -rf /tmp/pool-simulator-deploy

@@ -40,6 +40,7 @@ def public_account(user: Account) -> dict:
             if user.username_changed_at is not None
             else None
         ),
+        "hasPassword": user.password_hash != "!",
         "createdAt": user.created_at,
         "lastActiveAt": user.last_active_at,
         "premium": user.premium,
@@ -53,6 +54,8 @@ def digest(value: str) -> str:
 
 
 def verify(encoded: str, value: str) -> bool:
+    if encoded == "!":  # Explicitly disabled password for Google-created accounts.
+        return False
     try:
         return HASHER.verify(encoded, value)
     except VerificationError:
