@@ -156,3 +156,18 @@ for(const opponent of ['Jev','CPU'])test(`${opponent} stroke preserves the playe
   expect(actual.speed).toBeGreaterThan(0);
   if(opponent==='Jev')expect(actual.shotSpin).toMatchObject({tipX:-.3,tipY:.2});
 });
+
+
+test('Jev strategy belongs to its animated shot and clears before the human turn',async({page})=>{
+  const state=await setup(page);
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await page.route('**/api/opponents/jev/games/latency/turn',route=>route.fulfill({json:{
+    state,by:1,source:'jev',family:'direct',placement:{x:1,y:.6},
+    shot:{aim:.35,power:.3,tipX:0,tipY:0,calledBall:null,calledPocket:null},
+  }}));
+  await page.evaluate(()=>{const g=(window as any).__pool;g.gs.current=1;void g.playJevTurn();});
+  await expect(page.locator('#opponentstatus')).toHaveText('Jev AI selected a direct shot');
+  await settlePrediction(page);
+  await expect.poll(()=>page.evaluate(()=>(window as any).__pool.gs.current)).toBe(0);
+  await expect(page.locator('#opponentstatus')).toHaveText('');
+});

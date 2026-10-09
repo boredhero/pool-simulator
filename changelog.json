@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.5.1",
+    "date": "2026-10-08",
+    "title": "Clearer turns and called pockets",
+    "changes": [
+      "Clear Jev shot-strategy text when that shot finishes, so it does not linger on the next player\u2019s turn.",
+      "Make the selected pocket stand out with a bold gold target, dark outline, and a Called marker."
+    ]
+  },
+  {
     "version": "1.5.0",
     "date": "2026-10-08",
     "title": "Chalk-Sim and account preferences",
