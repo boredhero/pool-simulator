@@ -19,7 +19,7 @@ test('direct guest sign in and logout update the same identity control',async({p
 
 test('touch layout keeps account access and movement controls reachable',async({browser})=>{
  const context=await browser.newContext({viewport:{width:320,height:844},hasTouch:true,isMobile:true});const page=await context.newPage();await acceptWelcomeBeforeLoad(page);
- await page.addInitScript(()=>{localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-08',allow:false}));});
+ await page.addInitScript(()=>{localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-08',allow:false}));const raf=window.requestAnimationFrame.bind(window);window.requestAnimationFrame=cb=>raf(t=>{const g=(window as any).__pool;if(g)g.scene.renderer.render=()=>{};cb(t);});});
  await page.route('**/api/account',r=>r.fulfill({json:{account:null,stats:null}}));await page.goto('/');if(await page.locator('#helppanel').isVisible())await page.locator('#closehelp').tap();
  await expect(page.locator('#accountidentity')).toBeVisible();await expect(page.locator('#camera-profile-dock')).not.toBeVisible();await page.locator('#mobile-move-camera').tap();await expect(page.getByRole('button',{name:'Fly camera rise',exact:true})).toBeInViewport();
  await expect(page.locator('.control-tray')).toBeHidden();await page.getByRole('button',{name:'Done moving camera',exact:true}).tap();await expect(page.locator('.control-tray')).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);await page.screenshot({path:'/tmp/pool-094-touch-320.png'});await context.close();

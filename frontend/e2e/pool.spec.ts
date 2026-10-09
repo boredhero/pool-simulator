@@ -82,6 +82,7 @@ test('loads, renders table, breaks and resolves', async ({ page }) => {
 test('adaptive controls, readable settings, and desktop version card', async ({ page }) => {
   await page.setViewportSize({width:1440,height:900}); await openGame(page);
   await expect(page.locator('#mouseguide')).toBeVisible();
+  expect((await page.locator('#helppanel').boundingBox())!.width).toBeGreaterThanOrEqual(500);
   await expect(page.locator('.guide-tabs')).toHaveCount(0);
   await expect(page.locator('#version')).toHaveCSS('position','fixed');
   await page.locator('#settingsbtn').click();
@@ -98,7 +99,8 @@ test('adaptive controls, readable settings, and desktop version card', async ({ 
   await page.evaluate(() => window.dispatchEvent(new PointerEvent('pointerdown',{pointerType:'touch'})));
   await expect(page.locator('#touchguide')).toBeVisible();
   await expect(page.locator('#mouseguide')).toBeHidden();
-  await expect(page.locator('#version')).not.toHaveCSS('position','fixed');
+  // A narrow desktop viewport retains desktop controls; mobile relocation requires a coarse pointer.
+  await expect(page.locator('#version')).toHaveCSS('position','fixed');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
@@ -508,9 +510,9 @@ test('premium badges and unlimited racks follow the server account',async({page}
     return route.fulfill({json:{id:'premium-'+starts,state,status:'active',expiresAt:null}});
   });
   await page.locator('#jevbtn').click();
-  await expect.poll(()=>page.evaluate(()=>(window as any).__pool.jevGame?.id)).toBe('premium-0');
+  await expect.poll(()=>page.evaluate(()=>(window as any).__pool.jevGame?.id)).toBe('premium-1');
   await expect(page.locator('#opponentstatus')).toContainText('Unlimited Jev AI');
-  for(const n of [1,2]){
+  for(const n of [2,3]){
     await page.locator('#rack').click();
     await expect.poll(()=>page.evaluate(()=>(window as any).__pool.jevGame?.id)).toBe('premium-'+n);
   }
@@ -532,7 +534,7 @@ test('Jev requires sign-in while CPU remains available to guests', async ({page}
   expect(await page.evaluate(()=>(window as any).__pool.cpuOpponent)).toBe(true);
 });
 
-test('Jev resumes its server-owned game and reset discards an in-flight turn', async ({page}) => {
+test('Jev new rack discards an in-flight turn and opens a fresh server game', async ({page}) => {
   await page.route('**/api/account',route=>route.fulfill({json:{account:{id:'jev-test',username:'Tester',createdAt:0},stats:null}}));
   await page.route('**/api/opponents/jev',route=>route.fulfill({json:{available:true,usage:{budget:{remainingNano:150000000,limitNano:150000000,unknownRequests:0},resetsAt:2000000000}}}));
   await openGame(page);
@@ -542,7 +544,9 @@ test('Jev resumes its server-owned game and reset discards an in-flight turn', a
       ball_in_hand:false,break_shot:true,placement:'none',kitchen_shot:false,rules:g.gs.rules,
       revision:0,winner:null,message:'Player 1 to break'};
   });
-  await page.route('**/api/opponents/jev/games',route=>route.fulfill({json:{id:'daily-game',state,status:'active'}}));
+  let starts=0;
+  await page.route('**/api/opponents/jev/games',route=>{expect(route.request().postDataJSON().new_game).toBe(true);return route.fulfill({json:{id:++starts===1?'daily-game':'fresh-game',state,status:'active'}});});
+  if(await page.locator('#helppanel').isVisible())await page.locator('#closehelp').click();
   let release:(()=>void)|undefined,requests=0;
   await page.route('**/api/opponents/jev/games/daily-game/turn',async route=>{
     requests++;
@@ -555,9 +559,9 @@ test('Jev resumes its server-owned game and reset discards an in-flight turn', a
   await expect.poll(()=>requests).toBe(1);
   await page.locator('#rack').click();
   release!();
-  expect(await page.evaluate(()=>(window as any).__pool.jevGame)).toBeNull();
-  await page.locator('#jevbtn').click();
-  await expect.poll(()=>page.evaluate(()=>(window as any).__pool.jevGame?.id)).toBe('daily-game');
+  await expect.poll(()=>page.evaluate(()=>(window as any).__pool.jevGame?.id)).toBe('fresh-game');
+  await expect(page.locator('#opponentstatus')).not.toContainText('Resume game');
+  expect(starts).toBe(2);
 });
 
 test('optional analytics waits for consent, withdraws, and leaves play available',async({page})=>{
@@ -906,7 +910,8 @@ test('practice shot controls follow actual pointer interface and trackpad profil
   await page.locator('#touchpower').fill('35');await expect(page.locator('#tutorialprogress')).toHaveText('Practice · game saved');
   await touchPracticeControl(page,'#touchshoot');await expect(page.locator('#tutorialprogress')).toHaveText('Control worked');
   await touchPracticeControl(page,'#tutorialback');await touchPracticeControl(page,'#tutorialnext');
-  // A real mouse on a coarse hybrid must override the initial touch default.
+  // Stop Chromium translating mouse events into touch before using the hybrid's mouse.
+  await cdp.send('Emulation.setTouchEmulationEnabled',{enabled:false});
   await page.mouse.move(20,200);await page.mouse.down();await page.mouse.up();
   await expect(page.locator('#tutorial')).toHaveAttribute('data-profile','trackpad');
   await expect(page.locator('.power-control')).toHaveClass(/tutorial-focus/);
