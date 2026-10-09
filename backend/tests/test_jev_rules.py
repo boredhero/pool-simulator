@@ -15,6 +15,7 @@ from app.sim.rules import new_game
 HEADERS = {"X-Pool-Request": "1"}
 CUSTOM = dict(
     preset="custom",
+    chalkSim=False,
     scratch="anywhere",
     calls="none",
     eightOnBreak="spot",

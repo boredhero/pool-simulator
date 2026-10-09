@@ -18,6 +18,7 @@ from fastapi import HTTPException, WebSocket, WebSocketDisconnect
 from app.services.auth import COOKIE, account_for_token, allowed_origin, rate_limit
 from app.services.matches import abandon_match, record_shot, start_match
 from app.sim import opening
+from app.sim.chalk import contact, wear
 from app.sim.config import match_config
 from app.sim.cue import cue_elevation
 from app.sim.physics import Ball, ShotEvents, simulate_shot, strike
@@ -74,7 +75,7 @@ def valid_message(msg: dict) -> bool:
             return isinstance(msg.get("rules", {}), dict)
         code = msg.get("code")
         return isinstance(code, str) and len(code) == 8 and code.isascii() and code.isalnum()
-    if kind not in ("shot", "place") or type(msg.get("revision")) is not int:
+    if kind not in ("shot", "place", "chalk") or type(msg.get("revision")) is not int:
         return False
     if not 0 <= msg["revision"] <= 2**31 - 1:
         return False
@@ -82,6 +83,8 @@ def valid_message(msg: dict) -> bool:
     def finite(value, bound=1e6):
         return type(value) in (int, float) and -bound <= value <= bound and math.isfinite(value)
 
+    if kind == "chalk":
+        return True
     if kind == "place":
         return finite(msg.get("x")) and finite(msg.get("y"))
     shot = msg.get("shot")
@@ -130,6 +133,7 @@ class Room:
             "placement": self.gs.placement,
             "kitchen_shot": self.gs.kitchen_shot,
             "rules": self.gs.rules,
+            "chalk": self.gs.chalk,
             "ruleset": {"id": eight_ball.id, "version": eight_ball.version},
             "revision": self.revision,
             "winner": self.gs.winner,
@@ -231,7 +235,7 @@ async def handle(ws: WebSocket) -> None:
                 continue
             typ = msg.get("t")
             if not valid_message(msg):
-                if room and typ in ("shot", "place"):
+                if room and typ in ("shot", "place", "chalk"):
                     await room.reject(ws, "Invalid message fields")
                 else:
                     await ws.send_json({"t": "error", "error": "Invalid message fields"})
@@ -249,7 +253,16 @@ async def handle(ws: WebSocket) -> None:
                     await ws.send_json({"t": "error", "error": "Leave your current room first."})
                     continue
                 await asyncio.to_thread(rate_limit, "room-entry", ip, 30)
+                # Unlock and preference changes can happen after this socket opened.
+                identity = await asyncio.to_thread(account_for_token, token)
                 if typ == "create":
+                    if match_config(msg.get("rules"))["chalkSim"] and not (
+                        identity and identity.get("easterEggsEnabled")
+                    ):
+                        await ws.send_json(
+                            {"t": "error", "error": "Unlock Easter eggs before enabling Chalk-Sim."}
+                        )
+                        continue
                     room = lobby.create()
                     room.gs.rules = match_config(msg.get("rules"))
                     seat = 0
@@ -269,6 +282,16 @@ async def handle(ws: WebSocket) -> None:
                             }
                         )
                         continue
+                    if msg.get("chalkSim") is True:
+                        if not identity or not identity.get("easterEggsEnabled"):
+                            await ws.send_json(
+                                {
+                                    "t": "error",
+                                    "error": "Unlock Easter eggs before enabling Chalk-Sim.",
+                                }
+                            )
+                            continue
+                        candidate.gs.rules["chalkSim"] = True
                     room, seat = candidate, 1
                 room.players[seat] = ws
                 room.names[seat] = (
@@ -295,8 +318,23 @@ async def handle(ws: WebSocket) -> None:
             elif typ == "leave":
                 return
 
-            elif typ in ("shot", "place") and msg.get("revision") != room.revision:
+            elif typ in ("shot", "place", "chalk") and msg.get("revision") != room.revision:
                 await room.reject(ws, "stale table state")
+
+            elif typ == "chalk":
+                if (
+                    not all(room.players)
+                    or not room.match_id
+                    or seat != room.gs.current
+                    or room.gs.winner is not None
+                    or room.busy
+                    or not room.gs.rules.get("chalkSim")
+                ):
+                    await room.reject(ws, "Cannot chalk now.")
+                    continue
+                room.gs.chalk[seat] = 1.0
+                room.revision += 1
+                await room.broadcast(room.state_msg())
 
             elif typ == "shot":
                 if not all(room.players) or not room.match_id:
@@ -353,7 +391,25 @@ async def handle(ws: WebSocket) -> None:
                         "calledBall": called_ball,
                         "calledPocket": called_pocket,
                     }
-                    strike(cue, math.cos(aim), math.sin(aim), power, tip_x, tip_y, vmax, elevation)
+                    chalk_level = (
+                        next_state.chalk[seat] if next_state.rules.get("chalkSim") else 1.0
+                    )
+                    if next_state.rules.get("chalkSim"):
+                        shot.update(
+                            chalkLevel=chalk_level, miscue=contact(chalk_level, tip_x, tip_y)[3] < 1
+                        )
+                        next_state.chalk[seat] = wear(chalk_level, power, tip_x, tip_y)
+                    strike(
+                        cue,
+                        math.cos(aim),
+                        math.sin(aim),
+                        power,
+                        tip_x,
+                        tip_y,
+                        vmax,
+                        elevation,
+                        chalk_level,
+                    )
                     await room.broadcast({"t": "shot", "by": seat, "shot": shot})
                     worker = asyncio.create_task(
                         asyncio.to_thread(simulate_shot, next_state.balls, 0)

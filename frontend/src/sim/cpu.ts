@@ -274,7 +274,7 @@ export function planCpuTurn(gs: GameState, maxTrials = 12, budgetMs = 120): CpuP
     if(state.ballInHand && (!seed.placement || !placeCue(state,seed.placement.x,seed.placement.y))) continue;
     const cue=state.balls[0];beginShot(state,seed.ball,seed.pocket);
     strike(cue,Math.cos(seed.angle),Math.sin(seed.angle),seed.power,seed.tipX,seed.tipY,
-      state.rules[state.breakShot?'breakMax':'normalMax'],cueElevation(cue.x,cue.y,seed.angle,0,state.balls,seed.tipX,seed.tipY));
+      state.rules[state.breakShot?'breakMax':'normalMax'],cueElevation(cue.x,cue.y,seed.angle,0,state.balls,seed.tipX,seed.tipY),state.rules.chalkSim?state.chalk[state.current]:1);
     const ev: ShotEvents={firstContact:null,potted:[],offTable:[],railAfterContact:false,cuePotted:false};
     const contact={v:false};let ticks=0;
     while(ticks<45/DT && !allAsleep(state.balls)) {

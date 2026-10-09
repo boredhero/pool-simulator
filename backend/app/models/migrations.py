@@ -2,7 +2,7 @@
 
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
-from sqlalchemy import Boolean, Column, Integer, String, false, inspect, text
+from sqlalchemy import Boolean, Column, Integer, String, Text, false, inspect, text
 
 
 def upgrade_premium(connection) -> None:
@@ -88,6 +88,18 @@ def upgrade_account_status(connection) -> None:
         Operations(MigrationContext.configure(connection)).add_column(
             "accounts", Column("disabled", Boolean, nullable=False, server_default=false())
         )
+
+
+def upgrade_easter_eggs(connection) -> None:
+    columns = {c["name"] for c in inspect(connection).get_columns("accounts")}
+    op = Operations(MigrationContext.configure(connection))
+    if "settings_json" not in columns:
+        op.add_column(
+            "accounts", Column("settings_json", Text, nullable=False, server_default="{}")
+        )
+    for name in ("easter_eggs_enabled", "chalk_sim"):
+        if name not in columns:
+            op.add_column("accounts", Column(name, Boolean, nullable=False, server_default=false()))
 
 
 def upgrade_simulation(connection) -> None:

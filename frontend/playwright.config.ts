@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: ['pool.spec.ts', 'panels.spec.ts', 'admin.spec.ts', 'cameraFly.spec.ts', 'welcome.spec.ts', 'accountIdentity.spec.ts', 'accountTerms.spec.ts', 'mobileHud.spec.ts', 'mobileCamera.spec.ts', 'winner.spec.ts', 'coin.spec.ts', 'jevLatency.spec.ts', 'jevRules.spec.ts', 'simulation.spec.ts', 'passwords.spec.ts', 'usernames.spec.ts', 'google.spec.ts', 'settingsLayout.spec.ts', 'privacySettings.spec.ts', 'installApp.spec.ts'],
+  testMatch: ['accountPreferences.spec.ts', 'chalkSimulation.spec.ts', 'easterEggs.spec.ts', 'pool.spec.ts', 'panels.spec.ts', 'admin.spec.ts', 'cameraFly.spec.ts', 'welcome.spec.ts', 'accountIdentity.spec.ts', 'accountTerms.spec.ts', 'mobileHud.spec.ts', 'mobileCamera.spec.ts', 'winner.spec.ts', 'coin.spec.ts', 'jevLatency.spec.ts', 'jevRules.spec.ts', 'simulation.spec.ts', 'passwords.spec.ts', 'usernames.spec.ts', 'google.spec.ts', 'settingsLayout.spec.ts', 'privacySettings.spec.ts', 'installApp.spec.ts'],
   fullyParallel: true,
   workers: process.env.CI ? 1 : 2,
   timeout: 60_000,

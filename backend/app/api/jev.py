@@ -23,6 +23,7 @@ from app.services import jev_budget
 from app.services.auth import current_account, mutation_guard
 from app.services.matches import ensure_jev_match, record_shot_in_session
 from app.sim import opening
+from app.sim.chalk import contact, wear
 from app.sim.config import match_config
 from app.sim.cue import cue_elevation
 from app.sim.physics import Ball, simulate_shot, strike
@@ -83,6 +84,7 @@ class RuleSettings(BaseModel):
     scratchOnEightLoss: bool = True
     assignOnBreak: bool = True
     strictBreak: bool = False
+    chalkSim: bool = False
     normalMax: float = Field(default=3.5, ge=1, le=8.5, allow_inf_nan=False)
     breakMax: float = Field(default=9.5, ge=1, le=12, allow_inf_nan=False)
 
@@ -180,6 +182,8 @@ async def start_game(
             if existing.simulation and not current.sim_enabled:
                 raise HTTPException(403, "Sim mode is not enabled for this account.")
             return public_game(existing, premium)
+        if payload and payload.rules and payload.rules.chalkSim and not current.easter_eggs_enabled:
+            raise HTTPException(403, "Unlock Easter eggs before enabling Chalk-Sim.")
         budget = jev_budget.balance(db, current, now)
         if not premium and budget["remainingNano"] <= 0:
             raise HTTPException(
@@ -454,6 +458,8 @@ async def play_turn(
         else:
             # Planner previews copied state and jointly chooses legal placement plus shot.
             # CPU work runs off the event loop under the existing admission cap.
+            if gs.rules.get("chalkSim") and gs.chalk[by] < 0.45:
+                gs.chalk[by] = 1.0
             options = await asyncio.to_thread(plan_shots, gs)
             if not options:
                 raise HTTPException(409, "No legal shot plan. Resume your game.")
@@ -515,6 +521,13 @@ async def play_turn(
         elevation = cue_elevation(
             cue.x, cue.y, shot["aim"], 0, gs.balls, shot["tipX"], shot["tipY"]
         )
+        chalk_level = gs.chalk[by] if gs.rules.get("chalkSim") else 1.0
+        if gs.rules.get("chalkSim"):
+            shot.update(
+                chalkLevel=chalk_level,
+                miscue=contact(chalk_level, shot["tipX"], shot["tipY"])[3] < 1,
+            )
+            gs.chalk[by] = wear(chalk_level, shot["power"], shot["tipX"], shot["tipY"])
         begin_shot(gs, shot["calledBall"], shot["calledPocket"])
         strike(
             cue,
@@ -525,6 +538,7 @@ async def play_turn(
             shot["tipY"],
             vmax,
             elevation,
+            chalk_level,
         )
         events = await asyncio.to_thread(simulate_shot, gs.balls, 0)
         apply_shot(gs, events)
@@ -573,3 +587,33 @@ async def play_turn(
         }
     finally:
         active_games.discard(game_id)
+
+
+class ChalkRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    revision: int = Field(ge=0, le=1000000)
+
+
+@router.post("/games/{game_id}/chalk", dependencies=[Depends(mutation_guard)])
+async def chalk_cue(game_id: str, payload: ChalkRequest, account: dict = Depends(require_account)):
+    if game_id in active_games:
+        raise HTTPException(409, "Game is busy. Resume after this shot.")
+    with Session.begin() as db:
+        game = db.get(JevGame, game_id)
+        if game is None or game.account_id != account["id"]:
+            raise HTTPException(404, "Game not found.")
+        if game.status != "active" or payload.revision != game.revision:
+            raise HTTPException(409, "Table changed. Resume your game.")
+        gs = decode(game.state)
+        if (
+            game.simulation
+            or gs.current != 0
+            or gs.winner is not None
+            or not gs.rules.get("chalkSim")
+        ):
+            raise HTTPException(409, "Cannot chalk now.")
+        gs.chalk[0] = 1.0
+        game.state = json.dumps(asdict(gs))
+        game.revision += 1
+        game.updated_at = int(time.time())
+        return public_game(game, account.get("premium", False))

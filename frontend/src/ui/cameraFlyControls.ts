@@ -1,3 +1,4 @@
+import { accountPreferences } from './accountPreferences';
 import type { CameraRig } from '../render/cameraRig';
 import './cameraFlyControls.css';
 
@@ -35,7 +36,7 @@ export function setupCameraFly(rig: CameraRig): void {
   for(const [value,label] of [['mouse','Mouse & Keyboard Mode'],['trackpad','Trackpad Mode']]) {
     const option=document.createElement('option');option.value=value;option.textContent=label;profile.append(option);
   }
-  try { if(localStorage.getItem('pool:cameraInput')==='trackpad')profile.value='trackpad'; } catch { /* private mode */ }
+  try { if(accountPreferences.getItem('pool:cameraInput')==='trackpad')profile.value='trackpad'; } catch { /* private mode */ }
   rig.setInputProfile(profile.value as 'mouse'|'trackpad');
   const profileHint=document.createElement('span');profileHint.id='camera-input-hint';
   profile.setAttribute('aria-describedby',profileHint.id);
@@ -109,7 +110,7 @@ export function setupCameraFly(rig: CameraRig): void {
   const pointerBlocked=()=>!!document.querySelector('dialog[open]');
   profile.addEventListener('change',()=>{
     stop();rig.setInputProfile(profile.value as 'mouse'|'trackpad');updateHint();
-    try {localStorage.setItem('pool:cameraInput',profile.value);} catch { /* private mode */ }
+    try {accountPreferences.setItem('pool:cameraInput',profile.value);} catch { /* private mode */ }
   });
   const apply = () => {
     let forward = pointer?.forward ?? 0, right = pointer?.right ?? 0, up=pointer?.up??0, yaw=pointer?.yaw??0;
@@ -126,6 +127,10 @@ export function setupCameraFly(rig: CameraRig): void {
     apply();
   };
   const stop = () => { keys.clear(); releasePointer(); };
+  accountPreferences.subscribe(()=>{
+    stop();profile.value=accountPreferences.getItem('pool:cameraInput')==='trackpad'?'trackpad':'mouse';
+    rig.setInputProfile(profile.value as 'mouse'|'trackpad');updateHint();
+  });
   for (const [name, symbol, forward, right, up, yaw] of [
     ['forward', '↑', 1, 0,0,0], ['left', '←', 0, -1,0,0], ['backward', '↓', -1, 0,0,0], ['right', '→', 0, 1,0,0],
     ['rise','＋',0,0,1,0], ['lower','−',0,0,-1,0], ['turn-left','↶',0,0,0,1], ['turn-right','↷',0,0,0,-1],

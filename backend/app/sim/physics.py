@@ -81,6 +81,7 @@ def strike(
     tip_y: float,
     vmax: float = VMAX_NORMAL,
     elevation: float = 0.0,
+    chalk_level: float = 1.0,
 ) -> None:
     """Rigid cue impulse, then slate rebound; mirrors the browser model."""
     import math
@@ -99,6 +100,18 @@ def strike(
     b.wx = w * (-tx * st * rx - ty * ry)
     b.wy = w * (-tx * st * ry + ty * rx)
     b.wz = -w * tx * ct
+    from app.sim.chalk import contact
+
+    tx, ty, h, grip = contact(chalk_level, tip_x, tip_y)
+    if grip < 1:
+        forward = h * h + grip * (1 - h * h)
+        side, up = -h * tx * (1 - grip), -h * ty * (1 - grip)
+        b.vx = v * (forward * rx * ct - side * ry + up * rx * st)
+        b.vy = v * (forward * ry * ct + side * rx + up * ry * st)
+        b.vz = v * (-forward * st + up * ct)
+        b.wx *= grip
+        b.wy *= grip
+        b.wz *= grip
     b.asleep = False
     if b.z <= 1e-9 and b.vz < 0:
         land(b)

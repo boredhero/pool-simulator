@@ -2,6 +2,7 @@
 
 import base64
 import hashlib
+import json
 import os
 import re
 import secrets
@@ -45,6 +46,9 @@ def public_account(user: Account) -> dict:
         "lastActiveAt": user.last_active_at,
         "premium": user.premium,
         "simEnabled": user.sim_enabled,
+        "easterEggsEnabled": user.easter_eggs_enabled,
+        "chalkSim": user.chalk_sim,
+        "settings": json.loads(user.settings_json or "{}"),
         "isAdmin": is_admin(user.id),
     }
 

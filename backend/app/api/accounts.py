@@ -1,10 +1,12 @@
 """Optional accounts. Guest room creation never depends on these endpoints."""
 
+import json
+import re
 import secrets
 import time
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictBool
 from sqlalchemy import delete, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
@@ -257,3 +259,62 @@ def change_username(payload: UsernameChange, request: Request, response: Respons
         raise HTTPException(409, "That username is already taken. Choose another.") from exc
     response.headers["Cache-Control"] = "no-store"
     return {"account": result}
+
+
+@router.post("/easter-eggs/unlock", dependencies=[Depends(mutation_guard)])
+def unlock_easter_eggs(request: Request):
+    account = current_account(request)
+    if account is None:
+        raise HTTPException(401, "Sign in to unlock Easter eggs.")
+    with Session.begin() as db:
+        user = db.get(Account, account["id"])
+        if user is None or user.disabled:
+            raise HTTPException(401, "Account access is unavailable.")
+        user.easter_eggs_enabled = True
+        return {"account": public_account(user)}
+
+
+class Preferences(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    chalkSim: StrictBool | None = None
+    settings: dict[str, str] | None = None
+
+
+@router.post("/preferences", dependencies=[Depends(mutation_guard)])
+def save_preferences(payload: Preferences, request: Request):
+    account = current_account(request)
+    if account is None:
+        raise HTTPException(401, "Sign in to save preferences.")
+    with Session.begin() as db:
+        db.execute(
+            update(Account)
+            .where(Account.id == account["id"])
+            .values(settings_json=Account.settings_json)
+        )
+        user = db.get(Account, account["id"])
+        if user is None or user.disabled:
+            raise HTTPException(401, "Account access is unavailable.")
+        if payload.chalkSim and not user.easter_eggs_enabled:
+            raise HTTPException(403, "Unlock Easter eggs before enabling Chalk-Sim.")
+        if payload.chalkSim is not None:
+            user.chalk_sim = payload.chalkSim
+        if payload.settings is not None:
+            choices = {
+                "pool:cue-style": {"plain", "red-spots", "red-ring", "blue-dot", "black-triangles"},
+                "pool:sights": {"none", "dots", "diamonds", "double-diamonds", "squares"},
+                "pool:auto-camera": {"0", "1"},
+                "pool:fast-forward": {"0", "1"},
+                "pool:cameraInput": {"mouse", "trackpad"},
+            }
+            for key, value in payload.settings.items():
+                valid = (
+                    bool(re.fullmatch(r"#[0-9a-fA-F]{6}", value))
+                    if key in ("pool:felt", "pool:wood")
+                    else value in choices.get(key, set())
+                )
+                if not valid:
+                    raise HTTPException(422, "Invalid account preference.")
+            user.settings_json = json.dumps(
+                {**json.loads(user.settings_json or "{}"), **payload.settings}
+            )
+        return {"account": public_account(user)}

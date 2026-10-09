@@ -1,3 +1,4 @@
+import {chalkContact} from './chalk';
 // Planar rolling plus 3D flight and spin. Fixed dt=1/240, semi-implicit Euler
 // for friction + swept (analytic TOI) ball-ball / cushion / jaw collisions.
 // Mirror of backend/app/sim/physics.py — keep constants + behavior in sync.
@@ -63,7 +64,7 @@ export function throwMu(vRel: number): number {
 
 /** Rigid cue impulse + frictional slate rebound. See pooltool's
  * instantaneous_point and frictional_inelastic ball/table models. */
-export function strike(b: Ball, dx: number, dy: number, power: number, tipX: number, tipY: number, vmax = VMAX_NORMAL, elevation = 0): void {
+export function strike(b: Ball, dx: number, dy: number, power: number, tipX: number, tipY: number, vmax = VMAX_NORMAL, elevation = 0, chalkLevel = 1): void {
   const offset = Math.hypot(tipX, tipY);
   const scale = offset > TIP_MAX ? TIP_MAX / offset : 1;
   const tx = tipX * scale, ty = tipY * scale;
@@ -79,6 +80,14 @@ export function strike(b: Ball, dx: number, dy: number, power: number, tipX: num
   b.wx = w * (-tx * st * rx - ty * ry);
   b.wy = w * (-tx * st * ry + ty * rx);
   b.wz = -w * tx * ct;
+  const {h,grip}=chalkContact(chalkLevel,tx,ty);
+  if(grip<1){
+    const forward=h*h+grip*(1-h*h),side=-h*tx*(1-grip),up=-h*ty*(1-grip);
+    b.vx=v*(forward*rx*ct-side*ry+up*rx*st);
+    b.vy=v*(forward*ry*ct+side*rx+up*ry*st);
+    b.vz=v*(-forward*st+up*ct);
+    b.wx*=grip;b.wy*=grip;b.wz*=grip;
+  }
   b.asleep = false;
   if (b.z <= 1e-9 && b.vz < 0) land(b);
 }

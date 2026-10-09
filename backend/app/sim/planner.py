@@ -339,6 +339,7 @@ def _preview(gs, shot, deadline):
         shot["tipY"],
         state.rules["breakMax" if state.break_shot else "normalMax"],
         cue_elevation(cue.x, cue.y, shot["aim"], 0, state.balls, shot["tipX"], shot["tipY"]),
+        state.chalk[me] if state.rules.get("chalkSim") else 1.0,
     )
     events, contact, elapsed, ticks = ShotEvents(), {"v": False}, 0.0, 0
     while elapsed < 45 and not all_asleep(state.balls):

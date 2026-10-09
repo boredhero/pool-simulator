@@ -4,6 +4,7 @@ import math
 
 BAR_RULES = dict(
     preset="bar",
+    chalkSim=False,
     scratch="kitchen",
     calls="eight",
     eightOnBreak="win",
@@ -27,11 +28,12 @@ TOURNAMENT_RULES = {
 
 def match_config(value=None):
     data = value if isinstance(value, dict) else {}
+    extra = {"chalkSim": data.get("chalkSim") is True}
     if data.get("preset") == "tournament":
-        return dict(TOURNAMENT_RULES)
+        return {**TOURNAMENT_RULES, **extra}
     if data.get("preset") != "custom":
-        return dict(BAR_RULES)
-    out = {**BAR_RULES, "preset": "custom"}
+        return {**BAR_RULES, **extra}
+    out = {**BAR_RULES, **extra, "preset": "custom"}
     for key, choices in (
         ("scratch", ("kitchen", "anywhere")),
         ("calls", ("none", "eight", "all")),

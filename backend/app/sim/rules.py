@@ -28,6 +28,7 @@ class ShotContext:
 
 @dataclass
 class GameState:
+    chalk: list[float] = field(default_factory=lambda: [1.0, 1.0])
     balls: list[Ball] = field(default_factory=list)
     return_order: list[int] = field(default_factory=list)
     current: int = 0

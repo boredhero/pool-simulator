@@ -14,6 +14,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
 import { cueElevation } from './cuePose';
 import { createCue } from './cueModel';
+import { createChalks } from './chalk';
 import { createRailSights, type SightStyle } from './railSights';
 import { RAIL_W, CUSHION_W, bedGeometry, surroundGeometry } from './tableGeometry';
 import { BALL_R, POCKETS, TABLE_H, TABLE_W, cushions } from '../sim/table';
@@ -40,6 +41,7 @@ export interface SceneHandle {
   setPlace(visible: boolean, x: number, y: number, legal: boolean, zone?: string): void;
   setSights(style: SightStyle): void;
   setCueStyle(style: CueStyle): void;
+  setChalk(enabled: boolean, levels?: readonly number[], activeSeat?: number): void;
   setKitchen(visible: boolean, placed?: boolean): void;
   setCall(pocket: number | null, visible: boolean): void;
   /** Felt + wood theme colors (css color strings). */
@@ -47,6 +49,7 @@ export interface SceneHandle {
   /** Raycast pointer to felt plane, sim coords or null. */
   pickFelt(clientX: number, clientY: number, extendForAim?: boolean): [number, number] | null;
   pickPocket(clientX:number,clientY:number):number|null;
+  pickChalk(clientX:number,clientY:number):boolean;
   onFrame(cb: () => void): void;
 }
 
@@ -157,6 +160,8 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
   }
   const sights = createRailSights();
   scene.add(sights.group);
+  const chalks = createChalks();
+  scene.add(chalks.group);
   // Recessed wells, with open tops and leather lips, remain visible while
   // orbiting. Their bottoms sit below the cut bed instead of over the felt.
   const pocketCenters: Array<[number, number, number]> = [];
@@ -343,6 +348,7 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
     cameraRig.update(performance.now());
     constrainTableCamera(camera, controls, renderer.domElement.clientWidth <= 900 && matchMedia('(pointer: coarse)').matches);
     for (const cb of cbs) cb();
+    chalks.update(performance.now());
     if (kitchen.visible && !kitchenDismissed) {
       const anchor=kitchenAnchor.clone().project(camera), rect=canvas.getBoundingClientRect();
       kitchenLabel.hidden=anchor.z>1 || anchor.z < -1;
@@ -426,6 +432,7 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
       oldWood.map.dispose();oldWood.bump.dispose();oldWood.roughness.dispose();
     },
     setSights: sights.setStyle,
+    setChalk: chalks.set,
     setCueStyle(style) {
       if(style===cueAppearance)return;
       cueAppearance=style;
@@ -468,6 +475,7 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
     },
     pickFelt,
     pickPocket(x,y){return pickPocket(camera,canvas.getBoundingClientRect(),x,y);},
+    pickChalk(x,y){return chalks.pick(camera,canvas.getBoundingClientRect(),x,y);},
     onFrame(cb) { cbs.push(cb); },
   };
 }

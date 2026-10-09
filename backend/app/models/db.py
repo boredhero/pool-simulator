@@ -55,6 +55,7 @@ def init_db() -> None:
     Base.metadata.create_all(engine)
     from app.models.migrations import (
         upgrade_account_status,
+        upgrade_easter_eggs,
         upgrade_jev_allowance,
         upgrade_match_modes,
         upgrade_monthly_budget,
@@ -70,6 +71,7 @@ def init_db() -> None:
         upgrade_premium(connection)
         upgrade_jev_allowance(connection)
         upgrade_simulation(connection)
+        upgrade_easter_eggs(connection)
         upgrade_monthly_budget(connection)
         upgrade_terms(connection)
         upgrade_match_modes(connection)
@@ -88,6 +90,11 @@ class Account(Base):
     recovery_hash: Mapped[str] = mapped_column(Text)
     created_at: Mapped[int] = mapped_column(Integer)
     premium: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    settings_json: Mapped[str] = mapped_column(Text, default="{}", server_default="{}")
+    chalk_sim: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    easter_eggs_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false()
+    )
     sim_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     last_active_at: Mapped[int | None] = mapped_column(Integer, nullable=True)
     monthly_budget_nano: Mapped[int | None] = mapped_column(Integer, nullable=True)

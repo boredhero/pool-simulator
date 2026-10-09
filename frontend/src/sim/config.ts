@@ -1,4 +1,5 @@
 export interface MatchConfig {
+  chalkSim?: boolean;
   preset: 'bar' | 'tournament' | 'custom';
   scratch: 'kitchen' | 'anywhere';
   calls: 'none' | 'eight' | 'all';
@@ -9,13 +10,13 @@ export interface MatchConfig {
   normalMax: number;
   breakMax: number;
 }
-export const BAR_RULES: MatchConfig = { preset: 'bar', scratch: 'kitchen', calls: 'eight', eightOnBreak: 'win', scratchOnEightLoss: true, assignOnBreak: true, strictBreak: false, normalMax: 3.5, breakMax: 9.5 };
+export const BAR_RULES: MatchConfig = { chalkSim:false, preset: 'bar', scratch: 'kitchen', calls: 'eight', eightOnBreak: 'win', scratchOnEightLoss: true, assignOnBreak: true, strictBreak: false, normalMax: 3.5, breakMax: 9.5 };
 export const TOURNAMENT_RULES: MatchConfig = { ...BAR_RULES, preset: 'tournament', scratch: 'anywhere', calls: 'all', eightOnBreak: 'spot', scratchOnEightLoss: false, assignOnBreak: false, strictBreak: true };
 export function matchConfig(input: Partial<MatchConfig> = {}): MatchConfig {
-  if (input.preset === 'tournament') return { ...TOURNAMENT_RULES };
-  if (input.preset !== 'custom') return { ...BAR_RULES };
+  if (input.preset === 'tournament') return { ...TOURNAMENT_RULES, chalkSim:input.chalkSim===true };
+  if (input.preset !== 'custom') return { ...BAR_RULES, chalkSim:input.chalkSim===true };
   return {
-    ...BAR_RULES, preset: 'custom',
+    ...BAR_RULES, preset: 'custom', chalkSim:input.chalkSim===true,
     scratch: input.scratch === 'anywhere' ? 'anywhere' : 'kitchen',
     calls: input.calls === 'none' || input.calls === 'all' ? input.calls : 'eight',
     eightOnBreak: input.eightOnBreak === 'spot' ? 'spot' : 'win',

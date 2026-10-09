@@ -1,12 +1,12 @@
 # Application data inventory
 
 Checked against the database models, authentication/account endpoints, provider payload,
-and cleanup/deletion code for release 1.4.0. This describes application behavior. It does
+and cleanup/deletion code for release 1.5.0. This describes application behavior. It does
 not assert a retention period for separately configured reverse-proxy logs or backups.
 
 | Records | Stored information and purpose | Retention and deletion |
 | --- | --- | --- |
-| `accounts` | Stable ID, username/normalized key, most recent rename time, creation/last-active times, password/recovery hashes, Premium/Sim/disabled flags, optional monthly allowance override | Account lifetime; removed on account deletion. Google-only accounts use a disabled-password marker until recovery sets a password. No username history table; matches retain name snapshots. |
+| `accounts` | Stable ID, username/normalized key, most recent rename time, creation/last-active times, password/recovery hashes, Premium/Sim/disabled and Easter egg unlock/Chalk-Sim flags, saved appearance/camera/playback preferences, optional monthly allowance override | Account lifetime; removed on account deletion. Google-only accounts use a disabled-password marker until recovery sets a password. No username history table; matches retain name snapshots. |
 | `terms_acceptances` | Account ID, accepted content hash, acceptance time; adult affirmation is part of acceptance | Replaced by later acceptance; removed with account. No date of birth or identity document. |
 | `login_sessions`, `auth_fresh` | Hashed session token, account, session expiry and recent-authentication expiry | Sessions last up to 30 days; recent authentication five minutes. Logout/recovery/credential removal/disable revoke relevant sessions; expired rows are removed during later sign-ins. Account deletion removes both tables' account rows. |
 | `passkeys` | Credential ID/public key, name, account, signature counter, transport list, backup state, creation/last-use times | Until removal, recovery, or account deletion. Never private keys or biometric data. |
