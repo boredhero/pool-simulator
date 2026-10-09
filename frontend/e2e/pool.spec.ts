@@ -79,10 +79,11 @@ test('loads, renders table, breaks and resolves', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test('adaptive controls, readable settings, and desktop version card', async ({ page }) => {
+test('adaptive controls, readable settings, and desktop version card', async ({ page },testInfo) => {
   await page.setViewportSize({width:1440,height:900}); await openGame(page);
   await expect(page.locator('#mouseguide')).toBeVisible();
   expect((await page.locator('#helppanel').boundingBox())!.width).toBeGreaterThanOrEqual(500);
+  await testInfo.attach('desktop-controls-guide',{body:await page.screenshot(),contentType:'image/png'});
   await expect(page.locator('.guide-tabs')).toHaveCount(0);
   await expect(page.locator('#version')).toHaveCSS('position','fixed');
   await page.locator('#settingsbtn').click();

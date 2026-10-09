@@ -1,12 +1,14 @@
-import { acceptWelcomeBeforeLoad, waitForOpening } from './welcomeFixture';
+import { waitForOpening } from './welcomeFixture';
 import { expect, test, type Page } from '@playwright/test';
 
 async function open(page:Page,path='/'){
-  await acceptWelcomeBeforeLoad(page);
-  await page.addInitScript(()=>{
+  const {version}=await (await page.request.get('/api/privacy/terms')).json();
+  await page.addInitScript(version=>{
+    localStorage.setItem('pool:welcome',JSON.stringify({version,accepted:true}));
+    localStorage.setItem('pool:help-dismissed','1');
     const w=window as any,raf=requestAnimationFrame.bind(window);
     window.requestAnimationFrame=fn=>raf(t=>{if(w.__pool&&!w.__draw){const r=w.__pool.scene.renderer;w.__draw=r.render.bind(r);r.render=()=>{};}fn(t);});
-  });
+  },version);
   await page.goto(path);await page.waitForFunction(()=>!!(window as any).__draw);await waitForOpening(page);
 }
 async function account(page:Page){await page.locator('#onlinebtn').click();await page.locator('#accountbtn').click();}
@@ -19,7 +21,9 @@ test('optional account creation, recovery, session reset, and mobile profile',as
   const code=await page.locator('#recoveryvalue').inputValue();expect(code.length).toBe(39);
   await page.keyboard.press('Escape');await expect(page.locator('#accountdialog')).toBeVisible();
   await page.locator('#recoverysaved').click();await expect(page.locator('#accountname')).toHaveText(name);
-  await expect(page.locator('#accountstats')).toContainText('Online + Jev matches');
+  await page.locator('#account-tab-overview').click();
+  await expect(page.locator('#accountstats')).toBeVisible();
+  await expect(page.locator('#accountstats')).toContainText('Matches0');
   await page.locator('#accountlogout').click();await page.locator('#account-recover').click();
   await page.locator('#accountusername').fill(name);await page.locator('#accountpassword').fill(password+' new');await page.locator('#accountpasswordconfirm').fill(password+' new');
   await page.locator('#accountrecovery').fill(code);await page.locator('#accountsubmit').click();
@@ -77,7 +81,7 @@ test('development proxy supports same-origin account requests and WebSocket room
   await page.locator('#leaveroom').click();
 });
 
-test('daily Jev game uses server state and survives a page reload',async({page})=>{
+test('Jev state persists across reload and selecting Jev starts a new rack',async({page})=>{
   const response=await page.request.post('/api/account/register',{headers:{'X-Pool-Request':'1'},data:{
     username:'Jev_'+Date.now().toString(36),password:'a long daily game test password',adult:true,terms_version:(await (await page.request.get('/api/privacy/terms')).json()).version,
   }});
@@ -100,9 +104,12 @@ test('daily Jev game uses server state and survives a page reload',async({page})
     return (await response.json()).game?.state.revision;
   }).toBe(revision);
   await page.reload();await page.waitForFunction(()=>!!(window as any).__draw);
+  const persisted=await (await page.request.get('/api/opponents/jev')).json();
+  expect(persisted.game.id).toBe(id);expect(persisted.game.state.revision).toBe(revision);
+  if(breaker===1)expect(persisted.game.state.current).toBe(1);
   await page.locator('#jevbtn').click();
-  await expect.poll(()=>page.evaluate(()=>(window as any).__pool.jevGame)).toEqual({id,revision});
-  if(breaker===1)expect(await page.evaluate(()=>(window as any).__pool.gs.current)).toBe(1);
+  await expect.poll(()=>page.evaluate(()=>(window as any).__pool.jevGame?.id)).not.toBe(id);
+  await expect.poll(()=>page.evaluate(()=>(window as any).__pool.jevGame?.revision)).toBe(0);
   const info=await page.request.get('/api/opponents/jev');
   expect((await info.json()).usage.budget.spentNano).toBe(0);
   await page.screenshot({path:'/tmp/pool-jev-desktop.png'});

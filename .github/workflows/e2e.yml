@@ -54,6 +54,7 @@ jobs:
       - name: Run browser checks
         working-directory: frontend
         env:
+          PLAYWRIGHT_BLOB_OUTPUT_NAME: report-${{ matrix.suite }}-${{ matrix.shard }}.zip
           SUITE: ${{ matrix.suite }}
           SHARD: ${{ matrix.shard }}
           CONFIG: ${{ matrix.config }}

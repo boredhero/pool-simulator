@@ -66,13 +66,17 @@ npm --prefix frontend run build
 cd frontend
 npx playwright install chromium
 npm run test:e2e
+npm run test:passkeys
 npm run test:online
 ```
 
 The build includes TypeScript checking; `npm run typecheck` runs it separately.
 The online browser suite uses a temporary SQLite database, never production data.
 Required `ci` aggregates Ruff, backend tests, frontend tests/build and the container
-build. Browser checks run separately on development branches. Only pushes to
+build. Browser checks run separately on development branches: four standalone
+shards plus independent passkey and online integration jobs, each with one worker.
+The `browser-report` artifact contains the combined HTML report; per-job artifacts
+retain failure screenshots and traces. See the [Playwright sharding guide](https://playwright.dev/docs/test-sharding). Only pushes to
 `main` publish an image and deploy through CI/CD. A failed deployment health check
 fails the workflow. Live rooms are in memory: run **one API worker / instance**.
 
