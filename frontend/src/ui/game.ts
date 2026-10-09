@@ -731,7 +731,7 @@ export class Game {
     // Latch the actual strike direction; pending aim smoothing must not reverse the cue.
     this.targetAngle=this.angle;
     if(this.jevGame && !this.jevPlayback){void this.playJevTurn(power);return;}
-    this.power = power;
+    if(!shotSpin)this.power = power;
     const {tipX,tipY}=shotSpin??this;
     const elevation = authoritativeElevation??cueElevation(c.x, c.y, this.angle, 0, this.gs.balls,tipX,tipY);
     beginShot(this.gs, this.calledBall, this.calledPocket);
@@ -764,7 +764,7 @@ export class Game {
       if(!await this.showOpponentShot(selected,valid))return;
       if(state.ballInHand&&!placeCue(state,selected.placement.x,selected.placement.y))return;
       this.opponentAction=null;this.mode='aim';
-      this.angle=this.targetAngle=selected.aim;this.power=selected.power;
+      this.angle=this.targetAngle=selected.aim;
       this.calledBall=selected.calledBall;this.calledPocket=selected.calledPocket;
       this.fire(selected.power,undefined,undefined,selected);
     } finally {if(this.opponentAction===action)this.opponentAction=null;}
@@ -871,7 +871,7 @@ export class Game {
     (document.getElementById('touchshoot') as HTMLButtonElement).disabled=!this.humanTurn()||this.pointers.size>0;
     const aiming = this.mode === 'aim' && !this.cue().potted && this.humanCueControls();
     const pulling = this.pulling && aiming;
-    const pull = pulling ? 0.02 + this.pullPower() * 0.18 : 0.02 + this.power * 0.1;
+    const pull = 0.012 + (pulling ? this.pullPower() * 0.18 : 0);
     this.scene.setCall(this.calledPocket, aiming && callRequired(this.gs));
     if(presented&&this.opponentAction){
       const pose=cuePresentation(this.opponentAction.elapsed,presented.power,this.opponentAction.reduced);
@@ -1086,14 +1086,15 @@ export class Game {
     this.room = rc;
     this.seat = null;
     const handleState = (s: RoomState) => {
+      if(this.room!==rc)return;
       if (this.seat === null && rc.seat !== null) this.seat = rc.seat;
       this.applyServerState(s);
       const link=new URL('/',location.href);link.hash='join='+rc.code;
       (document.getElementById('roomlink') as HTMLInputElement).value=link.href;
     };
-    rc.onState = s => { if(this.coinPending()||this.mode==='rolling' || this.pendingNetwork.length)this.pendingNetwork.push(()=>handleState(s)); else handleState(s); };
+    rc.onState = s => { if(this.room!==rc)return; if(this.coinPending()||this.mode==='rolling' || this.pendingNetwork.length)this.pendingNetwork.push(()=>handleState(s)); else handleState(s); };
     const handleShot: typeof rc.onShot = (by, shot) => {
-      if (by === this.seat) return;
+      if (this.room!==rc || by === this.seat) return;
       const c = this.cue();
       if (c.potted) return;
       beginShot(this.gs, shot.calledBall, shot.calledPocket);
@@ -1107,11 +1108,11 @@ export class Game {
       this.cameraShotPending=true;this.cameraShotRevision=this.scene.cameraRig.revision; this.lastT = 0; this.accumulator = 0;
       this.hud();
     };
-    rc.onShot = (by,shot) => { if(by===this.seat)return; if(this.coinPending()||this.mode==='rolling' || this.pendingNetwork.length)this.pendingNetwork.push(()=>handleShot(by,shot)); else handleShot(by,shot); };
-    rc.onError = (e) => {if(!rc.code)this.leaveRoom(e);else this.el.msg.textContent=e;this.el.roominfo.textContent=e;};
+    rc.onShot = (by,shot) => { if(this.room!==rc||by===this.seat)return; if(this.coinPending()||this.mode==='rolling' || this.pendingNetwork.length)this.pendingNetwork.push(()=>handleShot(by,shot)); else handleShot(by,shot); };
+    rc.onError = (e) => {if(this.room!==rc)return;if(!rc.code)this.leaveRoom(e);else this.el.msg.textContent=e;this.el.roominfo.textContent=e;};
     rc.onClose = message=>{if(this.room===rc)this.leaveRoom(message);};
-    rc.onJoined = (names) => { this.roomNames = names; this.hud(); };
-    rc.onOpen = () => (create ? rc.create(name, this.gs.rules) : rc.join(code, name));
+    rc.onJoined = (names) => { if(this.room!==rc)return;this.roomNames = names; this.hud(); };
+    rc.onOpen = () => {if(this.room!==rc)return;create ? rc.create(name, this.gs.rules) : rc.join(code, name);};
     rc.connect();
     this.hud();
   }

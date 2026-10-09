@@ -10,6 +10,7 @@
       "Added firm glancing cluster-development options and outcome-based Jev guidance for useful attacking shots.",
       "Raised the default maximum break speed from 8.5 to 9.5 m/s; normal shots and custom speed settings are unchanged.",
       "Winner actions follow the game mode; Restart simulation preserves the selected AI pairing.",
+      "Kept opponent power separate from human controls, tightened the idle cue gap, and ignored callbacks from departed online rooms.",
       "Simplified turn status with one player label and capitalized action text, while preserving Jev shot-strategy details.",
       "Updated the Privacy Notice and data inventory for current account, sign-in, usage, and retention behavior.",
       "Corrected Terms to describe monthly Jev allowances; existing users will be asked to accept the updated Terms."

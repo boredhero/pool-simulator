@@ -85,3 +85,20 @@ it('side spin is symmetric around a corner and draw raises the cue only as neede
   expect(a).toBeCloseTo(cueElevation(.08,.08,Math.PI/4,0,[],-.4,-.3),12);
   expect(cueElevation(BALL_R,.635,0,0,[],0,-.55)).toBeGreaterThan(cueElevation(BALL_R,.635,0,0,[]));
 });
+
+it('keeps the same touching-cluster elevation throughout the rendered pullback and strike',()=>{
+  const c=cases.find(c=>c.name==='dense touching cluster full stroke')!;
+  const balls=c.balls.map(b=>({...b,potted:false}));
+  const e=cueElevation(c.x,c.y,c.aim,0,balls),{tip,axis}=shaft(c,e);
+  expect(cueElevation(c.x,c.y,c.aim,.2,balls)).toBeCloseTo(e,10);
+  for(const pull of [0,.012,.07,.12,.192,.2]) {
+    const renderedTip=tip.clone().addScaledVector(axis,pull);
+    for(const ball of balls) {
+      const center=new Vector3(ball.x-TABLE_W/2,BALL_R,ball.y-TABLE_H/2);
+      for(let s=0;s<=CUE_LENGTH;s+=.002) {
+        const clearance=center.distanceTo(renderedTip.clone().addScaledVector(axis,s))-BALL_R-(.006+.006*s);
+        expect(clearance,`pull ${pull}, shaft ${s}`).toBeGreaterThan(-1e-6);
+      }
+    }
+  }
+});
