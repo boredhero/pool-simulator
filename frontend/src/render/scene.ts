@@ -276,6 +276,29 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
     scene.add(mesh); return mesh;
   });
 
+  // A bold, two-tone target and camera-facing label distinguish the chosen
+  // pocket from the thin rings that merely indicate available choices.
+  const calledCanvas = document.createElement('canvas');
+  calledCanvas.width=256;calledCanvas.height=96;
+  const calledContext=calledCanvas.getContext('2d')!;
+  calledContext.fillStyle='#17150f';calledContext.strokeStyle='#f5cc79';calledContext.lineWidth=4;
+  calledContext.beginPath();calledContext.roundRect(3,3,250,65,16);calledContext.fill();calledContext.stroke();
+  calledContext.fillStyle='#fff4d8';calledContext.font='bold 32px sans-serif';calledContext.textAlign='center';calledContext.textBaseline='middle';
+  calledContext.fillText('CALLED',128,36);
+  calledContext.fillStyle='#f5cc79';calledContext.beginPath();calledContext.moveTo(111,73);calledContext.lineTo(145,73);calledContext.lineTo(128,94);calledContext.closePath();calledContext.fill();
+  const calledTexture=new THREE.CanvasTexture(calledCanvas);
+  calledTexture.colorSpace=THREE.SRGBColorSpace;
+  const calledTargets=pocketCenters.map(([x,z,radius],index)=>{
+    const group=new THREE.Group();group.name=`called-pocket-${index}`;group.position.set(x,.059,z);group.visible=false;
+    for(const [inner,outer,color,order] of [[1.0,1.58,0x17150f,6],[1.08,1.46,0xf5cc79,7]] as const){
+      const ring=new THREE.Mesh(new THREE.RingGeometry(radius*inner,radius*outer,64),new THREE.MeshBasicMaterial({color,depthTest:false,depthWrite:false,side:THREE.DoubleSide}));
+      ring.rotation.x=-Math.PI/2;ring.renderOrder=order;group.add(ring);
+    }
+    const label=new THREE.Sprite(new THREE.SpriteMaterial({map:calledTexture,depthTest:false,depthWrite:false,sizeAttenuation:false}));
+    label.position.y=.13;label.scale.set(.10,.0375,1);label.renderOrder=8;group.add(label);
+    scene.add(group);return group;
+  });
+
   const cueGroup = createCue();
   scene.add(cueGroup);
 
@@ -444,6 +467,7 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
       callRings.forEach((ring, i) => {
         ring.visible = visible && (pocket === null || pocket === i);
         ring.material.opacity = pocket === null ? .5 : 1;
+        calledTargets[i].visible=visible&&pocket===i;
       });
     },
     setPlace(visible, x, y, legal, zone = 'anywhere') {

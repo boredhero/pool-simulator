@@ -18,8 +18,8 @@ test('unlock requires backend success and saved preference survives reload witho
   await page.route('**/api/account/preferences',route=>{account={...account,...route.request().postDataJSON()};return route.fulfill({json:{account}});});
   await page.route('**/api/account/logout',route=>{account=null;return route.fulfill({json:{account:null}});});
   await page.goto('/');await expect(page.locator('#accountidentityname')).toHaveText('Player');
-  await code(page);await expect.poll(()=>unlocks).toBe(1);await expect(page.locator('#eastereggsdialog')).not.toBeVisible();await expect(page.locator('#eastereggssettings')).toBeHidden();
-  fail=false;await code(page);await expect(page.getByRole('heading',{name:'Easter eggs unlocked'})).toBeVisible();
+  await code(page);await expect.poll(()=>unlocks).toBe(1);await expect(page.getByRole('heading',{name:'Could not save the unlock'})).toBeVisible();await expect(page.locator('#eastereggssettings')).toBeHidden();
+  fail=false;await page.getByRole('button',{name:'Try again',exact:true}).click();await expect(page.getByRole('heading',{name:'Easter eggs unlocked'})).toBeVisible();
   await page.getByRole('button',{name:'Open Settings',exact:true}).click();
   await expect(page.locator('#chalksimenabled')).not.toBeChecked();await page.locator('#chalksimenabled').check();
   await expect.poll(()=>account.chalkSim).toBe(true);await expect(page.locator('#chalksimenabled')).toBeChecked();
@@ -31,7 +31,7 @@ test('guest code invites sign in without sending unlock, and typing in a dialog 
   await page.route('**/api/account/easter-eggs/unlock',route=>{unlocks++;return route.fulfill({status:401,json:{detail:'Sign in'}});});
   await page.goto('/');await page.locator('#accountidentity').click();await page.locator('#accountusername').focus();
   for(const key of keys)await page.keyboard.press(key);
-  await expect(page.locator('#eastereggsdialog')).not.toBeVisible();await page.locator('#accountclose').click();
+  await expect(page.locator('#eastereggsdialog')).not.toBeVisible();await page.locator('#accountclose').click();await expect(page.locator('#accountidentity')).toBeFocused();
   await code(page);await expect(page.getByRole('heading',{name:'Sign in to unlock Easter eggs'})).toBeVisible();expect(unlocks).toBe(0);await expect(page.locator('#eastereggssettings')).toBeHidden();
   await page.keyboard.press('Escape');await expect(page.locator('#eastereggsdialog')).not.toBeVisible();await expect(page.locator('canvas').first()).toBeFocused();
 });
@@ -54,4 +54,19 @@ test('preference failure rolls the checkbox back and leaves gameplay disabled',a
  await page.route('**/api/account/preferences',r=>r.fulfill({status:503,json:{detail:'Could not save your setting'}}));
  await page.goto('/');await expect(page.locator('#accountidentityname')).toHaveText('Player');await page.locator('#settingsbtn').click();await page.locator('#eastereggssettings summary').click();
  await page.locator('#chalksimenabled').click();await expect(page.locator('#chalksimstatus')).toContainText('Could not save');await expect(page.locator('#chalksimenabled')).not.toBeChecked();await expect(page.locator('#chalksimenabled')).toBeEnabled();await expect(page.locator('#chalkcontrols')).toBeHidden();
+});
+
+
+test('unlock works after closing account settings with HUD button focus and uppercase letters',async({page})=>{
+  let account={id:'focus',username:'Player',createdAt:1,premium:false,isAdmin:false,easterEggsEnabled:false,chalkSim:false};
+  let unlocks=0;
+  await page.route('**/api/account',route=>route.fulfill({json:{account,stats:null}}));
+  await page.route('**/api/account/easter-eggs/unlock',route=>{unlocks++;account={...account,easterEggsEnabled:true};return route.fulfill({json:{account}});});
+  await page.goto('/');await expect(page.locator('#accountidentityname')).toHaveText('Player');
+  await page.locator('#accountidentity').click();await page.locator('#accountclose').click();
+  await expect(page.locator('#accountidentity')).toBeFocused();
+  for(const key of keys.slice(0,8))await page.keyboard.press(key);
+  await page.keyboard.press('Shift+b');await page.keyboard.press('Shift+a');
+  await expect(page.getByRole('heading',{name:'Easter eggs unlocked'})).toBeVisible();
+  expect(unlocks).toBe(1);expect(account.chalkSim).toBe(false);
 });

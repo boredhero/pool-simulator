@@ -54,6 +54,7 @@ const freshEv = (): ShotEvents => ({
 export class Game {
   easterEggs?:EasterEggsPanel;
   private chalkPending=0;
+  private jevShotStatus: string | null = null;
   private chalkButton=document.createElement('button');
   private chalkInfo=document.createElement('span');
   private chalkBar=document.createElement('div');
@@ -451,6 +452,29 @@ export class Game {
   }
 
   wire(canvas: HTMLCanvasElement): void {
+    const cancelPull = () => { this.touchAim=false; this.pulling=false; this.pressPt=null; };
+    let cancelledPull=false;
+    const cancelWithSecondary=(event:PointerEvent)=>{
+      if(event.pointerType!=='mouse')return;
+      // Chorded buttons arrive as pointermove, not a second pointerdown.
+      if(this.pulling&&((event.buttons&2)!==0||event.button===2)){
+        cancelledPull=true;cancelPull();this.placementPress=null;
+      }
+      if(cancelledPull){
+        if(event.buttons===0){cancelledPull=false;return;}
+        event.preventDefault();event.stopImmediatePropagation();
+      }
+    };
+    canvas.addEventListener('pointerdown',cancelWithSecondary,true);
+    canvas.addEventListener('pointermove',cancelWithSecondary,true);
+    canvas.addEventListener('contextmenu',event=>{
+      if(!this.pulling&&!cancelledPull)return;
+      cancelledPull=true;cancelPull();this.placementPress=null;
+      event.preventDefault();event.stopImmediatePropagation();
+    },true);
+    // Let pointerup reach the camera controls so their pointer capture is freed.
+    addEventListener('pointerup',event=>{if(event.pointerType==='mouse'&&event.buttons===0)cancelledPull=false;},true);
+    addEventListener('blur',()=>{cancelledPull=false;cancelPull();this.pointers.clear();});
     const aimAt = (cx: number, cy: number) => {
       if(!this.humanCueControls())return;
       if (this.mode === 'place') {
@@ -490,7 +514,7 @@ export class Game {
       if (!this.pulling && (e.pointerType === 'mouse' || this.touchAim)) aimAt(p[0], p[1]); // aim locks once the pull starts
     });
     canvas.tabIndex=0;
-    canvas.setAttribute('aria-label','Pool table. Enter takes a shot; Space raises the camera, Left Shift lowers it.');
+    canvas.setAttribute('aria-label','Pool table. Secondary click cancels a drawn-back shot. Enter takes a shot; Space raises the camera, Left Shift lowers it.');
     canvas.addEventListener('pointerdown', (e) => {
       if(!document.querySelector('dialog[open]'))canvas.focus({preventScroll:true});
       this.sfx.unlock();
@@ -533,7 +557,6 @@ export class Game {
         this.hoverPt = p;
       }
     });
-    const cancelPull = () => { this.touchAim=false; this.pulling = false; this.pressPt = null; };
     this.scene.controls.addEventListener('start',()=>{cancelPull();this.placementPress=null;});
     canvas.addEventListener('pointerup', (e) => {
       this.pointers.delete(e.pointerId);
@@ -707,6 +730,9 @@ export class Game {
   }
 
   applyJevState(state: RoomState): void {
+    // Strategy describes the shot being animated, not the next player's turn.
+    if(this.jevShotStatus!==null&&this.el.opponentstatus.textContent===this.jevShotStatus)this.el.opponentstatus.textContent='';
+    this.jevShotStatus=null;
     this.applyServerState(state);this.roomNames=null;
     this.mode=state.winner!==null?'over':state.ball_in_hand?'place':'aim';
     if(this.jevGame)this.jevGame.revision=state.revision;
@@ -723,6 +749,7 @@ export class Game {
     const cue=this.cue();
     const shot=opponent?undefined:{aim:this.angle,power,tipX:this.tipX,tipY:this.tipY,
       calledBall:this.calledBall,calledPocket:this.calledPocket,x:cue.x,y:cue.y};
+    this.jevShotStatus=null;
     this.el.opponentstatus.textContent=shot?'Your shot · syncing with the server…':'';
     // Predict a human stroke immediately, as online rooms do. Only the server
     // result may advance the turn, award a win, or allow the next shot.
@@ -750,6 +777,7 @@ export class Game {
         result.source==='cpu-fallback'?'Jev AI unavailable or capacity reached · CPU took this shot':
         result.source==='planner'?(this.simMode==='jev-cpu'&&(result.by??state.current)===1?'':`Jev AI selected a ${result.family??'planned'} shot · no model choice needed`):
         this.account?.premium?'Premium · Unlimited Jev AI':'Monthly Jev allowance';
+      this.jevShotStatus=opponent&&(result.source==='jev'||result.source==='planner')?this.el.opponentstatus.textContent:null;
     } catch(error) {
       if(valid()){
         if(this.mode!=='rolling')this.mode='wait';
@@ -931,7 +959,7 @@ export class Game {
     const aiming = this.mode === 'aim' && !this.cue().potted && this.humanCueControls();
     const pulling = this.pulling && aiming;
     const pull = 0.012 + (pulling ? this.pullPower() * 0.18 : 0);
-    this.scene.setCall(this.calledPocket, aiming && callRequired(this.gs));
+    this.scene.setCall(this.calledPocket, callRequired(this.gs) && (aiming || ((this.mode==='rolling'||this.mode==='wait')&&this.calledPocket!==null)));
     if(presented&&this.opponentAction){
       const pose=cuePresentation(this.opponentAction.elapsed,presented.power,this.opponentAction.reduced);
       this.scene.setCue(true,presented.placement.x,presented.placement.y,presented.aim,pose.pull,presented.tipX,presented.tipY,presented.elevation);
