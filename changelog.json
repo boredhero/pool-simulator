@@ -3,7 +3,7 @@
     "version": "1.5.4",
     "date": "2026-10-09",
     "title": "Mobile header layout",
-    "changes": ["Keep the mobile account button readable when additional game controls are visible."]
+    "changes": ["Keep the mobile account button readable when additional game controls are visible.", "Auto camera follows the shot direction for AI and online opponents when the view is misaligned."]
   },
   {
     "version": "1.5.3",
