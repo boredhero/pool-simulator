@@ -111,9 +111,10 @@ test('a response arriving during playback queues final state without replaying t
 
 test('failed human sync settles without awarding a result and resumes authoritative state',async({page})=>{
   const state=await setup(page);
-  await page.route('**/api/opponents/jev/games/latency/turn',route=>route.fulfill({status:503,json:{detail:'Temporarily unavailable'}}));
+  await page.route('**/api/opponents/jev/games/latency/turn',route=>route.fulfill({status:503,headers:{'X-Request-ID':'0123456789abcdef01234567'},json:{detail:'Temporarily unavailable'}}));
   await page.evaluate(()=>{const g=(window as any).__pool;g.fire(.2);});
   await expect(page.locator('#opponentstatus')).toContainText('Temporarily unavailable');
+  await expect(page.locator('#opponentstatus')).toContainText('Diagnostic ID: 0123456789abcdef01234567');
   await settlePrediction(page);
   expect(await page.evaluate(()=>{const g=(window as any).__pool;return{mode:g.mode,current:g.gs.current,revision:g.jevGame.revision,winner:g.gs.winner};})).toEqual({mode:'wait',current:0,revision:0,winner:null});
   await page.route('**/api/opponents/jev/games',route=>route.fulfill({json:{id:'latency',created:false,state,expiresAt:null}}));
@@ -170,4 +171,18 @@ test('Jev strategy belongs to its animated shot and clears before the human turn
   await settlePrediction(page);
   await expect.poll(()=>page.evaluate(()=>(window as any).__pool.gs.current)).toBe(0);
   await expect(page.locator('#opponentstatus')).toHaveText('');
+});
+
+for(const reason of ['provider_timeout','provider_rate_limited','invalid_selection','budget_exhausted'])test(`Jev fallback ${reason} surfaces its diagnostic ID`,async({page})=>{
+  const state=await setup(page);await page.emulateMedia({reducedMotion:'reduce'});
+  await page.route('**/api/opponents/jev/games/latency/turn',route=>route.fulfill({headers:{'X-Request-ID':'0123456789abcdef01234567'},json:{
+    state,by:1,source:reason==='budget_exhausted'?'budget-fallback':'cpu-fallback',fallbackReason:reason,placement:{x:1,y:.6},
+    shot:{aim:.35,power:.3,tipX:0,tipY:0,calledBall:null,calledPocket:null},
+  }}));
+  await page.evaluate(()=>{const g=(window as any).__pool;g.gs.current=1;void g.playJevTurn();});
+  const expected={provider_timeout:'timed out',provider_rate_limited:'is busy',invalid_selection:'unusable choice',budget_exhausted:'allowance and completion grace used'}[reason]!;
+  await expect(page.locator('#opponentstatus')).toContainText(expected);
+  await expect(page.locator('#opponentstatus')).toContainText('CPU');
+  await expect(page.locator('#opponentstatus')).toContainText('Diagnostic ID: 0123456789abcdef01234567');
+  await settlePrediction(page);
 });

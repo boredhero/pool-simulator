@@ -22,7 +22,7 @@ import { TableOptions } from './tableOptions';
 import { allAsleep, strike, type Ball, type ShotEvents } from '../sim/physics';
 import { applyShot, beginShot, callRequired, canPlace, legalTargets, newGame, placeCue, type GameState } from '../sim/rules';
 import { planCpuTurn } from '../sim/cpu';
-import { jevRequest } from '../sim/jev';
+import { jevRequest, jevFallbackNotice } from '../sim/jev';
 import { Sfx } from './sfx';
 import { POCKETS, TABLE_H, TABLE_W } from '../sim/table';
 import { init, type SceneHandle } from '../render/scene';
@@ -777,6 +777,8 @@ export class Game {
     try {
       const result=await jevRequest(`/games/${game.id}/turn`,{revision:game.revision,shot},controller.signal);
       if(!valid())return;
+      const fallbackNotice=jevFallbackNotice(result);
+      if(fallbackNotice)this.el.opponentstatus.textContent=fallbackNotice;
       if(opponent){
         const selected=freezeShot({...result.shot,placement:result.placement});
         if(!await this.showOpponentShot(selected,valid)||!valid())return;
@@ -789,11 +791,11 @@ export class Game {
         try {this.fire(selected.power,selected.vmax,selected.elevation,selected);} finally {this.jevPlayback=false;}
       }
       this.pendingNetwork.push(()=>{if(valid())this.applyJevState(result.state);});
-      this.el.opponentstatus.textContent=result.source==='jev'?`Jev AI selected a ${result.family??'planned'} shot`:
+      this.el.opponentstatus.textContent=fallbackNotice??(result.source==='jev'?`Jev AI selected a ${result.family??'planned'} shot`:
         result.source==='budget-fallback'?'Monthly allowance and completion grace used · CPU is finishing this rack':
         result.source==='cpu-fallback'?'Jev AI unavailable or capacity reached · CPU took this shot':
         result.source==='planner'?(this.simMode==='jev-cpu'&&(result.by??state.current)===1?'':`Jev AI selected a ${result.family??'planned'} shot · no model choice needed`):
-        this.account?.premium?'Premium · Unlimited Jev AI':'Monthly Jev allowance';
+        this.account?.premium?'Premium · Unlimited Jev AI':'Monthly Jev allowance');
       this.jevShotStatus=opponent&&(result.source==='jev'||result.source==='planner')?this.el.opponentstatus.textContent:null;
     } catch(error) {
       if(valid()){

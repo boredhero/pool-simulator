@@ -7,7 +7,10 @@ import logging.handlers
 import os
 import shutil
 import time
+from contextvars import ContextVar
 from pathlib import Path
+
+request_id_context = ContextVar("request_id", default=None)
 
 
 class RetainedLog(logging.handlers.BaseRotatingHandler):
@@ -77,6 +80,8 @@ class RetainedLog(logging.handlers.BaseRotatingHandler):
 class JsonLog(logging.Formatter):
     def format(self, record):
         result = {"time": record.created, "level": record.levelname, "event": record.getMessage()}
+        if request_id_context.get():
+            result["request_id"] = request_id_context.get()
         for key in (
             "request_id",
             "method",
@@ -85,6 +90,9 @@ class JsonLog(logging.Formatter):
             "duration_ms",
             "error_type",
             "game_id",
+            "reason",
+            "revision",
+            "seat",
         ):
             if hasattr(record, key):
                 result[key] = getattr(record, key)

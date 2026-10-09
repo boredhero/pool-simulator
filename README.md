@@ -547,6 +547,10 @@ delete oldest archives first to keep storage below 100 MiB (reserving one active
 10 MiB file). The handler supports the current single-process deployment; multiple
 workers require a dedicated log collector. Request logs use route templates, never
 raw paths, queries, bodies, credentials, or cookies. Health-check access noise is omitted.
+The `X-Request-ID` response header correlates HTTP and nested service logs. Jev,
+account, and admin request errors display diagnostic references. Jev fallback
+notices distinguish timeouts, provider throttling/errors, unusable choices, and
+exhausted budgets; warning events carry the same request ID plus game/turn/seat.
 
 Docker's separate `local` stdout/stderr cache compresses rotated files and keeps
 three 10 MiB files, oldest first. Docker does not provide an age-based retention

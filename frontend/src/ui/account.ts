@@ -1,3 +1,4 @@
+import {diagnosticId,diagnosticMessage} from '../diagnostics';
 import {setupAccountSections,showAccountSection,setAccountSectionsBusy} from './accountSections';
 import {GooglePanel} from './google';
 import {UsernameControls} from './usernameControls';
@@ -69,7 +70,7 @@ export class AccountPanel {
   private async request(path:string,payload?:object) {
     const response=await fetch('/api/account'+path,{method:payload?'POST':'GET',credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(12000),headers:payload?{'Content-Type':'application/json','X-Pool-Request':'1'}:undefined,body:payload?JSON.stringify(payload):undefined});
     const data=await response.json();
-    if(!response.ok)throw new Error(typeof data.detail==='string'?data.detail:'Please check the form and try again.');
+    if(!response.ok)throw new Error(diagnosticMessage(typeof data.detail==='string'?data.detail:'Please check the form and try again.',diagnosticId(response)));
     return data;
   }
   async savePreferences(patch:{chalkSim?:boolean;settings?:Record<string,string>}):Promise<Account|null> {

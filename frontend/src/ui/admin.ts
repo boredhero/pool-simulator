@@ -1,3 +1,4 @@
+import {diagnosticId,diagnosticMessage} from '../diagnostics';
 import {defaultBudgetControls,accountBudgetControls} from './budgetControls';
 import type { Account } from './account';
 import './admin.css';
@@ -58,7 +59,7 @@ export class AdminPanel {
       if(path==='/overview'||response.status!==404)this.setAccount(null);
       throw new Error('Admin access is unavailable. Refresh your account to continue.');
     }
-    if(!response.ok){const data=await response.json().catch(()=>null);throw new Error(typeof data?.detail==='string'?data.detail:'Could not complete the admin request. Please try again.');}
+    if(!response.ok){const data=await response.json().catch(()=>null);throw new Error(diagnosticMessage(typeof data?.detail==='string'?data.detail:'Could not complete the admin request. Please try again.',diagnosticId(response)));}
     return response.json();
   }
   private async load() {

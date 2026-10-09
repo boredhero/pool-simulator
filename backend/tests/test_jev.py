@@ -161,6 +161,7 @@ def test_provider_failure_finishes_turn_with_cpu(monkeypatch):
     )
     assert response.status_code == 200, response.text
     assert response.json()["source"] == "cpu-fallback"
+    assert response.json()["fallbackReason"] == "provider_error"
     assert "private" not in response.text
     assert not jev.active_games
     with Session() as db:
@@ -267,6 +268,7 @@ def test_invalid_choice_with_valid_usage_is_metered(monkeypatch):
     )
     assert response.status_code == 200, response.text
     assert response.json()["source"] == "cpu-fallback"
+    assert response.json()["fallbackReason"] == "invalid_selection"
     with Session() as db:
         row = db.get(JevGame, game["id"])
         assert (row.requests, row.input_tokens, row.unmetered_requests) == (1, 500, 0)

@@ -88,3 +88,39 @@ def test_failed_request_returns_safe_correlation_id():
         assert response.headers["x-content-type-options"] == "nosniff"
     finally:
         app.router.routes.remove(route)
+
+
+def test_nested_service_logs_share_request_id_and_clear_context():
+    from app.observability import request_id_context
+
+    records = []
+
+    class Capture(logging.Handler):
+        def emit(self, record):
+            records.append(json.loads(JsonLog().format(record)))
+
+    logger = logging.getLogger("pool.jev")
+    capture = Capture()
+    logger.addHandler(capture)
+
+    async def service():
+        logger.warning("jev_fallback", extra={"reason": "provider_timeout", "game_id": "test-game"})
+        return {"ok": True}
+
+    app.add_api_route("/api/test-service-context", service)
+    route = app.router.routes.pop()
+    app.router.routes.insert(0, route)
+    try:
+        with TestClient(app) as client:
+            first = client.get("/api/test-service-context")
+            second = client.get("/api/test-service-context")
+        assert [r["request_id"] for r in records] == [
+            first.headers["x-request-id"],
+            second.headers["x-request-id"],
+        ]
+        assert records[0]["request_id"] != records[1]["request_id"]
+        assert records[0]["reason"] == "provider_timeout"
+        assert request_id_context.get() is None
+    finally:
+        logger.removeHandler(capture)
+        app.router.routes.remove(route)

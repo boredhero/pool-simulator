@@ -88,6 +88,7 @@ async def validation_error(request, exc):
 @app.middleware("http")
 async def diagnostics(request, call_next):
     request_id = secrets.token_hex(12)
+    context_token = observability.request_id_context.set(request_id)
     start = time.monotonic()
     status = 500
     logger = logging.getLogger("pool.http")
@@ -116,6 +117,8 @@ async def diagnostics(request, call_next):
                     "duration_ms": round((time.monotonic() - start) * 1000, 2),
                 },
             )
+
+        observability.request_id_context.reset(context_token)
 
 
 @app.middleware("http")
