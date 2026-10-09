@@ -11,7 +11,7 @@ BAR_RULES = dict(
     assignOnBreak=True,
     strictBreak=False,
     normalMax=3.5,
-    breakMax=8.5,
+    breakMax=9.5,
 )
 TOURNAMENT_RULES = {
     **BAR_RULES,

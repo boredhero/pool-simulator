@@ -91,10 +91,31 @@ test('monthly budgets show last activity and save defaults, limits and top-ups',
  await page.goto('/');await page.locator('#settingsbtn').click();await page.locator('#adminbtn').click();
  const panel=page.locator('#admindialog');await expect(page.locator('#adminrows')).toContainText('Last active');
  await expect(panel).toContainText('TypeSafe prepaid balance: unavailable');
- const defaultForm=panel.locator('.budget-default form');await defaultForm.locator('input').fill('0.10');await defaultForm.getByRole('button',{name:'Save',exact:true}).click();
+ const defaultForm=panel.locator('.budget-default form');await defaultForm.locator('input').fill('0.10');await defaultForm.getByRole('button',{name:'Save default',exact:true}).click();
  await expect.poll(()=>calls.length).toBe(1);expect(calls[0].body.dollars).toBe('0.10');expect(calls[0].body.requestId).toBeTruthy();
  await panel.getByRole('button',{name:'Usage details for BudgetPlayer'}).click();await expect(panel).toContainText('Recent request ledger');await expect(panel).toContainText('$0.000042');
- for(const [i,value] of [[0,'0.25'],[1,'0.05']] as const){const form=panel.locator('.budget-account form').nth(i);await form.locator('input').fill(value);await form.getByRole('button',{name:'Save',exact:true}).click();}
+ for(const [i,value] of [[0,'0.25'],[1,'0.05']] as const){const form=panel.locator('.budget-account form').nth(i);await form.locator('input').fill(value);await form.getByRole('button',{name:i===1?'Add credit':'Save allowance',exact:true}).click();}
  await expect.poll(()=>calls.length).toBe(3);expect(calls[1].path).toContain('/budget/limit');expect(calls[2].path).toContain('/budget/topup');
  await page.setViewportSize({width:390,height:844});expect((await panel.boundingBox())!.width).toBeLessThanOrEqual(390);await expect(panel).toContainText('$0.05 in top-ups');
+});
+
+test('budget top-up preserves retry identity, freezes pending amount, and prevents duplicate submission',async({page})=>{
+ const budget={month:'2026-10',baseNano:150000000,topupsNano:0,limitNano:150000000,spentNano:0,reservedNano:0,remainingNano:150000000,graceNano:20000000,unlimited:false,resetsAt:1793491200};
+ const calls:any[]=[];let release!:()=>void;const gate=new Promise<void>(resolve=>release=resolve);
+ await page.route('**/api/account',r=>r.fulfill({json:{account:owner,stats:null}}));
+ await page.route('**/api/admin/**',async r=>{
+  const path=new URL(r.request().url()).pathname;
+  if(r.request().method()==='POST'){
+   calls.push(r.request().postDataJSON());if(calls.length===1)return r.fulfill({status:503,json:{detail:'Temporary failure. Retry the same request.'}});
+   await gate;return r.fulfill({json:{...budget,topupsNano:50000000,limitNano:200000000}});
+  }
+  if(path.endsWith('/overview'))return r.fulfill({json:{accounts:1,premium:0,usage,lifetimeAttempts:12,budgetDefaultNano:150000000}});
+  if(path.endsWith('/accounts/player'))return r.fulfill({json:{budget,lifetimeAttempts:12,lifetimeCompleted:10,games:[],audit:[],requests:[],budgetAdjustments:[]}});
+  return r.fulfill({json:{total:1,accounts:[{id:'player',username:'BudgetPlayer',createdAt:1780000000,premium:false,isAdmin:false,usage}]}});
+ });
+ await page.goto('/');await page.locator('#settingsbtn').click();await page.locator('#adminbtn').click();await page.getByRole('button',{name:'Usage details for BudgetPlayer'}).click();
+ const form=page.locator('.budget-account form').nth(1),input=form.locator('input'),button=form.getByRole('button',{name:'Add credit'});
+ await input.fill('0.05');await button.click();await expect(form).toContainText('Temporary failure');await button.click();await expect(input).toBeDisabled();await expect(button).toBeDisabled();
+ await form.dispatchEvent('submit');expect(calls).toHaveLength(2);expect(calls[0].requestId).toBe(calls[1].requestId);release();
+ await expect(form).toContainText('Added $0.05');await expect(input).toHaveValue('');await expect(input).toBeEnabled();await expect(form.locator('[role=status]')).toBeFocused();
 });

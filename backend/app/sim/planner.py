@@ -134,12 +134,22 @@ def _development_seeds(gs):
         if not _inside(gx, gy) or not clear(cue.x, cue.y, gx, gy, gs.balls, [0, ball.id]):
             continue
         pocket = min(range(6), key=lambda i: math.dist((ball.x, ball.y), POCKETS[i][:2]))
-        # Add energy for travel before cluster impact; the preview decides usefulness.
-        for speed in (2.05, 2.85):
+        # Keep both centered energy samples, then offer glancing contacts that
+        # let the cue continue through/along the cluster instead of always
+        # stopping head-on. Every option still needs the settled legal preview.
+        ux, uy = (ball.x - cue.x) / distance, (ball.y - cue.y) / distance
+        for side, speed in ((0, 2.05), (0, 2.85), (-0.55, 2.85), (0.55, 2.85)):
+            contact = math.sqrt(1 - side * side)
+            point = (
+                ball.x - 2 * BALL_R * (ux * contact + uy * side),
+                ball.y - 2 * BALL_R * (uy * contact - ux * side),
+            )
+            if not _inside(*point) or not clear(cue.x, cue.y, *point, gs.balls, [0, ball.id]):
+                continue
             launch = math.sqrt(speed * speed + 2 * 0.01 * 9.81 * max(0, distance - 0.75))
             shot = _shot(
                 cue,
-                (ball.x, ball.y),
+                point,
                 ball,
                 pocket,
                 "development",
@@ -147,8 +157,9 @@ def _development_seeds(gs):
                 neighbors - distance,
             )
             shot["pace"] = "controlled firm" if speed == 2.05 else "strong"
+            shot["contactStyle"] = "glancing" if side else "head-on"
             options.append(shot)
-    return sorted(options, key=lambda s: -s["score"])[:4]
+    return sorted(options, key=lambda s: -s["score"])[:6]
 
 
 def _geometry(gs):
@@ -249,7 +260,7 @@ def _geometry(gs):
     for family in ("kick", "safety", "bank", "combination"):
         seeds.extend(special[family][1:3])
     development = _development_seeds(gs)
-    return seeds[:1] + development[:2] + seeds[1:] + development[2:]
+    return seeds[:1] + development[:2] + seeds[1:3] + development[2:4] + seeds[3:] + development[4:]
 
 
 def _placements(gs):

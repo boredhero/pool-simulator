@@ -139,7 +139,7 @@ test('kitchen guide and locally persisted sight shape', async ({page})=>{
   await openGame(page);
   expect(await page.locator('#railsights').inputValue()).toBe('diamonds');
   await page.locator('#settingsbtn').click();
-  await page.locator('#railsights').selectOption('double-diamonds');
+  await page.locator('summary').filter({hasText:'Appearance'}).click();await page.locator('#railsights').selectOption('double-diamonds');
   await openGame(page, true);
   expect(await page.locator('#railsights').inputValue()).toBe('double-diamonds');
   await page.evaluate(()=>{const g=(window as any).__pool;g.gs.ballInHand=true;g.gs.placement='kitchen';g.gs.kitchenShot=true;g.mode='place';g.frame();});
@@ -172,7 +172,7 @@ test('dismissal and independent playback preference survive reload',async({page}
   await expect(page.locator('#helppanel')).toBeHidden();
   await page.locator('#helpbtn').click();await expect(page.locator('#helppanel')).toBeVisible();
   await page.locator('#settingsbtn').click();await expect(page.locator('#fastforward')).not.toBeChecked();
-  await page.locator('#fastforward').check();await page.locator('#rulespreset').selectOption('custom');
+  await page.locator('summary').filter({hasText:'Camera & playback'}).click();await page.locator('#fastforward').check();await page.locator('#rulespreset').selectOption('custom');
   await expect(page.locator('#fastforward')).toBeChecked();await openGame(page, true);
   await expect(page.locator('#helppanel')).toBeHidden();
   expect(await page.evaluate(()=>(window as any).__pool.options.fastForward)).toBe(true);
@@ -226,6 +226,7 @@ test('close zoom cannot orbit the camera inside the table',async({page})=>{
 test('cue ball markings persist without changing the physical ball state',async({page})=>{
   await openGame(page);await page.locator('#settingsbtn').click();
   const before=await page.evaluate(()=>JSON.stringify((window as any).__pool.gs.balls));
+  await page.locator('summary').filter({hasText:'Appearance'}).click();
   for(const style of ['red-ring','blue-dot','black-triangles','plain','red-spots'])await page.locator('#cueappearance').selectOption(style);
   expect(await page.evaluate(()=>JSON.stringify((window as any).__pool.gs.balls))).toBe(before);
   await openGame(page,true);
@@ -287,7 +288,7 @@ test('camera preferences adapt to mobile and persist an explicit override',async
   await page.keyboard.press('Escape');
   expect(await page.evaluate(()=>(window as any).__pool.cameraMode)).toBe(false);
   await page.locator('#settingsbtn').click();
-  await page.locator('#autocamera').uncheck();
+  await page.locator('summary').filter({hasText:'Camera & playback'}).click();await page.locator('#autocamera').uncheck();
   await openGame(page,true);
   await expect(page.locator('#autocamera')).not.toBeChecked();
 });
@@ -345,7 +346,7 @@ test('CPU name appears in turn, foul, rolling, and winner messages',async({page}
   await openGame(page);
   for(const [mode,message,expected] of [
     ['place','Foul: No contact · Player 2, place anywhere','Foul: No contact · CPU, place anywhere'],
-    ['rolling','Player 2 to shoot','CPU · shot in motion'],
+    ['rolling','Player 2 to shoot','Shot in motion'],
     ['over','Player 2 wins!','CPU wins!'],
   ]) {
     const state=await page.evaluate(({mode,message})=>{const g=(window as any).__pool;g.cpuOpponent=true;g.gs.current=1;g.gs.message=message;g.mode=mode;g.hud();return{turn:document.getElementById('turn')!.textContent,message:document.getElementById('msg')!.textContent};},{mode,message});
@@ -726,7 +727,8 @@ test('Jev cue presentation uses authoritative placement and strike before final 
     return {cues,strikes,mode,revision:g.jevGame.revision,current:g.gs.current};
   });
   expect(result.mode).toBe('rolling');expect(result.strikes).toHaveLength(1);
-  expect(result.strikes[0]).toEqual({aim:shot.aim,tipX:0,tipY:.1,x:.3,y:.4,args:[.35,3.5,.12]});
+  // Opponent spin travels in the immutable shot, leaving the human's HUD unchanged.
+  expect(result.strikes[0]).toEqual({aim:shot.aim,tipX:0,tipY:0,x:.3,y:.4,args:[.35,3.5,.12,{...shot,placement:{x:.3,y:.4}}]});
   expect(result.cues.length).toBeGreaterThan(2);
   expect(result.cues.every((c:any[])=>c[1]===.3&&c[2]===.4&&c[3]===shot.aim&&c[7]===shot.elevation)).toBe(true);
   expect(result.revision).toBe(1);expect(result.current).toBe(0);
@@ -1004,4 +1006,16 @@ test('mobile circular touch aiming rotates repeatedly both ways without a foregr
     await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
     expect(await page.evaluate(()=>{const g=(window as any).__pool;return{mode:g.mode,speed:Math.hypot(g.cue().vx,g.cue().vy)};})).toEqual({mode:'aim',speed:0});
   }
+});
+
+for(const [simulation,seat,name] of [['jev-cpu',1,'CPU'],['jev-cpu',0,'Jev AI'],['jev-jev',1,'Jev AI 2']] as const)test(`pending ${simulation} seat ${seat} names the actual planner`,async({page})=>{
+  await openGame(page);
+  await page.route('**/api/opponents/jev/games/status-test/turn',route=>route.abort());
+  const status=await page.evaluate(({simulation,seat})=>{
+    const g=(window as any).__pool;g.coin.cancel();g.cancelOpponent();g.simMode=simulation;g.cpuOpponent=true;g.jevOpponent=true;
+    g.jevGame={id:'status-test',revision:0};g.gs.current=seat;g.mode='aim';
+    void g.playJevTurn();
+    return {name:document.getElementById('turn')!.textContent,primary:document.getElementById('msg')?.textContent,secondary:document.getElementById('opponentstatus')!.textContent};
+  },{simulation,seat});
+  expect(status).toEqual({name,primary:'Choosing a shot',secondary:''});
 });

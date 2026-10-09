@@ -157,3 +157,38 @@ def test_development_description_reports_outcomes_not_success_probabilities():
     assert description["development_result"] == "congestion opened with new direct shot options"
     assert description["cluster_development"]["new_shootable_targets"] > 0
     assert description["opponent_development"]["new_clear_object_ball_routes"] == 0
+
+
+def test_glancing_cluster_option_adds_useful_energy_and_a_distinct_cue_leave():
+    gs = fixture_state(CLUSTERS[0])
+    seeds = _development_seeds(gs)
+    glancing = next(s for s in seeds if s["contactStyle"] == "glancing")
+    straight = next(s for s in seeds if s["contactStyle"] == "head-on" and s["pace"] == "strong")
+    firm = _preview(gs, glancing, None)
+    soft = _preview(gs, {**glancing, "power": 0.42}, None)
+    head_on = _preview(gs, straight, None)
+    assert firm["evidence"]["legal"] and not firm["evidence"]["scratch"]
+    assert not soft["evidence"]["legal"]  # A weak glance fails to drive a ball to a rail.
+    assert firm["evidence"]["clusterLinksOpened"] > 0
+    assert firm["evidence"]["newTargetsAvailable"] > 0
+    assert firm["evidence"]["nextShots"] > soft["evidence"]["nextShots"]
+    assert firm["evidence"]["cueFinish"] != head_on["evidence"]["cueFinish"]
+    assert firm["power"] == straight["power"]  # New contact geometry, no blanket power boost.
+    assert 2.8 < firm["evidence"]["launchSpeed"] < 3.0
+
+
+def test_creative_contacts_are_previewed_within_existing_trial_budget(monkeypatch):
+    import app.sim.planner as planner
+
+    attempted = []
+    preview = planner._preview
+
+    def record(gs, shot, deadline):
+        attempted.append(shot)
+        return preview(gs, shot, deadline)
+
+    monkeypatch.setattr(planner, "_preview", record)
+    choices = planner.plan_shots(fixture_state(CLUSTERS[0]), max_trials=8, budget_seconds=None)
+    assert len(attempted) == 8
+    assert any(s.get("contactStyle") == "glancing" for s in attempted)
+    assert all(s["evidence"]["legal"] and not s["evidence"]["lost"] for s in choices)

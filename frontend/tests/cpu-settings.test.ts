@@ -40,7 +40,7 @@ it('calibrates zero-budget geometry to physical speed at both custom cap boundar
   expect(low.power).toBe(1);expect(low.verified).toBe(false);
   expect(shootSpeed(high.power,8.5)).toBeCloseTo(shootSpeed(standard.power,3.5),10);
 });
-it.each([1,12])('executes a full break at cap %s even when strict break cannot be satisfied',breakMax=>{
+it.each([1,9.5,12])('executes a full break at cap %s even when strict break cannot be satisfied',breakMax=>{
   const gs=newGame(1,{preset:'custom',breakMax,strictBreak:true});
   const shot=planCpuTurn(gs,1,Infinity)!;expect(shot.power).toBe(1);execute(gs,shot);
 });

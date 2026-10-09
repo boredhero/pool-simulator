@@ -34,15 +34,33 @@ function event(name:string) {
 export function initPrivacy(options:{deferNotice?:boolean}={}) {
   const dialog=document.getElementById('privacychoices') as HTMLDialogElement;
   const notice=document.getElementById('privacynotice')!;
-  document.getElementById('privacybtn')!.addEventListener('click',()=>dialog.showModal());
+  const status=document.getElementById('privacystatus')!;
+  const accept=document.getElementById('privacyaccept') as HTMLButtonElement;
+  const reject=document.getElementById('privacyreject') as HTMLButtonElement;
+  let saving=false;
+  const currentChoice=()=>optedOut()
+    ? 'Essential only. Your browser privacy signal keeps optional analytics off.'
+    : savedPrivacyChoice()?.allow
+      ? 'Current choice: optional analytics allowed.'
+      : 'Current choice: essential only. Optional analytics is off.';
+  const open=()=>{if(!saving)status.textContent=currentChoice();accept.disabled=saving||optedOut();if(!dialog.open)dialog.showModal();};
+  document.getElementById('privacybtn')!.addEventListener('click',open);
   document.getElementById('privacyclose')!.addEventListener('click',()=>dialog.close());
-  for(const [id,allow] of [['privacyaccept',true],['privacyreject',false]] as const){
-    document.getElementById(id)!.addEventListener('click',()=>{
-      void consent(allow).then(()=>{notice.hidden=true;dialog.close();if(enabled)event('session_start');})
-        .catch(e=>{document.getElementById('privacystatus')!.textContent=e.message;});
+  for(const [button,allow] of [[accept,true],[reject,false]] as const){
+    button.addEventListener('click',async()=>{
+      if(saving)return;
+      saving=true;accept.disabled=reject.disabled=true;dialog.setAttribute('aria-busy','true');
+      status.textContent='Saving privacy choice…';
+      try{await consent(allow);notice.hidden=true;status.textContent=currentChoice();dialog.close();if(enabled)event('session_start');}
+      catch{
+        // A failed change must not restore an earlier opt-in on the next visit.
+        enabled=false;
+        try{localStorage.setItem(KEY,JSON.stringify({version:VERSION,allow:false}));}catch{/* private mode */}
+        status.textContent='Could not save your choice on the server. Optional analytics is off on this device. Please try again.';
+      }finally{saving=false;accept.disabled=optedOut();reject.disabled=false;dialog.setAttribute('aria-busy','false');}
     });
   }
-  document.getElementById('privacyreview')!.addEventListener('click',()=>dialog.showModal());
+  document.getElementById('privacyreview')!.addEventListener('click',open);
   document.getElementById('privacyessential')!.addEventListener('click',()=>{
     chooseEssentialPrivacy();
   });

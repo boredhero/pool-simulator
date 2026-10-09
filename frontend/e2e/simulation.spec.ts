@@ -6,6 +6,8 @@ for(const mobile of [false,true])test.describe(mobile?'mobile simulation':'deskt
   await acceptWelcomeBeforeLoad(page);
   await page.addInitScript(()=>{localStorage.setItem('pool:help-dismissed','1');localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-08',allow:false}));const raf=requestAnimationFrame.bind(window);window.requestAnimationFrame=cb=>raf(t=>{const g=(window as any).__pool;if(g)g.scene.renderer.render=()=>{};cb(t);});});
   await page.route('**/api/account',r=>r.fulfill({json:{account:{id:'sim-user',username:'spectator',premium:false,simEnabled:true,isAdmin:false,createdAt:1},stats:null}}));
+  const cpuJevRequests:string[]=[];
+  page.on('request',r=>{if(r.url().includes('/api/opponents/jev/'))cpuJevRequests.push(r.url());});
   await page.goto('/');await expect(page.locator('#sim-button')).toBeVisible();
   if(mobile){
    for(const viewport of [{width:320,height:740},{width:390,height:844},{width:844,height:390}]){
@@ -24,6 +26,7 @@ for(const mobile of [false,true])test.describe(mobile?'mobile simulation':'deskt
   expect(await page.evaluate(()=>{const g=(window as any).__pool;return{mode:g.simMode,controls:g.humanCueControls(),names:[g.playerName(0),g.playerName(1)]};})).toEqual({mode:'cpu-cpu',controls:false,names:['CPU 1','CPU 2']});
   // Both seats enter the real planner and cue presentation, without human input.
   for(const seat of [0,1])expect(await page.evaluate(async seat=>{const g=(window as any).__pool;g.coin.cancel();g.cancelOpponent();g.gs.current=seat;g.mode='aim';let planned=false;const show=g.showOpponentShot;g.showOpponentShot=async()=>{planned=true;return false;};await g.cpuMove();g.showOpponentShot=show;return planned;},seat)).toBe(true);
+  expect(cpuJevRequests).toEqual([]);
   const requests:any[]=[];
   await page.route('**/api/opponents/jev/games',async r=>{requests.push(r.request().postDataJSON());await r.fulfill({status:429,json:{detail:'Daily allowance reached'}});});
   for(const mode of ['jev-cpu','jev-jev']){await page.locator('#sim-button').click();await page.locator(`[data-sim-mode="${mode}"]`).click();await expect.poll(()=>requests.at(-1)?.simulation).toBe(mode);await expect(page.locator('#opponentstatus')).toContainText('Daily allowance reached');}

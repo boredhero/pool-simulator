@@ -289,6 +289,7 @@ export class Game {
     this.pulling=false;this.touchAim=false;this.pressPt=null;this.placementPress=null;
     const action={controller:new AbortController(),shot:null,elapsed:0,phase:'planning' as CuePhase,
       reduced:matchMedia('(prefers-reduced-motion: reduce)').matches};
+    this.el.opponentstatus.textContent='';
     this.opponentAction=action;this.hud();return action;
   }
 
@@ -676,7 +677,7 @@ export class Game {
     const cue=this.cue();
     const shot=opponent?undefined:{aim:this.angle,power,tipX:this.tipX,tipY:this.tipY,
       calledBall:this.calledBall,calledPocket:this.calledPocket,x:cue.x,y:cue.y};
-    this.el.opponentstatus.textContent=shot?'Your shot · syncing with the server…':'Jev AI is choosing a shot…';
+    this.el.opponentstatus.textContent=shot?'Your shot · syncing with the server…':'';
     // Predict a human stroke immediately, as online rooms do. Only the server
     // result may advance the turn, award a win, or allow the next shot.
     if(shot){
@@ -701,7 +702,7 @@ export class Game {
       this.el.opponentstatus.textContent=result.source==='jev'?`Jev AI selected a ${result.family??'planned'} shot`:
         result.source==='budget-fallback'?'Monthly allowance and completion grace used · CPU is finishing this rack':
         result.source==='cpu-fallback'?'Jev AI unavailable or capacity reached · CPU took this shot':
-        result.source==='planner'?`${this.playerName(result.by??this.gs.current)} · local ${result.family??'planned'} shot (no model choice needed)`:
+        result.source==='planner'?(this.simMode==='jev-cpu'&&(result.by??state.current)===1?'':`Jev AI selected a ${result.family??'planned'} shot · no model choice needed`):
         this.account?.premium?'Premium · Unlimited Jev AI':'Monthly Jev allowance';
     } catch(error) {
       if(valid()){
@@ -901,10 +902,10 @@ export class Game {
   private showWinner():void {
     if(this.tutorial.active||this.mode!=='over'||this.gs.winner===null){this.winnerDialog.sync(null);return;}
     if(this.opponentAction||this.jevRequest||this.pendingNetwork.length||!allAsleep(this.gs.balls))return;
-    const online=!!this.room,jev=!!this.jevGame;
+    const online=!!this.room,simulation=!online&&this.simMode!==null,jev=!!this.jevGame;
     this.winnerDialog.sync({game:this.gs,name:this.playerName(this.gs.winner),
       detail:this.gs.message.replace(/\bPlayer ([12])\b/g,(_,seat)=>this.playerName(Number(seat)-1)),
-      action:online?'New online session':jev?'Play Jev again':'Play again',
+      action:online?'New online session':simulation?'Restart simulation':jev?'Play Jev again':this.cpuOpponent?'Play CPU again':'Play again',
       note:online?'Start a fresh room and share its new invite with your friend.':jev&&!this.account?.premium?'New games use your monthly Jev allowance. Check Account settings for your remaining balance.':''});
   }
 
@@ -912,22 +913,26 @@ export class Game {
     if(this.room){
       this.leaveRoom('Starting a new online session.');
       this.el.onlinepanel.classList.add('open');this.connectRoom(true);
+    } else if(this.simMode){
+      if(!this.account?.simEnabled)throw new Error('Simulation access is no longer enabled for this account.');
+      const previous=this.gs,previousId=this.jevGame?.id,simulation=this.simMode;
+      await this.startSimulation(simulation);
+      if(this.gs===previous||(simulation!=='cpu-cpu'&&this.jevGame?.id===previousId))throw new Error(this.el.opponentstatus.textContent||'Could not restart the simulation.');
     } else if(this.jevGame){
-      const previous=this.jevGame.id;await this.startJev(true);
+      const previous=this.jevGame.id;await this.startJev(true,this.gs.rules,null);
       if(this.jevGame?.id===previous)throw new Error(this.el.opponentstatus.textContent||'Could not start another Jev game.');
-    } else if(this.simMode)await this.startSimulation(this.simMode);
-    else this.reset();
+    } else this.reset();
   }
 
   hud(): void {
     let msg = this.gs.message;
     if(this.opponentAction){
       const phase=this.opponentAction.phase;
-      msg=`${this.playerName(this.gs.current)} · ${phase==='planning'?'choosing a shot':phase==='aiming'?'lining up':phase==='pulling'?'drawing back':'striking'}`;
+      msg=phase==='planning'?'Choosing a shot':phase==='aiming'?'Lining up':phase==='pulling'?'Drawing back':'Striking';
     }
     if (!this.opponentAction&&this.mode === 'place') msg += this.cpuOpponent && (this.simMode!==null||this.gs.current === 1) && !this.room
       ? ' — planning cue placement…' : ' — tap inside the outlined area to place the cue ball';
-    else if (this.mode === 'rolling') msg = `Player ${this.gs.current + 1} · shot in motion`;
+    else if (this.mode === 'rolling') msg = 'Shot in motion';
     else if (this.mode === 'wait' && this.room) msg += ' — waiting…';
     else if (this.room && this.seat !== null && this.seat !== this.gs.current && this.mode === 'aim') msg += ' — opponent aiming…';
     if(msg.startsWith('Illegal break'))msg += ' · no ball pocketed and fewer than four object balls reached a rail';

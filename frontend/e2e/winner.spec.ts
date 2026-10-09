@@ -86,3 +86,66 @@ for(const width of [1440,390])test(`celebration graphic stays centered with fini
   await page.waitForTimeout(450);await page.screenshot({path:testInfo.outputPath('winner-celebration.png')});
   await expect(page.locator('.winner-confetti i')).toHaveCount(0,{timeout:4000});await expect(page.locator('#winnerreplay')).toBeInViewport();
 });
+
+for(const mobile of [false,true])test.describe(mobile?'mobile replay modes':'desktop replay modes',()=>{
+  if(mobile)test.use({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
+  for(const simulation of ['cpu-cpu','jev-cpu','jev-jev'] as const)test(`${simulation} restarts the same simulation through the results action`,async({page})=>{
+    await page.route('**/api/account',r=>r.fulfill({json:{account:{...account,simEnabled:true},stats:null}}));
+    await open(page);
+    const state=await page.evaluate(()=>{const g=(window as any).__pool;return {balls:g.gs.balls,current:0,groups:[null,null],open:true,return_order:[],ball_in_hand:false,break_shot:true,placement:'none',kitchen_shot:false,rules:g.gs.rules,revision:0,winner:null,message:'Player 1 to break'};});
+    const requests:any[]=[];
+    await page.route('**/api/opponents/jev/games',async r=>{requests.push(r.request().postDataJSON());await r.fulfill({json:{id:'restarted-sim',state,simulation,expiresAt:null}});});
+    await page.route('**/api/opponents/jev/games/*/shots',r=>r.fulfill({status:503,json:{detail:'Paused by test'}}));
+    await page.evaluate(simulation=>{
+      const g=(window as any).__pool;g.coin.cancel();g.cancelOpponent();g.simMode=simulation;g.cpuOpponent=true;g.jevOpponent=simulation!=='cpu-cpu';
+      g.jevGame=simulation==='cpu-cpu'?null:{id:'finished-sim',revision:1};
+      g.gs={...g.gs,winner:1,message:'Player 2 wins the rack'};g.mode='over';g.hud();
+    },simulation);
+    await expect(page.locator('#winnerreplay')).toHaveText('Restart simulation');
+    await expect(page.locator('#winnertitle')).toHaveText(simulation==='cpu-cpu'?'CPU 2 wins!':simulation==='jev-jev'?'Jev AI 2 wins!':'CPU wins!');
+    await page.locator('#winnerreplay').click();await expect(page.locator('#winnerdialog')).not.toBeVisible();
+    expect(await page.evaluate(()=>{const g=(window as any).__pool;g.coin.cancel();g.cancelOpponent();return {simulation:g.simMode,winner:g.gs.winner,human:g.humanCueControls()};})).toEqual({simulation,winner:null,human:false});
+    if(simulation==='cpu-cpu')expect(requests).toEqual([]);
+    else expect(requests).toEqual([{new_game:true,rules:state.rules,simulation}]);
+  });
+});
+
+test('simulation restart errors preserve the result and allow retry with the same pairing',async({page})=>{
+  await page.route('**/api/account',r=>r.fulfill({json:{account:{...account,simEnabled:true,premium:false},stats:null}}));
+  await open(page);
+  const requests:any[]=[];
+  await page.route('**/api/opponents/jev/games',r=>{requests.push(r.request().postDataJSON());return r.fulfill({status:429,json:{detail:'Monthly Jev allowance exhausted'}});});
+  await page.evaluate(()=>{const g=(window as any).__pool;g.coin.cancel();g.cancelOpponent();g.simMode='jev-cpu';g.cpuOpponent=g.jevOpponent=true;g.jevGame={id:'finished-sim',revision:1};g.gs={...g.gs,winner:0,message:'Player 1 wins the rack'};g.mode='over';g.hud();});
+  await expect(page.locator('#winnerreplay')).toHaveText('Restart simulation');
+  await page.locator('#winnerreplay').click();
+  await expect(page.locator('#winnerstatus')).toContainText('Monthly Jev allowance exhausted');
+  await expect(page.locator('#winnerdialog')).toBeVisible();await expect(page.locator('#winnerreplay')).toBeEnabled();
+  expect(requests[0].simulation).toBe('jev-cpu');
+  expect(await page.evaluate(()=>{const g=(window as any).__pool;return [g.simMode,g.gs.winner,g.jevGame.id];})).toEqual(['jev-cpu',0,'finished-sim']);
+});
+
+test('local and CPU replay actions retain their human game mode',async({page})=>{
+  await open(page);
+  for(const opponent of ['local','cpu'] as const){
+    await finish(page,opponent);
+    await expect(page.locator('#winnerreplay')).toHaveText(opponent==='cpu'?'Play CPU again':'Play again');
+    await page.locator('#winnerreplay').click();await expect(page.locator('#winnerdialog')).not.toBeVisible();
+    expect(await page.evaluate(()=>{const g=(window as any).__pool;g.coin.cancel();g.cancelOpponent();return {simulation:g.simMode,cpu:g.cpuOpponent,winner:g.gs.winner};})).toEqual({simulation:null,cpu:opponent==='cpu',winner:null});
+  }
+});
+
+test('online replay leaves the completed room and requests a fresh invite',async({page})=>{
+  await open(page);await finish(page,'online');
+  await page.evaluate(()=>{const g=(window as any).__pool;g.room.close=()=>{g.__closedWinnerRoom=true;};g.connectRoom=(create:boolean)=>{g.__winnerCreateRoom=create;};});
+  await expect(page.locator('#winnerreplay')).toHaveText('New online session');
+  await page.locator('#winnerreplay').click();await expect(page.locator('#winnerdialog')).not.toBeVisible();
+  await expect(page.locator('#onlinepanel')).toHaveClass(/open/);
+  expect(await page.evaluate(()=>{const g=(window as any).__pool;return [g.__closedWinnerRoom,g.__winnerCreateRoom,g.gs.winner];})).toEqual([true,true,null]);
+});
+
+test('a revoked simulation permission does not silently dismiss the completed result',async({page})=>{
+  await open(page);
+  await page.evaluate(()=>{const g=(window as any).__pool;g.cancelOpponent();g.simMode='cpu-cpu';g.cpuOpponent=true;g.gs={...g.gs,winner:1,message:'Player 2 wins the rack'};g.mode='over';g.hud();});
+  await page.locator('#winnerreplay').click();await expect(page.locator('#winnerstatus')).toContainText('Simulation access is no longer enabled');
+  await expect(page.locator('#winnerdialog')).toBeVisible();await expect(page.locator('#winnerreplay')).toBeEnabled();
+});
