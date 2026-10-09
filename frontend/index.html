@@ -125,6 +125,11 @@ body:has(#tutorial:not([hidden])) .privacy-notice{display:none}
 .premium-badge{display:inline-block;vertical-align:middle;width:fit-content;padding:3px 9px;border:1px solid #baa065;border-radius:999px;background:#3c321f;color:#f4d88f;font-size:13px;font-weight:700;letter-spacing:.03em}.premium-badge[hidden]{display:none}
 #viewsource{display:flex;align-items:center;justify-content:center;gap:10px;min-height:44px;box-sizing:border-box;padding:10px 16px;border:1px solid #75634a;border-radius:10px;background:#302a21;color:#eee5d6;text-decoration:none;font-size:16px}#viewsource:hover{background:#443b2d;border-color:#b19a70}#viewsource:focus-visible{outline:2px solid #e7c384;outline-offset:2px}#viewsource img{display:block;object-fit:contain;flex:none}
 </style>
+<style>
+@media(min-width:901px) and (pointer:fine){
+  #helppanel{width:min(520px,calc(100vw - 48px));padding:24px;box-sizing:border-box}
+}
+</style>
 </head>
 <body>
 <div id="app"><canvas id="game-canvas"></canvas>

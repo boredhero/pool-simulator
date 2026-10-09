@@ -54,3 +54,31 @@ test('a late Jev rechalk response cannot replace a different game',async({page})
  release();await expect.poll(()=>page.evaluate(()=>(window as any).__pool.jevRequest)).toBeNull();
  expect(await page.evaluate(()=>{const g=(window as any).__pool;return{id:g.jevGame.id,revision:g.jevGame.revision,chalk:g.gs.chalk};})).toEqual({id:'replacement',revision:12,chalk:[.6,.7]});
 });
+
+test('turn status follows the active player across local, AI, simulation, and online games',async({page})=>{
+ await open(page);
+ const rows=await page.evaluate(()=>{
+  const g=(window as any).__pool;
+  g.cancelOpponent();g.mode='wait';g.gs.chalk=[.21,.73];g.gs.rules.chalkSim=true;
+  const result=[];
+  for(const mode of ['local','cpu','jev','cpu-cpu','jev-jev','jev-cpu','online']){
+   g.room=mode==='online'?{ready:true}:null;g.roomNames=mode==='online'?['Alice','Bob']:null;g.seat=0;
+   g.cpuOpponent=mode==='cpu'||mode==='jev';g.jevOpponent=mode==='jev';
+   g.simMode=mode.includes('-')?mode:null;
+   for(const current of [0,1]){
+    g.gs.current=current;g.hud();g.frame();
+    result.push({mode,current,name:document.getElementById('turn')!.textContent,chalk:document.getElementById('chalkstatus')!.textContent,disabled:(document.getElementById('rechalk') as HTMLButtonElement).disabled});
+   }
+  }
+  g.room=null;g.roomNames=null;g.simMode=null;g.cpuOpponent=false;g.jevOpponent=false;
+  return result;
+ });
+ expect(rows).toHaveLength(14);
+ for(const row of rows){
+  expect(row.chalk).toBe(`${row.name} · Chalk ${row.current===0?21:73}%${row.mode==='online'?' · Shared match rule':''}`);
+  expect(row.disabled).toBe(true);
+ }
+ expect(rows.find(r=>r.mode==='jev'&&r.current===1)?.name).toBe('Jev AI');
+ expect(rows.find(r=>r.mode==='cpu'&&r.current===1)?.name).toBe('CPU');
+ expect(rows.find(r=>r.mode==='online'&&r.current===1)?.name).toBe('Bob');
+});

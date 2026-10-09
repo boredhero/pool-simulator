@@ -855,7 +855,7 @@ export class Game {
     this.scene.setChalk(!!this.gs.rules.chalkSim,this.gs.chalk,this.gs.current);
     this.chalkBar.hidden=!this.gs.rules.chalkSim||this.tutorial.active;
     if(!this.chalkBar.hidden){
-      const seat=this.simMode?this.gs.current:this.room?(this.seat??0):this.cpuOpponent?0:this.gs.current;
+      const seat=this.gs.current;
       const text=`${this.playerName(seat)} · Chalk ${Math.round(this.gs.chalk[seat]*100)}%${this.room?' · Shared match rule':''}`;
       if(this.chalkInfo.textContent!==text)this.chalkInfo.textContent=text;
       this.chalkButton.disabled=!this.humanCueControls()||this.pulling;
