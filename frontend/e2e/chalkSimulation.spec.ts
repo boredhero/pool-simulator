@@ -4,7 +4,7 @@ import {TERMS_VERSION} from '../src/ui/terms';
 const account={id:'chalk-player',username:'ChalkPlayer',createdAt:1,premium:true,isAdmin:false,easterEggsEnabled:true,chalkSim:true};
 test.beforeEach(async({page})=>{
  await acceptWelcomeBeforeLoad(page);await page.emulateMedia({reducedMotion:'reduce'});
- await page.addInitScript(()=>{localStorage.setItem('pool:help-dismissed','1');localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-08',allow:false}));const raf=requestAnimationFrame.bind(window);window.requestAnimationFrame=cb=>raf(t=>{const g=(window as any).__pool;if(g)g.scene.renderer.render=()=>{};cb(t);});});
+ await page.addInitScript(()=>{localStorage.setItem('pool:help-dismissed','1');localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-09',allow:false}));const raf=requestAnimationFrame.bind(window);window.requestAnimationFrame=cb=>raf(t=>{const g=(window as any).__pool;if(g)g.scene.renderer.render=()=>{};cb(t);});});
  await page.route('**/api/account',r=>r.fulfill({json:{account,stats:null}}));
  await page.route('**/api/privacy/terms',r=>r.fulfill({json:{version:TERMS_VERSION,accepted:true,authenticated:true,accountId:account.id}}));
  await page.route('**/api/opponents/jev',r=>r.fulfill({json:{available:false}}));

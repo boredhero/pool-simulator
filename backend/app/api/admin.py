@@ -9,11 +9,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import delete, func, or_, select, update
 
+from app.api.privacy import VERSION as ANALYTICS_VERSION
 from app.models.db import (
     Account,
     AdminAccountAction,
     AdminAudit,
     AuthFresh,
+    FeatureEvent,
     GameMatch,
     GoogleFlow,
     GoogleIdentity,
@@ -28,6 +30,7 @@ from app.models.db import (
     PasskeyChallenge,
     Session,
     TermsAcceptance,
+    VisitorSession,
 )
 from app.services import jev_budget
 from app.services.auth import current_account, is_admin, mutation_guard
@@ -63,6 +66,36 @@ def usage_dict(row) -> dict:
     }
 
 
+def visitor_counts(db):
+    now = int(time.time())
+    result = {}
+    for label, days in (("day", 1), ("week", 7), ("month", 30)):
+        query = (
+            select(func.count())
+            .select_from(FeatureEvent)
+            .join(VisitorSession)
+            .where(
+                FeatureEvent.name == "session_start",
+                FeatureEvent.occurred_at >= now - days * 86400,
+                VisitorSession.consent_version == ANALYTICS_VERSION,
+            )
+        )
+        result[label] = int(db.scalar(query) or 0)
+    result["dailyVisitors"] = int(
+        db.scalar(
+            select(func.count(func.distinct(FeatureEvent.session_id)))
+            .join(VisitorSession, FeatureEvent.session_id == VisitorSession.id)
+            .where(
+                FeatureEvent.name == "session_start",
+                FeatureEvent.occurred_at >= now - 86400,
+                VisitorSession.consent_version == ANALYTICS_VERSION,
+            )
+        )
+        or 0
+    )
+    return result
+
+
 @router.get("/overview")
 def overview():
     with Session() as db:
@@ -83,6 +116,7 @@ def overview():
             select(func.sum(JevUsage.attempts), func.sum(JevUsage.completed))
         ).one()
         return {
+            "visitors": visitor_counts(db),
             "budgetDefaultNano": jev_budget.defaults(db),
             "accounts": accounts,
             "premium": premium,

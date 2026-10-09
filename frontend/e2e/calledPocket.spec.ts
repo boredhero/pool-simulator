@@ -9,7 +9,7 @@ for(const mobile of [false,true])test.describe(mobile?'mobile':'desktop',()=>{
   await page.route('**/api/**',route=>route.fulfill({json:{}}));
   await page.addInitScript(()=>{
     localStorage.setItem('pool:help-dismissed','1');
-    localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-08',allow:false}));
+    localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-09',allow:false}));
     const raf=requestAnimationFrame.bind(window);
     window.requestAnimationFrame=cb=>raf(time=>{
       const g=(window as any).__pool;

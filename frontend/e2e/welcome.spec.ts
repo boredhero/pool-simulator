@@ -43,7 +43,7 @@ test('analytics starts only after a separate opt-in and successful consent respo
   await page.locator('#welcometerms').check();await page.locator('#welcomeplay').click();
   await expect(page.locator('#welcomedialog')).not.toBeVisible();
   expect(consent).toEqual([true]);
-  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('pool:privacy')!))).toEqual({version:'2026-10-08',allow:true});
+  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('pool:privacy')!))).toEqual({version:'2026-10-09',allow:true});
   await expect(page.locator('#tutorial')).not.toBeVisible();
 });
 
@@ -69,7 +69,7 @@ for(const preference of ['globalPrivacyControl','doNotTrack'])test(`${preference
 });
 
 test('saved analytics preference is preserved and an invite remains ready',async({page})=>{
-  await page.addInitScript(()=>localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-08',allow:true})));
+  await page.addInitScript(()=>localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-09',allow:true})));
   await page.goto('/#join=ABCDEFGH');await expect(page.locator('#welcomeinvite')).toBeVisible();
   await expect(page.locator('#welcomeprivacy-note')).toContainText('saved analytics preference is enabled');
   await expect(page.locator('#welcomeanalyticschoice')).not.toBeVisible();
@@ -92,10 +92,10 @@ test.describe('small touch welcome',()=>{
 
 test('changed terms hash prompts independently of saved analytics',async({page})=>{
  const changed='b'.repeat(64);
- await page.addInitScript(version=>{if(!localStorage.getItem('pool:welcome'))localStorage.setItem('pool:welcome',JSON.stringify({version,accepted:true}));localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-08',allow:false}));},TERMS_VERSION);
+ await page.addInitScript(version=>{if(!localStorage.getItem('pool:welcome'))localStorage.setItem('pool:welcome',JSON.stringify({version,accepted:true}));localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-09',allow:false}));},TERMS_VERSION);
  await page.route('**/api/privacy/terms',r=>r.fulfill({json:{version:changed,accepted:false,authenticated:false,accountId:null}}));
  await page.goto('/');await expect(page.locator('#welcomedialog')).toBeVisible();await expect(page.locator('#welcometerms')).not.toBeChecked();await page.locator('#welcometerms').check();await page.locator('#welcomeplay').click();
- expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('pool:welcome')!).version)).toBe(changed);expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('pool:privacy')!).version)).toBe('2026-10-08');
+ expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('pool:welcome')!).version)).toBe(changed);expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('pool:privacy')!).version)).toBe('2026-10-09');
  await page.reload();await expect(page.locator('#welcomedialog')).toHaveCount(0);
 });
 test('signed-in acceptance is reused and a new agreement is saved to the backend',async({page})=>{

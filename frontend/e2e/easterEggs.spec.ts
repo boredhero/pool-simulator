@@ -4,7 +4,7 @@ const keys=['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight'
 async function code(page:Page){await page.locator('canvas').first().focus();for(const key of keys)await page.keyboard.press(key);}
 test.beforeEach(async({page})=>{
   await acceptWelcomeBeforeLoad(page);
-  await page.addInitScript(()=>{localStorage.setItem('pool:help-dismissed','1');localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-08',allow:false}));const raf=requestAnimationFrame.bind(window);window.requestAnimationFrame=cb=>raf(t=>{const g=(window as any).__pool;if(g)g.scene.renderer.render=()=>{};cb(t);});});
+  await page.addInitScript(()=>{localStorage.setItem('pool:help-dismissed','1');localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-09',allow:false}));const raf=requestAnimationFrame.bind(window);window.requestAnimationFrame=cb=>raf(t=>{const g=(window as any).__pool;if(g)g.scene.renderer.render=()=>{};cb(t);});});
   await page.route('**/api/opponents/jev',route=>route.fulfill({json:{available:false}}));
 });
 test('unlock requires backend success and saved preference survives reload without leaking on logout',async({page})=>{

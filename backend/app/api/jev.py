@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 import math
 import os
 import random
@@ -442,6 +443,7 @@ async def play_turn(
         raise HTTPException(409, "Not that player's turn.")
     active_games.add(game_id)
     source = "human"
+    fallback_reason = None
     try:
         if human:
             s = payload.shot.model_dump()
@@ -498,6 +500,8 @@ async def play_turn(
                             db.get(JevUsage, account["id"]).completed += 1
                     if chosen is not None:
                         s, source = chosen, "jev"
+                    else:
+                        fallback_reason = "invalid_selection"
                 except (
                     httpx.HTTPError,
                     TimeoutError,
@@ -505,11 +509,31 @@ async def play_turn(
                     KeyError,
                     TypeError,
                     HTTPException,
-                ):
-                    pass  # Preserve a playable deterministic fallback and private errors.
+                ) as error:
+                    if source == "budget-fallback":
+                        fallback_reason = "budget_exhausted"
+                    elif isinstance(error, (TimeoutError, httpx.TimeoutException)):
+                        fallback_reason = "provider_timeout"
+                    elif (
+                        isinstance(error, httpx.HTTPStatusError)
+                        and error.response.status_code == 429
+                    ):
+                        fallback_reason = "provider_rate_limited"
+                    else:
+                        fallback_reason = "provider_error"
                 finally:
                     if attempt is not None:
                         jev_budget.settle(attempt, result)
+                if fallback_reason:
+                    logging.getLogger("pool.jev").warning(
+                        "jev_fallback",
+                        extra={
+                            "reason": fallback_reason,
+                            "game_id": game_id,
+                            "revision": payload.revision,
+                            "seat": by,
+                        },
+                    )
             if gs.ball_in_hand:
                 position = s.get("placement")
                 if not position or not place_cue(gs, position["x"], position["y"]):
@@ -578,6 +602,7 @@ async def play_turn(
             "shot": {**shot, "vmax": vmax, "elevation": elevation},
             "placement": placement,
             "source": source,
+            "fallbackReason": fallback_reason,
             "family": s.get("family") if not human else None,
             "intent": ("Jev chose a " if source == "jev" else "CPU chose a ")
             + s.get("family", "direct")

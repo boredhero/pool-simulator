@@ -5,7 +5,7 @@ test.afterEach(async({page})=>{await page.unrouteAll({behavior:'wait'});});
 async function prepare(page:Page){
  await page.addInitScript(version=>{
   localStorage.setItem('pool:welcome',JSON.stringify({version,accepted:true}));
-  localStorage.setItem('pool:help-dismissed','1');localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-08',allow:false}));
+  localStorage.setItem('pool:help-dismissed','1');localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-09',allow:false}));
   // Exercise the explicit button deterministically; separate coverage checks conditional UI.
   PublicKeyCredential.isConditionalMediationAvailable=async()=>false;
   const raf=requestAnimationFrame.bind(window);window.requestAnimationFrame=cb=>raf(t=>{const g=(window as any).__pool;if(g)g.scene.renderer.render=()=>{};cb(t);});

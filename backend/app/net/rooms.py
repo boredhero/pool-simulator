@@ -33,7 +33,7 @@ from app.sim.rules import (
     place_cue,
 )
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("pool.rooms")
 
 
 def _code() -> str:

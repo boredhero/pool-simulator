@@ -1,3 +1,4 @@
+import {diagnosticId,diagnosticMessage} from '../diagnostics';
 import {defaultBudgetControls,accountBudgetControls} from './budgetControls';
 import type { Account } from './account';
 import './admin.css';
@@ -48,7 +49,7 @@ export class AdminPanel {
     this.account=account;el('adminbtn').hidden=!account?.isAdmin;
     if(!account?.isAdmin){
       this.pending?.abort();this.sequence++;
-      this.dialog.close();el('adminrows').replaceChildren();el('adminsummary').replaceChildren();
+      this.dialog.close();el('adminrows').replaceChildren();el('adminsummary').replaceChildren();el('adminvisitors').replaceChildren();
     } else el('adminowner').textContent=`Signed in as ${account.username}`;
   }
   private async request(path:string,options:RequestInit={}) {
@@ -58,7 +59,7 @@ export class AdminPanel {
       if(path==='/overview'||response.status!==404)this.setAccount(null);
       throw new Error('Admin access is unavailable. Refresh your account to continue.');
     }
-    if(!response.ok){const data=await response.json().catch(()=>null);throw new Error(typeof data?.detail==='string'?data.detail:'Could not complete the admin request. Please try again.');}
+    if(!response.ok){const data=await response.json().catch(()=>null);throw new Error(diagnosticMessage(typeof data?.detail==='string'?data.detail:'Could not complete the admin request. Please try again.',diagnosticId(response)));}
     return response.json();
   }
   private async load() {
@@ -75,6 +76,16 @@ export class AdminPanel {
       ]);
       if(seq!==this.sequence)return;
       this.total=list.total;
+      const visits=summary.visitors;
+      el('adminvisitors').replaceChildren();
+      if(visits){
+        el('adminvisitors').append(node('h3','Anonymous analytics'));
+        const cards=node('div','','admin-summary');
+        for(const [label,value] of [['Visitor IDs · 24h',visits.dailyVisitors],['Visits · 24h',visits.day],['Visits · 7 days',visits.week],['Visits · 30 days',visits.month]] as [string,number][]){
+          const card=node('div','','admin-metric');card.append(node('span',label),node('strong',number(value)));cards.append(card);
+        }
+        el('adminvisitors').append(cards,node('p','Opt-in browsers only, including signed-in players without account links. Daily cookie IDs are not unique people. A visit starts after 30 minutes of inactivity; refreshing does not add a visit. Cookie expiry, clearing, and separate devices can count again. Rolling time windows.','admin-note'));
+      }
       if(summary.budgetDefaultNano!==undefined)defaultBudgetControls(el('adminsummary').parentElement!,summary.budgetDefaultNano,(p,o)=>this.request(p,o));
       if(this.offset>=this.total&&this.offset>0){this.offset=Math.max(0,Math.floor((this.total-1)/20)*20);void this.load();return;}
       el('adminsummary').replaceChildren(...[

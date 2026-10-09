@@ -1,4 +1,5 @@
 [
+  {"version":"1.5.5","date":"2026-10-09","title":"Diagnostics and visit counts","changes":["Show diagnostic references on request errors and explain Jev CPU fallbacks.","Add compressed, bounded application logs with retention across deployments.","Show consented anonymous visit counts in the owner dashboard without browser fingerprinting."]},
   {
     "version": "1.5.4",
     "date": "2026-10-09",

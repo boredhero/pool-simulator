@@ -5,7 +5,7 @@ for(const mobile of [false,true])test.describe(mobile?'mobile passwords':'deskto
  if(mobile)test.use({viewport:devices['Pixel 7'].viewport,isMobile:true,hasTouch:true,deviceScaleFactor:devices['Pixel 7'].deviceScaleFactor,userAgent:devices['Pixel 7'].userAgent});
  test.beforeEach(async({page})=>{
   await acceptWelcomeBeforeLoad(page);
-  await page.addInitScript(()=>{localStorage.setItem('pool:help-dismissed','1');localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-08',allow:false}));const raf=requestAnimationFrame.bind(window);window.requestAnimationFrame=cb=>raf(t=>{const g=(window as any).__pool;if(g)g.scene.renderer.render=()=>{};cb(t);});});
+  await page.addInitScript(()=>{localStorage.setItem('pool:help-dismissed','1');localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-09',allow:false}));const raf=requestAnimationFrame.bind(window);window.requestAnimationFrame=cb=>raf(t=>{const g=(window as any).__pool;if(g)g.scene.renderer.render=()=>{};cb(t);});});
   await page.route('**/api/account',r=>r.fulfill({json:{account:null,stats:null}}));
   await page.goto('/');await page.locator('#accountidentity').click();
  });

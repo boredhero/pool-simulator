@@ -3,7 +3,7 @@ import {acceptWelcomeBeforeLoad} from './welcomeFixture';
 const identity={id:'preferences',username:'Player',createdAt:1,premium:false,isAdmin:false};
 async function prepare(page:Page){
   await acceptWelcomeBeforeLoad(page);
-  await page.addInitScript(()=>{localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-08',allow:false}));localStorage.setItem('pool:felt','#112233');localStorage.setItem('pool:cameraInput','mouse');const raf=window.requestAnimationFrame.bind(window);window.requestAnimationFrame=cb=>raf(t=>{const game=(window as any).__pool;if(game)game.scene.renderer.render=()=>{};cb(t);});});
+  await page.addInitScript(()=>{localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-09',allow:false}));localStorage.setItem('pool:felt','#112233');localStorage.setItem('pool:cameraInput','mouse');const raf=window.requestAnimationFrame.bind(window);window.requestAnimationFrame=cb=>raf(t=>{const game=(window as any).__pool;if(game)game.scene.renderer.render=()=>{};cb(t);});});
   await page.route('**/api/version',r=>r.fulfill({json:{version:'test'}}));
   await page.route('**/api/opponents/jev',r=>r.fulfill({json:{available:false}}));
 }

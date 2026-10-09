@@ -1,4 +1,4 @@
-export const PRIVACY_VERSION='2026-10-08';
+export const PRIVACY_VERSION='2026-10-09';
 const VERSION=PRIVACY_VERSION;
 const KEY='pool:privacy';
 let enabled=false;
@@ -67,7 +67,7 @@ export function initPrivacy(options:{deferNotice?:boolean}={}) {
   const saved=savedPrivacyChoice();
   if(saved?.version===VERSION){
     notice.hidden=true;
-    // Rotate a session on page load; never create a visitor identifier before opt-in.
+    // Reuse the consented daily ID; never create an identifier before opt-in.
     if(saved.allow&&!optedOut())void consent(true).then(()=>event('session_start')).catch(()=>{});
     else void consent(false).catch(()=>{});
   } else notice.hidden=options.deferNotice===true;

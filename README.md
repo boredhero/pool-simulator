@@ -322,8 +322,10 @@ the operator's actual audience and practices; they do not certify legal complian
 Optional first-party feature analytics is off until separate adult opt-in. Privacy
 choices offers withdrawal and honors GPC/DNT. `visitor_sessions` and `feature_events`
 store random session identifiers, broad input type, times and fixed feature names;
-no account link, IP, URL, raw user agent, text input, or session replay. There are no
-analytics read endpoints. Consent uses an HttpOnly one-day cookie; withdrawal
+no account link, IP, URL, raw user agent, text input, or session replay. Only the owner can read aggregate visit counts in the admin overview. Consent uses an
+HttpOnly one-day random cookie, reused until expiry. Visits are deduplicated within
+30 minutes of activity. Daily visitor IDs are not unique people and include consenting
+signed-in browsers without account links. The updated notice requires renewed opt-in; withdrawal
 removes that session and its events. Older unlinked sessions expire through retention.
 Essential sign-in, security limits and Jev billing/allowance records are independent
 of analytics consent. Terms acceptance never implies analytics consent.
@@ -535,3 +537,26 @@ host log and backup retention are separate operational settings.
 
 
 Added Easter eggs. Signed-in visual/control preferences are stored in SQLite; guest preferences remain device-local. Terms acceptance remains account- and content-version-bound.
+
+### Application logging
+
+Production writes structured diagnostics to `/srv/logs/application.jsonl` in the
+persistent `pool_logs` volume. Files rotate daily or at 10 MiB; archives use gzip.
+Startup/hourly maintenance and rotation remove archives older than 14 days and
+delete oldest archives first to keep storage below 100 MiB (reserving one active
+10 MiB file). The handler supports the current single-process deployment; multiple
+workers require a dedicated log collector. Request logs use route templates, never
+raw paths, queries, bodies, credentials, or cookies. Every application HTTP request, including health checks and failures, records
+`duration_ms` through the final response body and `headers_duration_ms` to response
+headers, plus `response_complete` to distinguish interrupted responses. These are
+server timings, not browser/network latency; WebSocket messages are not HTTP requests.
+The `X-Request-ID` response header correlates HTTP and nested service logs. Jev,
+account, and admin request errors display diagnostic references. Jev fallback
+notices distinguish timeouts, provider throttling/errors, unusable choices, and
+exhausted budgets; warning events carry the same request ID plus game/turn/seat.
+
+Docker's separate `local` stdout/stderr cache compresses rotated files and keeps
+three 10 MiB files, oldest first. Docker does not provide an age-based retention
+option for this driver. Host Nginx logs and backups remain separately managed.
+Deploy through CI to apply the Compose logging settings; do not remove `pool_logs`
+or `pool_data` during deployment. `docker logs pool-simulator-api` still works.

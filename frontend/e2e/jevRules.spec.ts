@@ -3,7 +3,7 @@ import {acceptWelcomeBeforeLoad} from './welcomeFixture';
 import {BAR_RULES,TOURNAMENT_RULES,type MatchConfig} from '../src/sim/config';
 import {TERMS_VERSION} from '../src/ui/terms';
 test.beforeEach(async({page})=>{
- await acceptWelcomeBeforeLoad(page);await page.addInitScript(()=>{localStorage.setItem('pool:help-dismissed','1');localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-08',allow:false}));const raf=requestAnimationFrame.bind(window);window.requestAnimationFrame=cb=>raf(t=>{const g=(window as any).__pool;if(g)g.scene.renderer.render=()=>{};cb(t);});});
+ await acceptWelcomeBeforeLoad(page);await page.addInitScript(()=>{localStorage.setItem('pool:help-dismissed','1');localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-09',allow:false}));const raf=requestAnimationFrame.bind(window);window.requestAnimationFrame=cb=>raf(t=>{const g=(window as any).__pool;if(g)g.scene.renderer.render=()=>{};cb(t);});});
  await page.route('**/api/version',r=>r.fulfill({json:{version:'e2e'}}));await page.route('**/api/account',r=>r.fulfill({json:{account:{id:'rules-player',username:'player',premium:true,isAdmin:false,createdAt:1},stats:null}}));
  await page.route('**/api/privacy/terms',r=>r.fulfill({json:{version:TERMS_VERSION,accepted:true,authenticated:true,accountId:'rules-player'}}));await page.route('**/api/opponents/jev',r=>r.fulfill({json:{available:false}}));
  await page.goto('/');await expect(page.locator('#accountidentityname')).toHaveText('player');

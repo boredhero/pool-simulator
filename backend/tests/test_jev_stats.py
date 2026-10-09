@@ -234,12 +234,14 @@ def test_ledger_failure_cannot_commit_jev_state_without_its_stats(player, monkey
         raise RuntimeError("ledger unavailable")
 
     monkeypatch.setattr(jev, "record_shot_in_session", fail)
-    with pytest.raises(RuntimeError, match="ledger unavailable"):
-        client.post(
-            f"/api/opponents/jev/games/{game['id']}/turn",
-            headers=HEADERS,
-            json={"revision": 0, "shot": {"aim": 0, "power": 0.05}},
-        )
+    response = client.post(
+        f"/api/opponents/jev/games/{game['id']}/turn",
+        headers=HEADERS,
+        json={"revision": 0, "shot": {"aim": 0, "power": 0.05}},
+    )
+    assert response.status_code == 500
+    assert response.json()["requestId"] == response.headers["X-Request-ID"]
+    assert "ledger unavailable" not in response.text
     with Session() as db:
         record = db.get(JevGame, game["id"])
         assert record.state == original and record.revision == 0

@@ -4,7 +4,7 @@ for(const mobile of [false,true])test.describe(mobile?'mobile simulation':'deskt
  if(mobile)test.use({viewport:{width:393,height:851},isMobile:true,hasTouch:true});
  test('permitted spectator can select all modes and return from the picker',async({page})=>{
   await acceptWelcomeBeforeLoad(page);
-  await page.addInitScript(()=>{localStorage.setItem('pool:help-dismissed','1');localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-08',allow:false}));const raf=requestAnimationFrame.bind(window);window.requestAnimationFrame=cb=>raf(t=>{const g=(window as any).__pool;if(g)g.scene.renderer.render=()=>{};cb(t);});});
+  await page.addInitScript(()=>{localStorage.setItem('pool:help-dismissed','1');localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-09',allow:false}));const raf=requestAnimationFrame.bind(window);window.requestAnimationFrame=cb=>raf(t=>{const g=(window as any).__pool;if(g)g.scene.renderer.render=()=>{};cb(t);});});
   await page.route('**/api/account',r=>r.fulfill({json:{account:{id:'sim-user',username:'spectator',premium:false,simEnabled:true,isAdmin:false,createdAt:1},stats:null}}));
   const cpuJevRequests:string[]=[];
   page.on('request',r=>{if(r.url().includes('/api/opponents/jev/'))cpuJevRequests.push(r.url());});

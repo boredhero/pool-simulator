@@ -24,7 +24,7 @@ test('owner can inspect usage, recover a failed toggle, search and close the das
   await page.route('**/api/account',r=>r.fulfill({json:{account:owner,stats:null}}));
   await page.route('**/api/admin/**',async r=>{
     const url=new URL(r.request().url());
-    if(url.pathname.endsWith('/overview'))return r.fulfill({json:{accounts:2,premium:1,usage,lifetimeAttempts:15}});
+    if(url.pathname.endsWith('/overview'))return r.fulfill({json:{accounts:2,premium:1,usage,lifetimeAttempts:15,visitors:{day:12,week:34,month:56,dailyVisitors:8}}});
     if(r.request().method()==='PATCH'){
       expect(r.request().headers()['x-pool-request']).toBe('1');
       if(fail){fail=false;return r.fulfill({status:500,json:{}});}
@@ -37,6 +37,9 @@ test('owner can inspect usage, recover a failed toggle, search and close the das
   await page.goto('/');await page.locator('#settingsbtn').click();await page.locator('#adminbtn').click();
   const dialog=page.locator('#admindialog');await expect(dialog).toBeVisible();
   await expect(page.locator('#adminsummary')).toContainText('$0.000050');
+  await expect(page.locator('#adminvisitors')).toContainText('Visitor IDs · 24h');
+  await expect(page.locator('#adminvisitors .admin-metric strong')).toHaveText(['8','12','34','56']);
+  await expect(page.locator('#adminvisitors')).toContainText('not unique people');
   const toggle=dialog.getByRole('switch',{name:'Premium for Player <safe>'});
   await toggle.click();await expect(page.locator('#adminstatus')).toContainText('Could not complete');
   await expect(toggle).toHaveAttribute('aria-checked','false');await expect(toggle).toBeEnabled();

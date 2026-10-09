@@ -1,4 +1,4 @@
-"""Explicit consent for optional first-party analytics; no analytics read endpoints."""
+"""Explicit consent for optional first-party analytics; owner-only aggregate reporting."""
 
 import os
 import secrets
@@ -7,7 +7,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import delete
+from sqlalchemy import delete, exists, or_, select, update
 
 from app.models.db import (
     FeatureEvent,
@@ -23,7 +23,7 @@ from app.services.auth import current_account, digest, mutation_guard, rate_limi
 from app.services.terms import terms_version
 
 router = APIRouter(prefix="/privacy")
-VERSION = "2026-10-08"
+VERSION = "2026-10-09"
 COOKIE = "pool_analytics"
 
 
@@ -96,7 +96,7 @@ def cleanup(db):
 class Consent(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     allow: bool
-    version: Literal["2026-10-08"]
+    version: Literal["2026-10-09"]
     adult: bool = False
     device: Literal["touch", "pointer"] = "pointer"
 
@@ -127,6 +127,17 @@ def consent(payload: Consent, request: Request, response: Response):
             remove_session(db, token)
         cleanup(db)
         if allowed:
+            now = int(time.time())
+            existing = (
+                db.get(VisitorSession, digest(token)) if token and len(token) <= 128 else None
+            )
+            if (
+                existing
+                and existing.consent_version == VERSION
+                and existing.started_at > now - 86400
+            ):
+                return {"analytics": True}
+            remove_session(db, token)
             token = secrets.token_urlsafe(32)
             now = int(time.time())
             db.add(
@@ -194,7 +205,26 @@ def feature(payload: Event, request: Request):
         session = db.get(VisitorSession, identity)
         if not session:
             return Response(status_code=204)
-        session.last_seen = now
+        if payload.name == "session_start":
+            # Conditional write serializes concurrent page loads/tabs on SQLite.
+            previous = exists(
+                select(FeatureEvent.id).where(
+                    FeatureEvent.session_id == identity, FeatureEvent.name == "session_start"
+                )
+            )
+            changed = db.execute(
+                update(VisitorSession)
+                .where(
+                    VisitorSession.id == identity,
+                    or_(VisitorSession.last_seen <= now - 1800, ~previous),
+                )
+                .values(last_seen=now)
+            )
+            if not changed.rowcount:
+                session.last_seen = now
+                return Response(status_code=204)
+        else:
+            session.last_seen = now
         db.add(
             FeatureEvent(
                 id=secrets.token_hex(16), session_id=session.id, name=payload.name, occurred_at=now
