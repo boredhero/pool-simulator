@@ -205,8 +205,13 @@ function earliestContact(balls: Ball[], dt: number): Contact | null {
         const lineY = cu.y1;
         const target = lineY === 0 ? BALL_R : TABLE_H - BALL_R;
         if ((lineY === 0 && A.vy >= 0) || (lineY === TABLE_H && A.vy <= 0)) continue;
-        const t = (target - A.y) / A.vy;
-        if (t < 0 || t > dt || (best && t >= best.t)) continue;
+        // Ball-ball separation can push a rail-frozen ball slightly past the
+        // inset contact plane. Recover grounded overlaps only: airborne balls
+        // may already have legitimately cleared the nose on an earlier step.
+        const crossing = (target - A.y) / A.vy;
+        if (crossing < 0 && (A.z > 1e-9 || A.vz !== 0)) continue;
+        const t = Math.max(0, crossing);
+        if (A.y < 0 || A.y > TABLE_H || t > dt || (best && t >= best.t)) continue;
         const cx = A.x + A.vx * t;
         const lo = Math.min(cu.x1, cu.x2) - 1e-6, hi = Math.max(cu.x1, cu.x2) + 1e-6;
         if (cx < lo || cx > hi || A.z + A.vz * t - 0.5 * G * t * t > 0.05) continue;
@@ -216,8 +221,10 @@ function earliestContact(balls: Ball[], dt: number): Contact | null {
         const lineX = cu.x1;
         const target = lineX === 0 ? BALL_R : TABLE_W - BALL_R;
         if ((lineX === 0 && A.vx >= 0) || (lineX === TABLE_W && A.vx <= 0)) continue;
-        const t = (target - A.x) / A.vx;
-        if (t < 0 || t > dt || (best && t >= best.t)) continue;
+        const crossing = (target - A.x) / A.vx;
+        if (crossing < 0 && (A.z > 1e-9 || A.vz !== 0)) continue;
+        const t = Math.max(0, crossing);
+        if (A.x < 0 || A.x > TABLE_W || t > dt || (best && t >= best.t)) continue;
         const cy = A.y + A.vy * t;
         const lo = Math.min(cu.y1, cu.y2) - 1e-6, hi = Math.max(cu.y1, cu.y2) + 1e-6;
         if (cy < lo || cy > hi || A.z + A.vz * t - 0.5 * G * t * t > 0.05) continue;
@@ -336,7 +343,16 @@ export function step(balls: Ball[], dt: number, ev: ShotEvents, cueId: number, c
     const byId = (id: number) => balls.find((b) => b.id === id)!;
     if (c.kind === 'bb') resolveBallBall(byId(c.a), byId(c.b), c.nx, c.ny, ev, cueId, c.nz ?? 0);
     else if (c.kind === 'floor') land(byId(c.a));
-    else resolveRail(byId(c.a), c.nx, c.ny, ev, contactMade);
+    else {
+      const ball = byId(c.a);
+      if (c.kind === 'rail') {
+        if (c.nx > 0) ball.x = Math.max(ball.x, BALL_R);
+        else if (c.nx < 0) ball.x = Math.min(ball.x, TABLE_W - BALL_R);
+        if (c.ny > 0) ball.y = Math.max(ball.y, BALL_R);
+        else if (c.ny < 0) ball.y = Math.min(ball.y, TABLE_H - BALL_R);
+      }
+      resolveRail(ball, c.nx, c.ny, ev, contactMade);
+    }
   }
   if (remaining > 1e-9) {
     for (const b of balls) {

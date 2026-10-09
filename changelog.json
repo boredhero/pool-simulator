@@ -8,7 +8,8 @@
       "Rechalk from either table-side cube; chalk wears separately per player and low grip can cause miscues on off-center shots. CPU and Jev can rechalk too.",
       "Online matches share Chalk-Sim when either participant has it selected, without changing the other account\u2019s preferences.",
       "Signed-in appearance, camera input, auto-camera, and playback settings now follow your account across devices. Guest preferences remain local.",
-      "Install app controls are shown only in mobile mode."
+      "Install app controls are shown only in mobile mode.",
+      "Fixed grounded object balls passing through cushions after another ball pushed them slightly into the rail."
     ]
   },
   {

@@ -235,8 +235,14 @@ def _earliest_contact(balls: list[Ball], dt: float):
                 target = BALL_R if y1 == 0 else TABLE_H - BALL_R
                 if (y1 == 0 and a.vy >= 0) or (y1 == TABLE_H and a.vy <= 0):
                     continue
-                t = (target - a.y) / a.vy
-                if t < 0 or t > dt or (best is not None and t >= best[0]):
+                # Ball-ball separation can push a rail-frozen ball past the
+                # inset plane. Airborne balls may already have legitimately
+                # cleared that nose on an earlier step; recover grounded ones.
+                crossing = (target - a.y) / a.vy
+                if crossing < 0 and (a.z > 1e-9 or a.vz != 0):
+                    continue
+                t = max(0.0, crossing)
+                if a.y < 0 or a.y > TABLE_H or t > dt or (best is not None and t >= best[0]):
                     continue
                 cx = a.x + a.vx * t
                 if (
@@ -251,8 +257,11 @@ def _earliest_contact(balls: list[Ball], dt: float):
                 target = BALL_R if x1 == 0 else TABLE_W - BALL_R
                 if (x1 == 0 and a.vx >= 0) or (x1 == TABLE_W and a.vx <= 0):
                     continue
-                t = (target - a.x) / a.vx
-                if t < 0 or t > dt or (best is not None and t >= best[0]):
+                crossing = (target - a.x) / a.vx
+                if crossing < 0 and (a.z > 1e-9 or a.vz != 0):
+                    continue
+                t = max(0.0, crossing)
+                if a.x < 0 or a.x > TABLE_W or t > dt or (best is not None and t >= best[0]):
                     continue
                 cy = a.y + a.vy * t
                 if (
@@ -379,7 +388,17 @@ def step(balls: list[Ball], dt: float, ev: ShotEvents, cue_id: int, contact_made
         elif c[1] == "floor":
             land(by_id[c[2]])
         else:
-            _resolve_rail(by_id[c[2]], c[4], c[5], ev, contact_made)
+            ball = by_id[c[2]]
+            if c[1] == "rail":
+                if c[4] > 0:
+                    ball.x = max(ball.x, BALL_R)
+                elif c[4] < 0:
+                    ball.x = min(ball.x, TABLE_W - BALL_R)
+                if c[5] > 0:
+                    ball.y = max(ball.y, BALL_R)
+                elif c[5] < 0:
+                    ball.y = min(ball.y, TABLE_H - BALL_R)
+            _resolve_rail(ball, c[4], c[5], ev, contact_made)
     if remaining > 1e-9:
         for b in balls:
             if not b.potted and not b.asleep:
