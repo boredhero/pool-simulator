@@ -40,8 +40,9 @@ export function legalTargets(gs: GameState): number[] {
   const targets = remaining(gs);
   return targets.length || gs.open ? targets : [8];
 }
-export function callRequired(gs: GameState): boolean {
-  return !gs.breakShot && (gs.rules.calls === 'all' || (gs.rules.calls === 'eight' && legalTargets(gs).includes(8)));
+export function callRequired(gs: GameState, before?: ShotContext): boolean {
+  const onEight=before ? !before.open && before.remaining.length===0 : legalTargets(gs).includes(8);
+  return !(before?.breakShot??gs.breakShot) && (gs.rules.calls === 'all' || (gs.rules.calls === 'eight' && onEight));
 }
 export function beginShot(gs: GameState, calledBall: number | null = null, calledPocket: number | null = null): ShotContext {
   const before = { current: gs.current, open: gs.open, breakShot: gs.breakShot, group: gs.groups[gs.current], remaining: remaining(gs), kitchen: gs.kitchenShot, calledBall, calledPocket };

@@ -388,6 +388,11 @@ test('settings title and close button stay visible while scrolling on desktop an
   for(const viewport of [{width:1280,height:720},{width:390,height:844}]) {
     await page.setViewportSize(viewport);
     await page.locator('#settingsbtn').click();
+    // Expand real sections so the test exercises overflow rather than a short collapsed panel.
+    for(const section of await page.locator('#settingspanel details.settings-group:visible').all()){
+      if(await section.getAttribute('open')===null)await section.locator(':scope > summary').click();
+    }
+    await page.locator('#settingspanel .settings-body').evaluate(el=>el.scrollTop=0);
     const header=page.locator('#settingspanel .settings-header'),before=(await header.boundingBox())!;
     await page.locator('#settingspanel .settings-body').evaluate(el=>el.scrollTop=el.scrollHeight);
     expect(await page.locator('#settingspanel .settings-body').evaluate(el=>el.scrollTop)).toBeGreaterThan(100);
@@ -527,6 +532,7 @@ test('premium badges and unlimited racks follow the server account',async({page}
 
 test('Jev requires sign-in while CPU remains available to guests', async ({page}) => {
   await openGame(page);
+  if(await page.locator('#helppanel').isVisible())await page.locator('#closehelp').click();
   await page.locator('#jevbtn').click();
   await expect(page.locator('#accountdialog')).toBeVisible();
   expect(await page.evaluate(()=>(window as any).__pool.jevOpponent)).toBe(false);

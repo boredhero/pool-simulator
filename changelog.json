@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.5.3",
+    "date": "2026-10-09",
+    "title": "Called-pocket consistency and browser checks",
+    "changes": [
+      "Keep called-pocket indicators tied to the rules at the start of the shot, including the last group ball in bar rules.",
+      "Repair remaining browser checks for current account, settings, and new-game flows."
+    ]
+  },
+  {
     "version": "1.5.2",
     "date": "2026-10-08",
     "title": "Browser checks and desktop help",

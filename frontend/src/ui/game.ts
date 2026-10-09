@@ -959,11 +959,15 @@ export class Game {
     const aiming = this.mode === 'aim' && !this.cue().potted && this.humanCueControls();
     const pulling = this.pulling && aiming;
     const pull = 0.012 + (pulling ? this.pullPower() * 0.18 : 0);
-    this.scene.setCall(this.calledPocket, callRequired(this.gs) && (aiming || ((this.mode==='rolling'||this.mode==='wait')&&this.calledPocket!==null)));
+    const playingShot=this.mode==='rolling'||this.mode==='wait';
+    // A ball dropping cannot retroactively turn this stroke into an 8-ball call.
+    const showCall=callRequired(this.gs,playingShot?this.gs.shot:undefined)
+      && (this.gs.rules.calls!=='eight'||this.calledPocket===null||this.calledBall===8);
+    this.scene.setCall(this.calledPocket, showCall && (aiming || (playingShot&&this.calledPocket!==null)));
     if(presented&&this.opponentAction){
       const pose=cuePresentation(this.opponentAction.elapsed,presented.power,this.opponentAction.reduced);
       this.scene.setCue(true,presented.placement.x,presented.placement.y,presented.aim,pose.pull,presented.tipX,presented.tipY,presented.elevation);
-      this.scene.setCall(presented.calledPocket,callRequired(this.gs));
+      this.scene.setCall(presented.calledPocket,callRequired(this.gs)&&(this.gs.rules.calls!=='eight'||presented.calledBall===8));
     } else this.scene.setCue(aiming, this.cue().x, this.cue().y, this.angle, pull, this.tipX, this.tipY);
     const controls=this.humanCueControls();
     (document.getElementById('touchpower') as HTMLInputElement).disabled=!controls;
