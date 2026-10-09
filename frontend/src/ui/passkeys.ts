@@ -39,7 +39,7 @@ export class PasskeyPanel {
   }
   private message(error:unknown){
     const name=error instanceof Error?error.name:'';
-    return name==='NotAllowedError'||name==='AbortError'?'No changes made. You can try again or use your password.':name==='InvalidStateError'?'A passkey from this provider is already saved. Try another device or provider.':error instanceof Error?error.message:'Passkey request failed. Please try again.';
+    return name==='NotAllowedError'||name==='AbortError'?'No changes made. You can try again or use another sign-in method.':name==='InvalidStateError'?'A passkey from this provider is already saved. Try another device or provider.':error instanceof Error?error.message:'Passkey request failed. Please try again.';
   }
   private async run(action:()=>Promise<void>){
     if(this.busy||this.blocked())return;
@@ -53,6 +53,7 @@ export class PasskeyPanel {
   update(account:Account|null,loginActive:boolean){
     if(this.account?.id!==account?.id){this.revision++;this.keys=[];this.fresh=false;this.clearVerify();el('passkeyoffer').hidden=true;this.status('');}
     this.account=account;
+    el('passkeyverifyform').hidden=account?.hasPassword===false;
     el('settingspasskeys').hidden=!account;
     el('passkeylogin').hidden=!this.supported||!loginActive;
     this.loginActive=loginActive&&!account;
@@ -88,7 +89,7 @@ export class PasskeyPanel {
       editor.addEventListener('submit',e=>{e.preventDefault();void this.authorize(async()=>{await this.request('/'+key.id,{name:input.value.trim()||'My passkey'},'PATCH');await this.refresh();this.status('Passkey renamed.');});});
       rename.addEventListener('click',()=>{editor.hidden=!editor.hidden;if(!editor.hidden)input.focus();});
       const confirm=document.createElement('div');confirm.hidden=true;confirm.className='passkey-remove';
-      const warning=document.createElement('p');warning.textContent='Remove this passkey? Other sessions will be signed out. Your password and other passkeys still work. Also remove it from your password manager if no longer needed.';
+      const warning=document.createElement('p');warning.textContent='Remove this passkey? Other sessions will be signed out. Your other sign-in methods still work. You must keep at least one. Also remove it from your password manager if no longer needed.';
       const yes=document.createElement('button');yes.type='button';yes.textContent='Confirm removal';yes.addEventListener('click',()=>void this.authorize(async()=>{await this.request('/'+key.id,undefined,'DELETE');await this.refresh();this.status('Passkey removed. Other sessions have been signed out.');el('passkeyadd').focus();}));
       const no=document.createElement('button');no.type='button';no.textContent='Cancel';no.addEventListener('click',()=>{confirm.hidden=true;remove.focus();});confirm.append(warning,yes,no);
       remove.addEventListener('click',()=>{confirm.hidden=false;yes.focus();});
@@ -98,7 +99,11 @@ export class PasskeyPanel {
   private async authorize(action:()=>Promise<void>){
     if(this.busy||this.blocked())return;
     await this.refresh();
-    if(!this.fresh){this.pending=action;el('passkeyverify').hidden=false;el('passkeyverifykey').hidden=!this.keys.length||!this.supported;el<HTMLInputElement>('passkeypassword').focus();return;}
+    if(!this.fresh){
+      if(this.account?.hasPassword===false&&!this.keys.length){this.status('Sign out and sign back in with Google, then add your passkey.');return;}
+      this.pending=action;el('passkeyverify').hidden=false;el('passkeyverifykey').hidden=!this.keys.length||!this.supported;
+      el(this.account?.hasPassword===false?'passkeyverifykey':'passkeypassword').focus();return;
+    }
     await this.run(action);
   }
   private async reverify(passkey:boolean){
@@ -116,7 +121,7 @@ export class PasskeyPanel {
     const name=el<HTMLInputElement>('passkeyname').value.trim()||'My passkey';
     await this.request('/register/verify',{ceremony:options.ceremony,credential,name});
     el('passkeyoffer').hidden=true;el<HTMLInputElement>('passkeyname').value='';
-    await this.refresh();this.status('Passkey added. You can use it instead of your password next time.');
+    await this.refresh();this.status('Passkey added. You can use it to sign in next time.');
     el('passkeystatus').focus();
   }
   private loginOptions(){

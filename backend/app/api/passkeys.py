@@ -24,7 +24,15 @@ from webauthn.helpers.structs import (
     UserVerificationRequirement,
 )
 
-from app.models.db import Account, AuthFresh, LoginSession, Passkey, PasskeyChallenge, Session
+from app.models.db import (
+    Account,
+    AuthFresh,
+    GoogleIdentity,
+    LoginSession,
+    Passkey,
+    PasskeyChallenge,
+    Session,
+)
 from app.services.auth import (
     COOKIE,
     current_account,
@@ -110,7 +118,11 @@ def lock_owner(db, request: Request, account_id: str, fresh=True):
         raise HTTPException(401, "Sign in again.")
     proof = db.get(AuthFresh, session_hash)
     if fresh and (not proof or proof.expires_at <= int(time.time())):
-        raise HTTPException(403, "Verify your identity before changing passkeys.")
+        raise HTTPException(
+            403,
+            "Verify your identity again before changing sign-in methods. "
+            "Sign out and sign in again, or use the passkey verification controls.",
+        )
     return session_hash
 
 
@@ -416,6 +428,17 @@ def remove(key_id: str, request: Request):
         )
         if changed.rowcount != 1:
             raise HTTPException(404, "Passkey not found.")
+        user = db.get(Account, account["id"])
+        if (
+            user.password_hash == "!"
+            and not db.scalar(select(Passkey.id).where(Passkey.account_id == user.id))
+            and not db.scalar(
+                select(GoogleIdentity.subject).where(GoogleIdentity.account_id == user.id)
+            )
+        ):
+            raise HTTPException(
+                409, "Keep at least one sign-in method. Link Google or add another passkey first."
+            )
         # A removed/lost authenticator may already have issued a session.
         db.execute(
             delete(LoginSession).where(

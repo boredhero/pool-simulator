@@ -11,6 +11,8 @@ from sqlalchemy.exc import IntegrityError
 from app.models.db import (
     Account,
     AuthFresh,
+    GoogleFlow,
+    GoogleIdentity,
     LoginSession,
     Passkey,
     PasskeyChallenge,
@@ -170,7 +172,14 @@ def recover(payload: Recovery, request: Request, response: Response) -> dict:
         )
         if changed.rowcount != 1:
             raise HTTPException(401, "Username or recovery code is incorrect.")
-        for model in (LoginSession, AuthFresh, Passkey, PasskeyChallenge):
+        for model in (
+            LoginSession,
+            AuthFresh,
+            Passkey,
+            PasskeyChallenge,
+            GoogleIdentity,
+            GoogleFlow,
+        ):
             db.execute(delete(model).where(model.account_id == user.id))
     response.delete_cookie(COOKIE, path="/")
     response.headers["Cache-Control"] = "no-store"

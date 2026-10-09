@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api.accounts import router as accounts_router
 from app.api.admin import router as admin_router
+from app.api.google import router as google_router
 from app.api.jev import router as jev_router
 from app.api.passkeys import router as passkeys_router
 from app.api.privacy import cleanup
@@ -54,11 +55,17 @@ app.include_router(jev_router, prefix="/api")
 app.include_router(privacy_router, prefix="/api")
 app.include_router(accounts_router, prefix="/api")
 app.include_router(passkeys_router, prefix="/api")
+app.include_router(google_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
 
 
 @app.exception_handler(RequestValidationError)
 async def validation_error(request, exc):
+    if request.url.path.startswith("/api/account/google"):
+        return JSONResponse(
+            status_code=422,
+            content={"detail": "Check your username and Google sign-in request, then try again."},
+        )
     if request.url.path.startswith("/api/account/username"):
         return JSONResponse(
             status_code=422,
@@ -77,11 +84,14 @@ async def account_cache_control(request, call_next):
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
-    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
-        "img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; "
+        "default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client; "
+        "style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; "
+        "img-src 'self' data: blob:; connect-src 'self' https://accounts.google.com/gsi/; "
+        "frame-src https://accounts.google.com/gsi/; object-src 'none'; "
         "base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
     )
     if request.url.scheme == "https":

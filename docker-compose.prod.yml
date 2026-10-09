@@ -8,6 +8,8 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
     environment:
+      GOOGLE_CLIENT_ID: ${POOL_MARTINOSPIZZA_DEV_OAUTH_CLIENT_ID:-}
+      GOOGLE_ORIGIN: https://pool.martinospizza.dev
       JEV_API_KEY: ${JEV_API_KEY:-}
       ADMIN_ACCOUNT_ID: ${ADMIN_ACCOUNT_ID:-}
       DATABASE_URL: sqlite:////srv/data/pool.db

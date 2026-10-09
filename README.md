@@ -474,3 +474,47 @@ Existing accounts receive a nullable `username_changed_at` column through an ide
 Account IDs, roles, balances, history, sessions, recovery codes and passkeys remain attached to
 the same account. Password login uses the new username. Recorded match names remain historical
 snapshots; leave an online room before changing your name in the UI.
+
+### Optional Google sign-in (1.3.0)
+
+Choose **Continue with Google** in Account to load Google Identity Services. New users
+choose an available pool username, accept the current Terms/18+ affirmation, save a
+recovery code, and may add a passkey. A Google-created account has no password until
+recovery sets one. Existing users should sign in first and choose **Link Google account**;
+we never merge accounts by email. Google email, profile name/photo, access tokens, and
+refresh tokens are not stored. Only the stable Google subject identifier is retained.
+
+Linking and unlinking require authentication within five minutes. Sign out and back in
+if prompted, or use password/passkey verification in the passkey controls. Unlinking
+revokes other sessions and requires another sign-in method. Removing a last passkey
+is likewise blocked when neither a password nor Google link remains. Recovery removes
+both Google links and passkeys; it sets a password and replaces the recovery code.
+Disabling an account blocks every sign-in method; deletion removes identity records.
+
+Configure a Google **Web application** client with the exact production JavaScript
+origin `https://pool.martinospizza.dev`. The GIS button uses an ID-token callback, so
+no redirect URI or client secret is needed. Enable the external audience for your users
+in Google Auth Platform; testing mode only admits configured test users. Backend
+`GOOGLE_CLIENT_ID` and `GOOGLE_ORIGIN` are runtime configuration, never inferred from
+request headers. Compose maps `POOL_MARTINOSPIZZA_DEV_OAUTH_CLIENT_ID` to the client ID.
+Deployment reads that one public setting from its environment or `/etc/environment`
+using `scripts/google-client-id.py`, without executing the file or reading client secrets.
+Local development needs a separately authorized localhost origin and matching settings.
+An absent client ID hides Google controls while existing sign-in methods still work.
+
+The server verifies signatures against Google's cached certificates, issuer, audience,
+expiry, and a random nonce. Five-minute, single-use database flows bind callbacks to
+an HttpOnly browser cookie or the current account session. Signup tickets are also
+browser-bound. New `google_identities` and `google_flows` tables are created by the
+existing idempotent initializer. Existing account records are unchanged. Google-only
+accounts use an explicit disabled-password marker, never a shared or generated password.
+
+Validation: `cd backend && uv run pytest tests/test_google.py` verifies real locally signed
+JWTs against the production verification code without external credentials. The browser
+suite `e2e/google.spec.ts` covers desktop/mobile signup, login, linking, cancellation,
+conflict recovery, and provider-load failure using a GIS stub. Google's live account chooser
+and physical iOS/macOS behavior require a smoke test on the authorized deployed origin.
+
+References: [Google server-side verification](https://developers.google.com/identity/gsi/web/guides/verify-google-id-token),
+[GIS setup and security headers](https://developers.google.com/identity/gsi/web/guides/get-google-api-clientid),
+[GIS JavaScript reference](https://developers.google.com/identity/gsi/web/reference/js-reference).

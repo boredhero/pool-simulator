@@ -94,6 +94,24 @@ class Account(Base):
     disabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
 
 
+class GoogleIdentity(Base):
+    __tablename__ = "google_identities"
+    subject: Mapped[str] = mapped_column(String(255), primary_key=True)
+    account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), unique=True)
+    created_at: Mapped[int] = mapped_column(Integer)
+
+
+class GoogleFlow(Base):
+    __tablename__ = "google_flows"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    nonce: Mapped[str] = mapped_column(String(64))
+    binding: Mapped[str] = mapped_column(String(64))
+    purpose: Mapped[str] = mapped_column(String(16))
+    account_id: Mapped[str | None] = mapped_column(ForeignKey("accounts.id"), nullable=True)
+    subject: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    expires_at: Mapped[int] = mapped_column(Integer, index=True)
+
+
 class LoginSession(Base):
     __tablename__ = "login_sessions"
     token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)

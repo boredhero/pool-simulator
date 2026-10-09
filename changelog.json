@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.3.0",
+    "date": "2026-10-08",
+    "title": "Optional Google sign-in",
+    "changes": [
+      "Create an account or sign in with Google, with a chosen pool username and no extra password required.",
+      "Link or unlink Google in account settings. Your account, Premium, stats, and balance stay with you.",
+      "Google signup includes Terms acceptance, a recovery code, and the optional passkey offer. Keep at least one working sign-in method.",
+      "Account recovery removes Google links and passkeys; Google loads only when you choose to use it."
+    ]
+  },
+  {
     "version": "1.2.1",
     "date": "2026-10-08",
     "title": "Account username changes",
@@ -260,9 +271,9 @@
     "changes": [
       "Settings now has a fixed title bar and close button that stay visible while scrolling, with Escape dismissal and keyboard focus restored to the Table button.",
       "Automatic framing uses a lower, closer playing view and tighter bounds around the visible balls. Cue alignment remains adjustable and never overrides a shot being pulled.",
-      "Automatic camera framing now swings behind the cue toward the majority of the current player\u2019s legal targets, including the final 8-Ball, with the idle cue facing forward from the new view.",
+      "Automatic camera framing now swings behind the cue toward the majority of the current player’s legal targets, including the final 8-Ball, with the idle cue facing forward from the new view.",
       "Bar house rules now keep the layout after an empty break instead of automatically reracking. Players alternate until a legal pot assigns groups; pots made with a scratch stay down without assigning a group.",
-      "Turn, foul, and result messages use the CPU opponent\u2019s name consistently. Illegal-break reracks now explain the missing pocket and four-rail requirement.",
+      "Turn, foul, and result messages use the CPU opponent’s name consistently. Illegal-break reracks now explain the missing pocket and four-rail requirement.",
       "Once groups are assigned, player cards show the 8-Ball after their group, highlighted when it becomes the final target.",
       "Desktop tables open from behind the cue, looking toward the fresh rack.",
       "Pocketed balls visibly fall into deeper pocket wells before entering the return, while scoring updates immediately.",
