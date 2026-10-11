@@ -1,11 +1,13 @@
 // Offline CPU: geometry seeds and bounded previews using the live physics/rules.
 // Legacy difficulty helpers remain available to existing callers.
 import { BALL_R, POCKETS, TABLE_H, TABLE_W, cushions } from './table';
-import { allAsleep, DT, shootSpeed, step, strike, type Ball, type ShotEvents } from './physics';
+import { allAsleep, DT, shootSpeed, step, type Ball } from './physics';
+import { strikeBalls } from './stroke';
+import { wearChalk } from './chalk';
 import { cueElevation } from './cue';
 import { applyShot, beginShot, canPlace, groupOf, legalTargets as ruleTargets, placeCue, type GameState } from './rules';
 
-export interface CpuShot { angle: number; power: number; tipX: number; tipY: number; ball?: number; pocket?: number }
+export interface CpuShot { elevation?: number; angle: number; power: number; tipX: number; tipY: number; ball?: number; pocket?: number }
 
 function segClear(
   x1: number, y1: number, x2: number, y2: number, balls: Ball[], ignore: number[], margin = 0.004,
@@ -96,13 +98,13 @@ export function legalTargets(balls: Ball[], group: string | null, open: boolean)
 
 export interface CpuPlan extends CpuShot {
   ball: number; pocket: number;
-  family: 'direct' | 'bank' | 'kick' | 'safety' | 'break' | 'development';
+  family: 'direct' | 'bank' | 'kick' | 'safety' | 'break' | 'development' | 'jump' | 'masse';
   placement?: { x: number; y: number };
   breakStyle?: string;
   verified: boolean;
   score: number;
   evidence?: { clusterLinksOpened: number; newObjectRoutes: number; newTargetsAvailable: number;
-    opponentClusterLinksOpened: number; opponentNewObjectRoutes: number; nextShots: number; opponentShots: number };
+    opponentClusterLinksOpened: number; opponentNewObjectRoutes: number; nextShots: number; opponentShots: number; lookaheadDepth?: number; followUpTrials?: number; followUpVerified?: boolean; runout?: boolean; peakHeight?: number; curveDisplacement?: number };
 }
 
 function powerForSpeed(speed: number, vmax: number): number {
@@ -277,40 +279,58 @@ function placementSeeds(gs: GameState, rnd:()=>number): CpuPlan[] {
   return unique;
 }
 
-/** Entirely offline. Preview copies use the same elevation, physics and rules as fire(). */
-export function planCpuTurn(gs: GameState, maxTrials = 12, budgetMs = 120, rnd:()=>number=Math.random): CpuPlan | null {
-  if(gs.winner!==null) return null;
-  const deadline=performance.now()+budgetMs;
-  const seeds=placementSeeds(gs,rnd);
-  if(!seeds.length) return null;
-  const vmax=gs.rules[gs.breakShot?'breakMax':'normalMax'];
-  // Geometry seeds use the default 3.5 m/s calibration; custom caps change
-  // normalized power, not the intended physical energy. Development is already calibrated.
-  if(!gs.breakShot) for(const seed of seeds) if(seed.family!=='development')
-    seed.power=powerForSpeed(shootSpeed(seed.power,3.5),vmax);
-  const firm={...seeds[0],power:powerForSpeed(shootSpeed(seeds[0].power,vmax)+.65,vmax)};
-  const queue=[...seeds.slice(0,1),...(gs.breakShot?[]:[firm]),...seeds.slice(1,8),...(gs.breakShot?[]:seeds.slice(0,2)).flatMap(s=>[
-    {...s,power:Math.max(.12,s.power*.7),tipY:.18}, {...s,tipY:-.22},
-  ])];
-  let best: CpuPlan|null=null;
-  for(const seed of queue.slice(0,maxTrials)) {
-    if(performance.now()>=deadline) break;
+/** Geometry proposes elevated rescue shots; full physics must establish legality. */
+export function advancedPlans(gs:GameState):CpuPlan[] {
+  if(gs.breakShot||gs.ballInHand)return [];
+  const cue=gs.balls[0],plans:CpuPlan[]=[];
+  for(const ball of gs.balls){
+    if(ball.potted||ball.n===null||!ruleTargets(gs).includes(ball.n))continue;
+    if(gs.kitchenShot&&ball.x<TABLE_W/4)continue;
+    for(let pocket=0;pocket<POCKETS.length;pocket++){
+      const p=POCKETS[pocket],distance=Math.hypot(ball.x-p.x,ball.y-p.y);
+      if(!distance)continue;
+      const gx=ball.x+2*BALL_R*(ball.x-p.x)/distance,gy=ball.y+2*BALL_R*(ball.y-p.y)/distance;
+      if(gx<BALL_R||gx>TABLE_W-BALL_R||gy<BALL_R||gy>TABLE_H-BALL_R)continue;
+      if(!segClear(ball.x,ball.y,p.x,p.y,gs.balls,[0,ball.id]))continue;
+      if(segClear(cue.x,cue.y,gx,gy,gs.balls,[0,ball.id]))continue;
+      const seed:CpuPlan={angle:Math.atan2(gy-cue.y,gx-cue.x),power:.85,tipX:0,tipY:.1,
+        ball:ball.n,pocket,family:'jump',score:0,verified:false};
+      for(const elevation of [.45,.7,.95])plans.push({...seed,elevation});
+      for(const side of [-1,1])plans.push({...seed,family:'masse',elevation:1.05,power:.55,
+        tipY:0,tipX:side*.45,angle:Math.atan2(ball.y-cue.y,ball.x-cue.x)-side*.4});
+      if(plans.length>=10)return plans;
+    }
+  }
+  return plans;
+}
+
+function previewPlan(gs:GameState,seed:CpuPlan,deadline:number){
     const state=structuredClone(gs),me=state.current;
-    if((state.ballInHand||seed.placement) && (!seed.placement || !placeCue(state,seed.placement.x,seed.placement.y))) continue;
-    const cue=state.balls[0];beginShot(state,seed.ball,seed.pocket);
-    strike(cue,Math.cos(seed.angle),Math.sin(seed.angle),seed.power,seed.tipX,seed.tipY,
-      state.rules[state.breakShot?'breakMax':'normalMax'],cueElevation(cue.x,cue.y,seed.angle,0,state.balls,seed.tipX,seed.tipY),state.rules.chalkSim?state.chalk[state.current]:1);
-    const ev: ShotEvents={firstContact:null,potted:[],offTable:[],railAfterContact:false,cuePotted:false};
-    const contact={v:false};let ticks=0;
+    if((state.ballInHand||seed.placement) && (!seed.placement || !placeCue(state,seed.placement.x,seed.placement.y))) return null;
+    const cue=state.balls[0];
+    const elevation=Math.max(seed.elevation??0,cueElevation(cue.x,cue.y,seed.angle,0,state.balls,seed.tipX,seed.tipY));
+    beginShot(state,seed.ball,seed.pocket);
+    const chalk=state.rules.chalkSim?state.chalk[me]:1;
+    if(state.rules.chalkSim)state.chalk[me]=wearChalk(chalk,seed.power,seed.tipX,seed.tipY);
+    const ev=strikeBalls(state.balls,0,Math.cos(seed.angle),Math.sin(seed.angle),seed.power,seed.tipX,seed.tipY,
+      state.rules[state.breakShot?'breakMax':'normalMax'],elevation,chalk);
+    const contact={v:ev.firstContact!==null};let ticks=0;
+    let peak=cue.z,curvature=0,trackingCurve=true;
+    const initialX=cue.x,initialY=cue.y,initialAngle=Math.atan2(cue.vy,cue.vx);
     while(ticks<45/DT && !allAsleep(state.balls)) {
       if(ticks%64===0 && performance.now()>=deadline) break;
       step(state.balls,DT,ev,0,contact);ticks++;
+      peak=Math.max(peak,cue.z);
+      if(Math.min(cue.x,TABLE_W-cue.x,cue.y,TABLE_H-cue.y)<BALL_R+.002)trackingCurve=false;
+      if(ev.firstContact===null&&trackingCurve)curvature=Math.max(curvature,Math.abs(-(cue.x-initialX)*Math.sin(initialAngle)+(cue.y-initialY)*Math.cos(initialAngle)));
     }
-    if(!allAsleep(state.balls)) continue;
-    if(seed.breakStyle?.startsWith('second-')&&ev.firstContact!==seed.ball)continue;
+    if(!allAsleep(state.balls)) return null;
+    if(seed.breakStyle?.startsWith('second-')&&ev.firstContact!==seed.ball)return null;
+    if(seed.family==='jump'&&(peak<.01||ev.firstContact!==seed.ball))return null;
+    if(seed.family==='masse'&&(curvature<.01||ev.firstContact!==seed.ball))return null;
     applyShot(state,ev);
-    if(state.winner===1-me || state.ballInHand || state.message.startsWith('Illegal break')) continue;
-    const continues=state.current===me;
+    if(state.winner===1-me || state.ballInHand || state.message.startsWith('Illegal break')) return null;
+    const resolvedCurrent=state.current,continues=state.current===me;
     state.current=me;
     const own=shotCandidates(state.balls,ruleTargets(state));
     const comparison={...gs,current:me,groups:state.groups,open:state.open};
@@ -330,11 +350,69 @@ export function planCpuTurn(gs: GameState, maxTrials = 12, budgetMs = 120, rnd:(
     let score=state.winner===me?10000:(continues?80+Math.min(own.length,5)*3:30-Math.min(opponent,5)*3);
     if(before.pairs.size) score+=Math.min(20,Math.min(6,.5*opened)+Math.min(4,2*newRoutes)+Math.min(12,6*newTargets))-Math.min(15,.8*opponentOpened+4*opponentRoutes);
     score-=.2*seed.power;
-    const plan={...seed,score,verified:true,evidence:{clusterLinksOpened:opened,newObjectRoutes:newRoutes,newTargetsAvailable:newTargets,
+    const plan:CpuPlan={...seed,elevation,score,verified:true,evidence:{peakHeight:peak,curveDisplacement:curvature,clusterLinksOpened:opened,newObjectRoutes:newRoutes,newTargetsAvailable:newTargets,
       opponentClusterLinksOpened:opponentOpened,opponentNewObjectRoutes:opponentRoutes,nextShots:own.length,opponentShots:opponent}};
-    if(!best || score>best.score) best=plan;
-    if(state.winner===me) break;
+    state.current=resolvedCurrent;
+    return {plan,state,continues};
+}
+
+/** Entirely offline. Preview copies use the same elevation, physics and rules as fire(). */
+export function planCpuTurn(gs: GameState, maxTrials = 12, budgetMs = 120, rnd:()=>number=Math.random): CpuPlan | null {
+  if(gs.winner!==null) return null;
+  const deadline=performance.now()+budgetMs;
+  const seeds=placementSeeds(gs,rnd);
+  if(!seeds.length) return null;
+  const vmax=gs.rules[gs.breakShot?'breakMax':'normalMax'];
+  // Geometry seeds use the default 3.5 m/s calibration; custom caps change
+  // normalized power, not the intended physical energy. Development is already calibrated.
+  if(!gs.breakShot) for(const seed of seeds) if(seed.family!=='development')
+    seed.power=powerForSpeed(shootSpeed(seed.power,3.5),vmax);
+  const firm={...seeds[0],power:powerForSpeed(shootSpeed(seeds[0].power,vmax)+.65,vmax)};
+  const queue=[...seeds.slice(0,1),...(gs.breakShot?[]:[firm]),...seeds.slice(1,8),...(gs.breakShot?[]:seeds.slice(0,2)).flatMap(s=>[
+    {...s,power:Math.max(.12,s.power*.7),tipY:.18}, {...s,tipY:-.22},
+  ])];
+  const advanced=advancedPlans(gs);
+  if(advanced.length)queue.splice(5,0,advanced[0],advanced[3],advanced[4],advanced[1]);
+  const limit=Math.max(0,Math.min(64,maxTrials));
+  const rootLimit=gs.breakShot||limit<8?limit:limit-Math.min(4,Math.floor(limit/3));
+  let trials=0;
+  const completed:Array<NonNullable<ReturnType<typeof previewPlan>>>=[];
+  for(const seed of queue.slice(0,rootLimit)){
+    if(performance.now()>=deadline)break;
+    trials++;
+    const result=previewPlan(gs,seed,deadline);
+    if(result)completed.push(result);
   }
+  completed.sort((a,b)=>b.plan.score-a.plan.score);
+  if(!gs.breakShot){
+    for(const root of completed.filter(r=>r.continues&&r.state.winner===null).slice(0,2)){
+      for(const seed of placementSeeds(root.state,rnd).slice(0,2)){
+        if(trials>=limit||performance.now()>=deadline)break;
+        trials++;
+        if(seed.family!=='development')seed.power=powerForSpeed(shootSpeed(seed.power,3.5),vmax);
+        const child=previewPlan(root.state,seed,deadline);
+        if(!child)continue;
+        const evidence=root.plan.evidence!;
+        evidence.lookaheadDepth=Math.max(2,evidence.lookaheadDepth??1);
+        evidence.followUpTrials=(evidence.followUpTrials??0)+1;
+        if(child.continues){
+          if(!evidence.followUpVerified)root.plan.score+=35;
+          evidence.followUpVerified=true;
+          if(child.state.winner===gs.current){if(!evidence.runout)root.plan.score+=150;evidence.runout=true;}
+          else if(ruleTargets(child.state).length<=2&&trials<limit&&performance.now()<deadline){
+            const third=placementSeeds(child.state,rnd)[0];
+            if(third){
+              if(third.family!=='development')third.power=powerForSpeed(shootSpeed(third.power,3.5),vmax);trials++;
+              const leaf=previewPlan(child.state,third,deadline);
+              if(leaf){evidence.lookaheadDepth=3;if(leaf.state.winner===gs.current){if(!evidence.runout)root.plan.score+=150;evidence.runout=true;}}
+            }
+          }
+        }
+      }
+    }
+  }
+  completed.sort((a,b)=>b.plan.score-a.plan.score);
+  const best=completed[0]?.plan;
   // Unverified escape remains explicit; never target a potted apex as a fallback.
   return best ?? seeds[0];
 }
