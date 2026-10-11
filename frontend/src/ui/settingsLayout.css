@@ -78,7 +78,8 @@
 
 #rules-comparison{margin:12px 0;border:1px solid #514637;border-radius:10px;padding:12px}
 #rules-comparison>summary{cursor:pointer;font-weight:700;min-height:32px;align-content:center}
-#rules-comparison table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:13px;line-height:1.4}
+#rules-comparison-content{overflow-x:auto;overscroll-behavior-x:contain}
+#rules-comparison table{min-width:460px;width:100%;table-layout:fixed;border-collapse:collapse;font-size:13px;line-height:1.4}
 #rules-comparison caption{text-align:left;margin:8px 0;font-weight:700}
 #rules-comparison th,#rules-comparison td{text-align:left;vertical-align:top;padding:9px 6px;border-bottom:1px solid #514637;overflow-wrap:anywhere}
 #rules-comparison thead th{color:#d8e5c8}
