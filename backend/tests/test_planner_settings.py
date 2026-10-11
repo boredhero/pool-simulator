@@ -44,6 +44,8 @@ def fixture(settings):
 
 
 def execute(gs, shot):
+    if gs.break_shot and shot.get("placement"):
+        gs.ball_in_hand, gs.placement = True, "kitchen"
     if gs.ball_in_hand:
         assert place_cue(gs, **shot["placement"])
     cue = gs.balls[0]
@@ -56,7 +58,7 @@ def execute(gs, shot):
         shot["tipX"],
         shot["tipY"],
         gs.rules["breakMax" if gs.break_shot else "normalMax"],
-        cue_elevation(cue.x, cue.y, shot["aim"], 0, gs.balls),
+        cue_elevation(cue.x, cue.y, shot["aim"], 0, gs.balls, shot["tipX"], shot["tipY"]),
     )
     events = simulate_shot(gs.balls, 0)
     assert all_asleep(gs.balls)
@@ -84,7 +86,8 @@ def test_selected_plan_executes_under_custom_rules(settings):
 def test_break_cap_is_used_by_actual_plan_and_replay(maximum):
     gs = new_game(1, {"preset": "custom", "breakMax": maximum, "strictBreak": True})
     selected = plan_shots(gs, max_trials=1, budget_seconds=None)[0]
-    assert selected["power"] == 1
+    assert 0 < selected["power"] <= 1
+    assert selected["evidence"]["launchSpeed"] <= maximum
     events = execute(gs, selected)  # Low caps may foul but must finish.
     if maximum == 9.5:
         assert not events.off_table
@@ -114,3 +117,12 @@ def test_unverified_fallback_preserves_physical_energy_under_custom_caps():
         powers[maximum] = shot["power"]
     assert powers[1] == 1
     assert shoot_speed(powers[8.5], 8.5) == pytest.approx(shoot_speed(powers[3.5], 3.5))
+
+
+def test_custom_fixed_break_does_not_relocate_ai_cue():
+    from app.sim.planner import _break_seeds
+
+    state = new_game(options={"preset": "custom", "breakPlacement": False})
+    assert all("placement" not in shot for shot in _break_seeds(state, "fixed"))
+    selected = plan_shots(state, budget_seconds=None)[0]
+    assert "placement" not in selected

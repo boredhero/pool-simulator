@@ -641,6 +641,10 @@ export class Game {
       if(keys[e.key]){e.preventDefault();e.stopPropagation();this.setSpin(this.tipX+keys[e.key][0],this.tipY+keys[e.key][1]);}
       else if(e.key==='Home'||e.key==='0'){e.preventDefault();e.stopPropagation();this.setSpin(0,0);}
     });
+    document.getElementById('breakplace')!.addEventListener('click',()=>{
+      if(!this.humanTurn()||this.mode!=='aim'||this.pulling||!this.gs.breakShot||this.gs.rules.breakPlacement===false)return;
+      this.mode='place';this.placeX=this.cue().x;this.placeY=this.cue().y;this.hud();
+    });
     document.getElementById('resetspin')!.addEventListener('click',()=>this.setSpin(0,0));
     const setCameraMode=(enabled:boolean)=>{
       this.cameraMode=enabled;cancelPull();this.placementPress=null;this.scene.cameraRig.setMode(enabled);
@@ -818,6 +822,11 @@ export class Game {
     try { localStorage.setItem('pool:seen', '1'); } catch { /* private mode */ }
     const c = this.cue();
     if (c.potted) return;
+    if(this.gs.breakShot&&c.x>=TABLE_W/4){
+      this.el.msg.textContent='Place the cue ball behind the head string before breaking';
+      if(this.gs.rules.breakPlacement!==false)this.mode='place';
+      return;
+    }
     if (callRequired(this.gs) && (this.calledBall === null || this.calledPocket === null)) {
       this.el.msg.textContent = 'Choose a ball and tap its destination pocket before shooting'; return;
     }
@@ -859,7 +868,7 @@ export class Game {
       const selected=freezeShot({aim:plan.angle,power:plan.power,tipX:plan.tipX,tipY:plan.tipY,
         calledBall:plan.ball,calledPocket:plan.pocket,placement:plan.placement??{x:this.cue().x,y:this.cue().y}});
       if(!await this.showOpponentShot(selected,valid))return;
-      if(state.ballInHand&&!placeCue(state,selected.placement.x,selected.placement.y))return;
+      if((state.ballInHand||plan.placement)&&!placeCue(state,selected.placement.x,selected.placement.y))return;
       this.opponentAction=null;this.mode='aim';
       this.angle=this.targetAngle=selected.aim;
       this.calledBall=selected.calledBall;this.calledPocket=selected.calledPocket;
@@ -975,6 +984,7 @@ export class Game {
       this.angle += d * Math.min(1, fdt * 14);
     }
     (document.getElementById('touchshoot') as HTMLButtonElement).disabled=!this.humanTurn()||this.pointers.size>0;
+    document.getElementById('breakplace')!.hidden=!(this.gs.breakShot&&this.gs.rules.breakPlacement!==false&&this.humanTurn()&&this.mode==='aim'&&!this.pulling&&!this.tutorial.active);
     const aiming = this.mode === 'aim' && !this.cue().potted && this.humanCueControls();
     const pulling = this.pulling && aiming;
     const pull = 0.012 + (pulling ? this.pullPower() * 0.18 : 0);
@@ -994,9 +1004,9 @@ export class Game {
     (document.getElementById('resetspin') as HTMLButtonElement).disabled=!controls||Math.hypot(this.tipX,this.tipY)<1e-9;
     this.el.spin.setAttribute('aria-disabled',String(!controls));
     (this.el.chargefill as HTMLElement).style.width = pulling ? `${this.pullPower() * 100}%` : '0%';
-    this.scene.setKitchen((this.mode === 'place' && this.gs.placement === 'kitchen') || (aiming && this.gs.kitchenShot), aiming);
+    this.scene.setKitchen((this.mode === 'place' && (this.gs.placement === 'kitchen'||this.gs.breakShot)) || (aiming && this.gs.kitchenShot), aiming);
     if (this.mode === 'place' && this.humanCueControls()) {
-      this.scene.setPlace(true, this.placeX, this.placeY, canPlace(this.gs, this.placeX, this.placeY), this.gs.placement);
+      this.scene.setPlace(true, this.placeX, this.placeY, canPlace(this.gs, this.placeX, this.placeY), this.gs.breakShot?'kitchen':this.gs.placement);
     } else {
       this.scene.setPlace(false, 0, 0, false);
     }

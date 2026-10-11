@@ -1,4 +1,5 @@
 [
+  {"version":"1.5.6","date":"2026-10-11","title":"Varied Jev breaks","changes":["Jev chooses between previewed head-ball and second-ball breaks with varied legal placements, pace, and spin.","Break setups vary between racks while keeping server and client shot physics deterministic.","CPU uses varied offline break plans without Jev requests.","Place and reposition the cue ball behind the head string before breaking. Bar and Tournament allow it; Custom can use a fixed start."]},
   {"version":"1.5.5","date":"2026-10-09","title":"Diagnostics and visit counts","changes":["Show diagnostic references on request errors and explain Jev CPU fallbacks.","Add compressed, bounded application logs with retention across deployments.","Show consented anonymous visit counts in the owner dashboard without browser fingerprinting."]},
   {
     "version": "1.5.4",

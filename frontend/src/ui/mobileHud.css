@@ -1,5 +1,6 @@
 /* Keep mobile play controls together and reserve the center for the table. */
 @media(max-width:900px){
+  #breakplace{order:-1;flex:1 0 100%;font-size:13px;min-height:44px;padding:0 10px}
   .topbar{left:8px;right:8px;padding:6px 8px;gap:4px;border-radius:13px}
   .topbar .status-meta{display:contents}
   .topbar #accountidentity{order:0;flex:1;max-width:none;margin:0;padding:0 8px;gap:5px;font-size:13px;height:44px}
@@ -83,4 +84,8 @@
 
 @media(max-width:380px) and (pointer:coarse){
   html.touch-input body:not(.tutorial-practice) .spin-control .control-label{display:none}
+}
+
+@media(max-width:900px) and (orientation:portrait){
+  #breakplace{position:absolute;bottom:calc(100% + 6px);left:0;flex:none;background:#302a21;border:1px solid #75634a}
 }

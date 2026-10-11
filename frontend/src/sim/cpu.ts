@@ -98,6 +98,7 @@ export interface CpuPlan extends CpuShot {
   ball: number; pocket: number;
   family: 'direct' | 'bank' | 'kick' | 'safety' | 'break' | 'development';
   placement?: { x: number; y: number };
+  breakStyle?: string;
   verified: boolean;
   score: number;
   evidence?: { clusterLinksOpened: number; newObjectRoutes: number; newTargetsAvailable: number;
@@ -224,7 +225,31 @@ function geometryPlans(gs: GameState): CpuPlan[] {
   return [shot(target,[target.x,target.y],0,'safety',.5)];
 }
 
-function placementSeeds(gs: GameState): CpuPlan[] {
+/** Deliberate break variations; randomness proposes a shot, never alters physics. */
+export function breakPlans(gs: GameState, rnd:()=>number=Math.random):CpuPlan[] {
+  const rack=gs.balls.filter(b=>b.n!==null&&!b.potted).sort((a,b)=>a.x-b.x||a.y-b.y);
+  if(!rack.length)return [];
+  const movable=gs.rules.breakPlacement!==false;
+  const styles:Array<[string,number,Ball,number,number,number]>=[
+    ['head-on',.5,rack[0],1,.06,0],['head-left',.32,rack[0],.9,.10,0],['head-right',.68,rack[0],.9,.10,0],
+  ];
+  if(movable&&rack.length>=3){
+    const second=rack.slice(1,3).sort((a,b)=>a.y-b.y);
+    styles.push(['second-left',.13,second[0],.78,-.1,-.035],['second-right',.87,second[1],.78,-.1,.035]);
+  }
+  for(let i=styles.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[styles[i],styles[j]]=[styles[j],styles[i]];}
+  return styles.flatMap(([breakStyle,lane,target,power,tipY,offset])=>{
+    const x=movable?TABLE_W/4-(.015+rnd()*.075):gs.balls[0].x;
+    const y=movable?TABLE_H*lane+(rnd()-.5)*.07:gs.balls[0].y;
+    if(movable&&!canPlace(gs,x,y))return [];
+    return [{angle:Math.atan2(target.y+offset-y,target.x-x),power:Math.min(1,power+(rnd()-.5)*.08),
+      tipX:0,tipY:tipY+(rnd()-.5)*.05,ball:target.n!,pocket:0,family:'break' as const,
+      breakStyle,verified:false,score:0,...(movable?{placement:{x,y}}:{})}];
+  });
+}
+
+function placementSeeds(gs: GameState, rnd:()=>number): CpuPlan[] {
+  if(gs.breakShot)return breakPlans(gs,rnd);
   if (!gs.ballInHand) return geometryPlans(gs);
   const points: Array<[number,number]> = [];
   for (const ball of gs.balls.filter(b => !b.potted && b.n !== null && ruleTargets(gs).includes(b.n))) {
@@ -253,10 +278,10 @@ function placementSeeds(gs: GameState): CpuPlan[] {
 }
 
 /** Entirely offline. Preview copies use the same elevation, physics and rules as fire(). */
-export function planCpuTurn(gs: GameState, maxTrials = 12, budgetMs = 120): CpuPlan | null {
+export function planCpuTurn(gs: GameState, maxTrials = 12, budgetMs = 120, rnd:()=>number=Math.random): CpuPlan | null {
   if(gs.winner!==null) return null;
   const deadline=performance.now()+budgetMs;
-  const seeds=placementSeeds(gs);
+  const seeds=placementSeeds(gs,rnd);
   if(!seeds.length) return null;
   const vmax=gs.rules[gs.breakShot?'breakMax':'normalMax'];
   // Geometry seeds use the default 3.5 m/s calibration; custom caps change
@@ -264,14 +289,14 @@ export function planCpuTurn(gs: GameState, maxTrials = 12, budgetMs = 120): CpuP
   if(!gs.breakShot) for(const seed of seeds) if(seed.family!=='development')
     seed.power=powerForSpeed(shootSpeed(seed.power,3.5),vmax);
   const firm={...seeds[0],power:powerForSpeed(shootSpeed(seeds[0].power,vmax)+.65,vmax)};
-  const queue=[...seeds.slice(0,1),...(gs.breakShot?[]:[firm]),...seeds.slice(1,8),...seeds.slice(0,2).flatMap(s=>[
+  const queue=[...seeds.slice(0,1),...(gs.breakShot?[]:[firm]),...seeds.slice(1,8),...(gs.breakShot?[]:seeds.slice(0,2)).flatMap(s=>[
     {...s,power:Math.max(.12,s.power*.7),tipY:.18}, {...s,tipY:-.22},
   ])];
   let best: CpuPlan|null=null;
   for(const seed of queue.slice(0,maxTrials)) {
     if(performance.now()>=deadline) break;
     const state=structuredClone(gs),me=state.current;
-    if(state.ballInHand && (!seed.placement || !placeCue(state,seed.placement.x,seed.placement.y))) continue;
+    if((state.ballInHand||seed.placement) && (!seed.placement || !placeCue(state,seed.placement.x,seed.placement.y))) continue;
     const cue=state.balls[0];beginShot(state,seed.ball,seed.pocket);
     strike(cue,Math.cos(seed.angle),Math.sin(seed.angle),seed.power,seed.tipX,seed.tipY,
       state.rules[state.breakShot?'breakMax':'normalMax'],cueElevation(cue.x,cue.y,seed.angle,0,state.balls,seed.tipX,seed.tipY),state.rules.chalkSim?state.chalk[state.current]:1);
@@ -282,6 +307,7 @@ export function planCpuTurn(gs: GameState, maxTrials = 12, budgetMs = 120): CpuP
       step(state.balls,DT,ev,0,contact);ticks++;
     }
     if(!allAsleep(state.balls)) continue;
+    if(seed.breakStyle?.startsWith('second-')&&ev.firstContact!==seed.ball)continue;
     applyShot(state,ev);
     if(state.winner===1-me || state.ballInHand || state.message.startsWith('Illegal break')) continue;
     const continues=state.current===me;

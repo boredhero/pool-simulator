@@ -32,6 +32,7 @@ from app.sim.rules import (
     new_game,
     place_cue,
 )
+from app.sim.table import TABLE_W
 
 logger = logging.getLogger("pool.rooms")
 
@@ -352,6 +353,9 @@ async def handle(ws: WebSocket) -> None:
                     await room.reject(ws, "bad shot")
                     continue
                 cue = room.gs.balls[0]
+                if room.gs.break_shot and cue.x >= TABLE_W / 4:
+                    await room.reject(ws, "Break from behind the head string.")
+                    continue
                 if cue.potted or room.gs.ball_in_hand:
                     await room.reject(ws, "cue ball in hand — place it first")
                     continue
@@ -461,7 +465,13 @@ async def handle(ws: WebSocket) -> None:
                 pass  # Playback acknowledgement is not evidence and cannot create statistics.
 
             elif typ == "place":
-                if seat != room.gs.current or not room.gs.ball_in_hand or room.busy:
+                if (
+                    seat != room.gs.current
+                    or room.busy
+                    or not all(room.players)
+                    or not room.match_id
+                    or room.gs.winner is not None
+                ):
                     continue
                 try:
                     x, y = float(msg["x"]), float(msg["y"])
