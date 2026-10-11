@@ -185,12 +185,13 @@ body:has(#tutorial:not([hidden])) .privacy-notice{display:none}
   <details class="settings-group" open><summary><span>Table &amp; rules<small>Game presets and rack settings</small></span></summary><div class="settings-group-body">
   <label for="rulespreset">Game</label><select id="rulespreset"><option value="bar">8-Ball (Bar)</option><option value="tournament">8-Ball (Tourny)</option><option value="custom">8-Ball (Custom)</option></select>
   <p class="guide-note" id="rulesnotice">Preset rules are locked. Choose Custom to make them your own.</p>
+  <details id="rules-comparison"><summary>Compare rulesets</summary><p class="guide-note">Preview only. Rules change when you start a new rack. Tournament is our simplified tournament preset, not a complete WPA implementation.</p><div id="rules-comparison-content"></div><p class="guide-note">Both presets: a scratch never assigns groups. Pocketing the 8 and scratching loses, except Tournament respots the 8 on the break.</p></details>
   <button id="rule-details-toggle" type="button" aria-expanded="false" aria-controls="rulefields">View rule details</button>
   <fieldset id="rulefields" aria-label="Game rules" hidden>
     <label for="scratchrule">Scratch placement</label><select id="scratchrule"><option value="kitchen">Behind the head string</option><option value="anywhere">Anywhere (except break)</option></select>
     <label for="callsrule">Call shots</label><select id="callsrule"><option value="none">No calls</option><option value="eight">8-Ball only</option><option value="all">Every ball</option></select>
     <label for="eightbreakrule">8-Ball on the break</label><select id="eightbreakrule"><option value="win">Win</option><option value="spot">Spot it; keep playing</option></select>
-    <label class="check"><input id="scratch8rule" type="checkbox"> Scratch while on the 8 loses</label>
+    <label class="check"><input id="scratch8rule" type="checkbox"> Scratch while on the 8 loses even if the 8 stays up</label>
     <label class="check"><input id="assignrule" type="checkbox"> Assign groups on the break</label>
     <label class="check"><input id="breakplacementrule" type="checkbox"> Allow cue placement behind the head string before breaking</label>
     <label class="check"><input id="strictbreakrule" type="checkbox"> Legal break: pot or four object rails</label>

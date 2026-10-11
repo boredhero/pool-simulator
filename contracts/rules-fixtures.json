@@ -449,7 +449,7 @@
     ]
   },
   {
-    "name": "bar scratch on eight loses even if eight stays",
+    "name": "bar scratch on eight stays alive",
     "state": {
       "breakShot": false,
       "open": false,
@@ -466,7 +466,10 @@
       "cuePotted": true
     },
     "expected": {
-      "winner": 1
+      "winner": null,
+      "current": 1,
+      "ballInHand": true,
+      "placement": "kitchen"
     },
     "pottedBefore": [
       1,
@@ -735,5 +738,78 @@
         5
       ]
     }
+  },
+  {
+    "name": "bar eight and cue pocketed together loses",
+    "state": {
+      "breakShot": false,
+      "open": false,
+      "groups": [
+        "solid",
+        "stripe"
+      ]
+    },
+    "ev": {
+      "firstContact": 8,
+      "potted": [
+        8
+      ],
+      "offTable": [],
+      "railAfterContact": true,
+      "cuePotted": true
+    },
+    "expected": {
+      "winner": 1
+    },
+    "pottedBefore": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "call": [
+      8,
+      2
+    ]
+  },
+  {
+    "name": "bar eight and cue off table loses",
+    "state": {
+      "breakShot": false,
+      "open": false,
+      "groups": [
+        "solid",
+        "stripe"
+      ]
+    },
+    "ev": {
+      "firstContact": 8,
+      "potted": [],
+      "offTable": [
+        8,
+        null
+      ],
+      "railAfterContact": true,
+      "cuePotted": true
+    },
+    "expected": {
+      "winner": 1
+    },
+    "pottedBefore": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "call": [
+      8,
+      2
+    ]
   }
 ]

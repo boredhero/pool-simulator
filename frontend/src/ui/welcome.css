@@ -9,3 +9,4 @@
 @media(max-height:600px){.welcome-header{padding:12px 16px}.welcome-header h1{font-size:24px}.welcome-header>p,.welcome-eyebrow{display:none}.welcome-footer{padding:10px 16px}.welcome-footer>p{display:none}}
 
 #welcometitle:focus{outline:none}
+#welcomerulessection{display:grid;gap:8px;padding:14px;background:#252c20;border:1px solid #667853;border-radius:10px}
