@@ -27,7 +27,7 @@ from app.sim import opening
 from app.sim.chalk import contact, wear
 from app.sim.config import match_config
 from app.sim.cue import cue_elevation
-from app.sim.physics import Ball, simulate_shot, strike
+from app.sim.physics import Ball
 from app.sim.planner import plan_shots
 from app.sim.rules import (
     GameState,
@@ -39,6 +39,7 @@ from app.sim.rules import (
     new_game,
     place_cue,
 )
+from app.sim.stroke import simulate_stroke
 from app.sim.table import TABLE_W
 
 router = APIRouter(prefix="/opponents/jev")
@@ -277,6 +278,12 @@ def describe_plan(plan: dict) -> dict:
     ev = plan.get("evidence", {})
     return {
         "family": plan["family"],
+        "elevation_degrees": round(math.degrees(plan.get("elevation", 0)), 1),
+        "lookahead": {
+            "verified_depth": ev.get("lookaheadDepth", 0),
+            "verified_runout": ev.get("runout", False),
+            "follow_up_verified": ev.get("followUpVerified", False),
+        },
         "break_style": plan.get("breakStyle", "not a break variation"),
         "target_ball": plan["calledBall"],
         "called_pocket": plan["calledPocket"],
@@ -567,8 +574,10 @@ async def play_turn(
             )
             gs.chalk[by] = wear(chalk_level, shot["power"], shot["tipX"], shot["tipY"])
         begin_shot(gs, shot["calledBall"], shot["calledPocket"])
-        strike(
-            cue,
+        events = await asyncio.to_thread(
+            simulate_stroke,
+            gs.balls,
+            0,
             math.cos(shot["aim"]),
             math.sin(shot["aim"]),
             shot["power"],
@@ -578,7 +587,6 @@ async def play_turn(
             elevation,
             chalk_level,
         )
-        events = await asyncio.to_thread(simulate_shot, gs.balls, 0)
         apply_shot(gs, events)
         with Session.begin() as db:
             game = db.get(JevGame, game_id)

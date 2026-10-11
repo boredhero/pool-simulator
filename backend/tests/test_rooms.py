@@ -393,15 +393,15 @@ def test_busy_rejection_contains_last_completed_table_not_worker_positions(monke
     from app.net import rooms
 
     reached, release = threading.Event(), threading.Event()
-    simulate = rooms.simulate_shot
+    simulate = rooms.simulate_stroke
 
-    def blocked(balls, cue_id):
-        events = simulate(balls, cue_id)
+    def blocked(balls, cue_id, *args):
+        events = simulate(balls, cue_id, *args)
         reached.set()
         assert release.wait(5)
         return events
 
-    monkeypatch.setattr(rooms, "simulate_shot", blocked)
+    monkeypatch.setattr(rooms, "simulate_stroke", blocked)
     with TestClient(app) as client:
         with client.websocket_connect("/ws") as first, client.websocket_connect("/ws") as second:
             room = lobby.get(pair(first, second))

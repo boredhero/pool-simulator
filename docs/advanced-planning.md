@@ -1,7 +1,7 @@
 # Bounded continuation planning
 
 Both the offline CPU and server planner propose geometric shots, simulate them
-with the production physics/rules, and retain measured legal results. Jev selects
+with the production physics/rules, and retain simulated legal results. Jev selects
 from server-verified options; it does not supply unverified trajectories. The CPU
 never calls a model or provider.
 
