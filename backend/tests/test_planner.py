@@ -192,3 +192,38 @@ def test_creative_contacts_are_previewed_within_existing_trial_budget(monkeypatc
     assert len(attempted) == 8
     assert any(s.get("contactStyle") == "glancing" for s in attempted)
     assert all(s["evidence"]["legal"] and not s["evidence"]["lost"] for s in choices)
+
+
+def test_break_variations_are_repeatable_per_rack_and_differ_between_racks():
+    from app.sim.planner import _break_seeds
+
+    state = new_game(1)
+    original = copy.deepcopy(state)
+    first = _break_seeds(state, "rack-a")
+    assert first == _break_seeds(state, "rack-a")
+    assert first != _break_seeds(state, "rack-b")
+    assert len({s["breakStyle"] for s in first}) == 5
+    assert state == original
+    placement_state = copy.deepcopy(state)
+    placement_state.ball_in_hand, placement_state.placement = True, "kitchen"
+    for shot in first:
+        assert can_place(placement_state, **shot["placement"])
+        assert 0 < shot["power"] <= 1
+        assert math.hypot(shot["tipX"], shot["tipY"]) <= 0.55
+
+
+@pytest.mark.parametrize("preset", ["bar", "tournament"])
+def test_break_preview_varies_settled_positions_without_mutating_input(preset):
+    state = new_game(1, {"preset": preset})
+    original = copy.deepcopy(state)
+    finishes = []
+    for seed in ("rack-a", "rack-b", "rack-c"):
+        choices = plan_shots(state, break_seed=seed, budget_seconds=None)
+        assert len(choices) > 1
+        assert all(s["evidence"]["verified"] and s["evidence"]["legal"] for s in choices)
+        for shot in choices:
+            if shot.get("breakStyle", "").startswith("second-"):
+                assert shot["evidence"]["firstContact"] == shot["calledBall"]
+        finishes.append(choices[0]["evidence"]["cueFinish"])
+    assert len({(p["x"], p["y"]) for p in finishes}) == 3
+    assert state == original

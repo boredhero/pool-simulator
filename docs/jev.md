@@ -153,3 +153,28 @@ opportunities. The old numeric-candidates-only description above is historical. 
 usernames, browser IPs, credentials, and player-written text are not model input. A server
 API credential authorizes requests; the provider still receives server connection metadata.
 See [data inventory](data-inventory.md) for retention and deletion details.
+
+
+## 1.5.6 break selection
+
+Previously the break offered only the fixed fallback and explicitly bypassed Jev.
+The server now samples head-on, offset head-ball, and left/right second-ball setups.
+Each game ID seeds bounded variations in kitchen placement, speed and vertical tip
+contact. This seed only proposes shots; the selected shot and physics remain exact.
+Second-ball candidates must actually hit their intended ball in the preview.
+Legal settled previews take precedence over fouls; the existing time/trial budget
+and unverified fallback remain available when previews cannot finish.
+
+Jev can select between break candidates using the same metered request and fallback
+path as other turns. CPU seats never call Jev. A single surviving candidate needs
+no model call. Different racks sample different setups, but a particular style is
+not forbidden from recurring and a timeout can still use the standard fallback.
+Ordinary offline CPU planning is unchanged.
+
+Research: David Alciatore's [How to Break Like a Pro / Break Dance](https://billiardsdigest.com/new_current_issue/sep_16/bb_index.php)
+compares square head-ball power breaks with more controlled second-ball breaks,
+including their relevance when the eight on the break wins. It also explains cue
+control using slight follow and the accuracy cost of excessive side spin. Our
+implementation samples these families with vertical spin and evaluates the actual
+configured rules rather than assuming a real-world pocketing pattern transfers
+unchanged to this simulation. No random forces or rack perturbations were added.

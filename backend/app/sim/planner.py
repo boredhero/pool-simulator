@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import copy
 import math
+import random
 import time
 
 from app.sim.cpu import candidates, clear, fallback
@@ -322,8 +323,64 @@ def _seeds(gs):
     return [{**s, "placement": {"x": x, "y": y}} for s in _geometry(state)]
 
 
+def _break_seeds(gs, seed):
+    """Sample deliberate break setups, leaving execution physics unchanged."""
+    rng = random.Random(seed)
+    state = copy.deepcopy(gs)
+    state.ball_in_hand, state.placement = True, "kitchen"
+    rack = sorted(
+        (b for b in state.balls if b.n is not None and not b.potted), key=lambda b: (b.x, b.y)
+    )
+    if not rack:
+        return []
+    head = rack[0]
+    styles = [
+        ("head-on", 0.5, head, 1.0, 0.06),
+        ("head-left", 0.32, head, 0.90, 0.10),
+        ("head-right", 0.68, head, 0.90, 0.10),
+    ]
+    if len(rack) >= 3:
+        second = sorted(rack[1:3], key=lambda b: b.y)
+        styles.extend(
+            [
+                ("second-left", 0.13, second[0], 0.78, -0.10),
+                ("second-right", 0.87, second[1], 0.78, -0.10),
+            ]
+        )
+    rng.shuffle(styles)
+    shots = []
+    for style, lane, target, power, spin in styles:
+        x = TABLE_W / 4 - rng.uniform(0.015, 0.09)
+        y = TABLE_H * lane + rng.uniform(-0.035, 0.035)
+        if not can_place(state, x, y):
+            continue
+        cue = copy.copy(state.balls[0])
+        cue.x, cue.y = x, y
+        # Aim toward the exposed outside face of the second-row ball;
+        # its center line from the kitchen clips the head ball.
+        offset = -0.035 if style == "second-left" else 0.035 if style == "second-right" else 0
+        shot = _shot(
+            cue,
+            (target.x, target.y + offset),
+            target,
+            0,
+            "break",
+            min(1.0, power + rng.uniform(-0.04, 0.04)),
+        )
+        shot.update(
+            placement={"x": x, "y": y},
+            breakStyle=style,
+            tipY=spin + rng.uniform(-0.025, 0.025),
+            pace="firm",
+        )
+        shots.append(shot)
+    return shots
+
+
 def _preview(gs, shot, deadline):
     state = copy.deepcopy(gs)
+    if state.break_shot and shot.get("placement"):
+        state.ball_in_hand, state.placement = True, "kitchen"
     if state.ball_in_hand:
         placement = shot.get("placement")
         if not placement or not place_cue(state, placement["x"], placement["y"]):
@@ -430,7 +487,7 @@ def _preview(gs, shot, deadline):
     }
 
 
-def plan_shots(gs: GameState, *, max_trials=16, budget_seconds=2.0):
+def plan_shots(gs: GameState, *, max_trials=16, budget_seconds=2.0, break_seed=0):
     """Return ranked executable options. None budget is for deterministic CI only.
 
     A safety may still need a legal ball/pocket call under call-all rules; such a
@@ -456,7 +513,7 @@ def plan_shots(gs: GameState, *, max_trials=16, budget_seconds=2.0):
     }
     if placement:
         backup["placement"] = placement
-    seeds = [backup] if state.break_shot else _seeds(gs)
+    seeds = (_break_seeds(gs, break_seed) or [backup]) if state.break_shot else _seeds(gs)
     # Geometry powers were tuned at 3.5 m/s. Preserve that physical speed
     # under custom caps; development seeds already express physical energy.
     if not state.break_shot:
@@ -480,7 +537,7 @@ def plan_shots(gs: GameState, *, max_trials=16, budget_seconds=2.0):
         queue.extend(
             {**bank, "aim": bank["aim"] + offset, "refined": True} for offset in (-0.09, 0.09)
         )
-    for seed in seeds[:3]:
+    for seed in [] if state.break_shot else seeds[:3]:
         queue.extend(
             [
                 {**seed, "power": max(0.08, seed["power"] * 0.65), "tipY": 0.18},
@@ -497,6 +554,11 @@ def plan_shots(gs: GameState, *, max_trials=16, budget_seconds=2.0):
         trial += 1
         preview = _preview(gs, shot, deadline)
         if preview is None:
+            continue
+        if (
+            shot.get("breakStyle", "").startswith("second-")
+            and preview["evidence"]["firstContact"] != shot["calledBall"]
+        ):
             continue
         completed.append(preview)
         # Small throw corrections around promising near misses, not random aim.

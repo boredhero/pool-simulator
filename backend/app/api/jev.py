@@ -275,6 +275,7 @@ def describe_plan(plan: dict) -> dict:
     ev = plan.get("evidence", {})
     return {
         "family": plan["family"],
+        "break_style": plan.get("breakStyle", "not a break variation"),
         "target_ball": plan["calledBall"],
         "called_pocket": plan["calledPocket"],
         "placement": "planned legal placement" if plan.get("placement") else "current cue position",
@@ -462,12 +463,16 @@ async def play_turn(
             # CPU work runs off the event loop under the existing admission cap.
             if gs.rules.get("chalkSim") and gs.chalk[by] < 0.45:
                 gs.chalk[by] = 1.0
-            options = await asyncio.to_thread(plan_shots, gs)
+            options = (
+                await asyncio.to_thread(plan_shots, gs, break_seed=game_id)
+                if gs.break_shot
+                else await asyncio.to_thread(plan_shots, gs)
+            )
             if not options:
                 raise HTTPException(409, "No legal shot plan. Resume your game.")
             s = options[0]
             source = "planner"
-            if use_jev and len(options) > 1 and not gs.break_shot:
+            if use_jev and len(options) > 1:
                 source = "cpu-fallback"
                 attempt = jev_budget.reserve(account["id"], game_id, payload.revision, by, MODEL)
                 result = None
@@ -534,6 +539,8 @@ async def play_turn(
                             "seat": by,
                         },
                     )
+            if gs.break_shot and s.get("placement"):
+                gs.ball_in_hand, gs.placement = True, "kitchen"
             if gs.ball_in_hand:
                 position = s.get("placement")
                 if not position or not place_cue(gs, position["x"], position["y"]):

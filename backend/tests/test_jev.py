@@ -516,3 +516,41 @@ def test_spin_boundary_roundoff_accepted_but_real_overspin_rejected():
         },
     )
     assert response.status_code == 200, response.text
+
+
+@pytest.mark.parametrize("simulation,provider_calls", [("", 1), ("jev-cpu", 0), ("jev-jev", 1)])
+def test_jev_chooses_a_break_and_executes_its_previewed_placement(
+    monkeypatch, simulation, provider_calls
+):
+    from app.sim.planner import plan_shots
+
+    monkeypatch.setattr(jev.opening, "choose_breaker", lambda: 1)
+    if simulation:
+        enable_sim()
+    game = sim_start(simulation).json() if simulation else start()
+    with Session() as db:
+        state = jev.decode(db.get(JevGame, game["id"]).state)
+    options = plan_shots(state, break_seed=game["id"], budget_seconds=None)
+    selected = options[-1] if provider_calls else options[0]
+    calls = []
+    monkeypatch.setattr(jev, "plan_shots", lambda gs, **kwargs: options)
+
+    async def evaluate(payload, key):
+        calls.append(payload)
+        return jev.Evaluation(selected["id"], 100, 10)
+
+    monkeypatch.setattr(jev, "evaluate", evaluate)
+    response = client.post(
+        f"/api/opponents/jev/games/{game['id']}/turn", headers=HEADERS, json={"revision": 0}
+    )
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert len(calls) == provider_calls
+    assert result["source"] == ("jev" if provider_calls else "planner")
+    with Session() as db:
+        assert db.get(JevGame, game["id"]).requests == provider_calls
+    assert result["placement"] == selected["placement"]
+    assert result["shot"]["power"] == selected["power"]
+    cue = result["state"]["balls"][0]
+    assert cue["x"] == selected["evidence"]["cueFinish"]["x"]
+    assert cue["y"] == selected["evidence"]["cueFinish"]["y"]
