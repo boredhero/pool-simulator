@@ -45,7 +45,7 @@ class GameState:
 
 
 def new_game(seed: int = 1, options=None) -> GameState:
-    balls = [Ball(id=0, n=None, x=HEAD_SPOT[0], y=HEAD_SPOT[1])]
+    balls = [Ball(id=0, n=None, x=HEAD_SPOT[0] - 0.001, y=HEAD_SPOT[1])]
     for i, (n, (x, y)) in enumerate(zip(rack_order(seed), rack_positions())):
         balls.append(Ball(id=i + 1, n=n, x=x, y=y))
     return GameState(balls=balls, rules=match_config(options))
@@ -255,14 +255,20 @@ def apply_shot(gs: GameState, ev: ShotEvents, before: ShotContext | None = None)
 
 
 def can_place(gs: GameState, x: float, y: float) -> bool:
-    if not gs.ball_in_hand or gs.winner is not None or not math.isfinite(x) or not math.isfinite(y):
+    opening = gs.break_shot and gs.rules.get("breakPlacement", True)
+    if (
+        (not gs.ball_in_hand and not opening)
+        or gs.winner is not None
+        or not math.isfinite(x)
+        or not math.isfinite(y)
+    ):
         return False
     if not (
         BALL_R + 0.001 <= x <= TABLE_W - BALL_R - 0.001
         and BALL_R + 0.001 <= y <= TABLE_H - BALL_R - 0.001
     ):
         return False
-    if gs.placement == "kitchen" and x >= TABLE_W / 4:
+    if (gs.placement == "kitchen" or opening) and x >= TABLE_W / 4:
         return False
     return all(
         b.id == 0 or b.potted or math.hypot(b.x - x, b.y - y) >= 2 * BALL_R + 0.001
@@ -274,7 +280,11 @@ def place_cue(gs: GameState, x: float, y: float) -> bool:
     if not can_place(gs, x, y):
         return False
     gs.balls[0].__dict__.update(Ball(id=0, n=None, x=x, y=y).__dict__)
-    gs.kitchen_shot, gs.ball_in_hand, gs.placement = gs.placement == "kitchen", False, "none"
+    gs.kitchen_shot, gs.ball_in_hand, gs.placement = (
+        gs.placement == "kitchen" or gs.break_shot,
+        False,
+        "none",
+    )
     return True
 
 

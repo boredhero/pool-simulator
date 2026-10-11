@@ -26,7 +26,7 @@ export interface Ruleset<S, C> {
   canPlace(state: S, x: number, y: number): boolean;
 }
 export function newGame(seed = 1, options: MatchConfig = BAR_RULES): GameState {
-  const balls = [makeBall(0, null, ...HEAD_SPOT)];
+  const balls = [makeBall(0, null, HEAD_SPOT[0] - .001, HEAD_SPOT[1])];
   const order = rackOrder(seed), pos = rackPositions();
   order.forEach((n, i) => balls.push(makeBall(i + 1, n, ...pos[i])));
   return { chalk:[1,1], returnOrder: [], balls, current: 0, groups: [null, null], open: true, ballInHand: false, placement: 'none', kitchenShot: false, breakShot: true, winner: null, message: 'Player 1 to break', rules: matchConfig(options) };
@@ -133,15 +133,16 @@ export function applyShot(gs: GameState, ev: ShotEvents, before = gs.shot ?? beg
   return gs;
 }
 export function canPlace(gs: GameState, x: number, y: number): boolean {
-  if (!gs.ballInHand || gs.winner !== null || !Number.isFinite(x) || !Number.isFinite(y)) return false;
+  const opening=gs.breakShot&&gs.rules.breakPlacement!==false;
+  if ((!gs.ballInHand&&!opening) || gs.winner !== null || !Number.isFinite(x) || !Number.isFinite(y)) return false;
   if (x < BALL_R + .001 || x > TABLE_W - BALL_R - .001 || y < BALL_R + .001 || y > TABLE_H - BALL_R - .001) return false;
-  if (gs.placement === 'kitchen' && x >= TABLE_W / 4) return false;
+  if ((gs.placement === 'kitchen'||opening) && x >= TABLE_W / 4) return false;
   return gs.balls.every(b => b.id === 0 || b.potted || Math.hypot(b.x - x, b.y - y) >= 2 * BALL_R + .001);
 }
 export function placeCue(gs: GameState, x: number, y: number): boolean {
   if (!canPlace(gs, x, y)) return false;
   Object.assign(gs.balls[0], makeBall(0, null, x, y));
-  gs.kitchenShot = gs.placement === 'kitchen'; gs.ballInHand = false; gs.placement = 'none';
+  gs.kitchenShot = gs.placement === 'kitchen'||gs.breakShot; gs.ballInHand = false; gs.placement = 'none';
   return true;
 }
 export const eightBall: Ruleset<GameState, ShotContext> = { id: 'eight-ball', version: 2, create: newGame, begin: beginShot, resolve: applyShot, targets: legalTargets, canPlace };

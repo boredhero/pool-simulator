@@ -22,6 +22,7 @@ CUSTOM = dict(
     scratchOnEightLoss=False,
     assignOnBreak=False,
     strictBreak=True,
+    breakPlacement=True,
     normalMax=5.2,
     breakMax=10.0,
 )

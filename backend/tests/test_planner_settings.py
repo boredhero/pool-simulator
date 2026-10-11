@@ -117,3 +117,12 @@ def test_unverified_fallback_preserves_physical_energy_under_custom_caps():
         powers[maximum] = shot["power"]
     assert powers[1] == 1
     assert shoot_speed(powers[8.5], 8.5) == pytest.approx(shoot_speed(powers[3.5], 3.5))
+
+
+def test_custom_fixed_break_does_not_relocate_ai_cue():
+    from app.sim.planner import _break_seeds
+
+    state = new_game(options={"preset": "custom", "breakPlacement": False})
+    assert all("placement" not in shot for shot in _break_seeds(state, "fixed"))
+    selected = plan_shots(state, budget_seconds=None)[0]
+    assert "placement" not in selected

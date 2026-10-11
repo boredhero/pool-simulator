@@ -39,6 +39,7 @@ from app.sim.rules import (
     new_game,
     place_cue,
 )
+from app.sim.table import TABLE_W
 
 router = APIRouter(prefix="/opponents/jev")
 MODEL = "jev-1.13.0"
@@ -85,6 +86,7 @@ class RuleSettings(BaseModel):
     scratchOnEightLoss: bool = True
     assignOnBreak: bool = True
     strictBreak: bool = False
+    breakPlacement: bool = True
     chalkSim: bool = False
     normalMax: float = Field(default=3.5, ge=1, le=8.5, allow_inf_nan=False)
     breakMax: float = Field(default=9.5, ge=1, le=12, allow_inf_nan=False)
@@ -450,7 +452,12 @@ async def play_turn(
             s = payload.shot.model_dump()
             if math.hypot(s["tipX"], s["tipY"]) > 0.55 + 1e-12:
                 raise HTTPException(422, "Spin is out of range.")
-            if gs.ball_in_hand and (
+            opening_placement = (
+                gs.break_shot
+                and gs.rules.get("breakPlacement", True)
+                and (s["x"] is not None or s["y"] is not None)
+            )
+            if (gs.ball_in_hand or opening_placement) and (
                 s["x"] is None or s["y"] is None or not place_cue(gs, s["x"], s["y"])
             ):
                 raise HTTPException(422, "Place the cue ball legally first.")
@@ -539,13 +546,13 @@ async def play_turn(
                             "seat": by,
                         },
                     )
-            if gs.break_shot and s.get("placement"):
-                gs.ball_in_hand, gs.placement = True, "kitchen"
-            if gs.ball_in_hand:
+            if gs.ball_in_hand or s.get("placement"):
                 position = s.get("placement")
                 if not position or not place_cue(gs, position["x"], position["y"]):
                     raise HTTPException(409, "No legal cue placement. Resume your game.")
         cue = gs.balls[0]
+        if gs.break_shot and cue.x >= TABLE_W / 4:
+            raise HTTPException(422, "Break from behind the head string.")
         placement = {"x": cue.x, "y": cue.y}
         shot = {k: s[k] for k in ("aim", "power", "tipX", "tipY", "calledBall", "calledPocket")}
         vmax = gs.rules["breakMax" if gs.break_shot else "normalMax"]

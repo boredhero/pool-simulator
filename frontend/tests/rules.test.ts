@@ -30,7 +30,7 @@ describe('rack', () => {
 
 describe('placement policy', () => {
   it('requires ball in hand, rejects kitchen boundary, overlap, and nonfinite input', () => {
-    const gs = newGame();
+    const gs = newGame(); gs.breakShot=false;
     expect(placeCue(gs, .3, .6)).toBe(false);
     gs.ballInHand = true; gs.placement = 'kitchen';
     expect(placeCue(gs, .635, .6)).toBe(false);
@@ -108,4 +108,18 @@ describe('called-shot presentation context',()=>{
     const regular=beginShot(gs,1,2);expect(callRequired(gs,regular)).toBe(true);
     gs.rules.calls='none';expect(callRequired(gs,regular)).toBe(false);
   });
+});
+
+it('allows repeated opening kitchen placement only when the rules permit it',()=>{
+  for(const preset of ['bar','tournament','custom'] as const){
+    const gs=newGame(1,matchConfig({preset}));
+    expect(gs.balls[0].x).toBeLessThan(.635);
+    expect(placeCue(gs,.635,.6)).toBe(false);
+    expect(placeCue(gs,.4,.2)).toBe(true);
+    expect(placeCue(gs,.5,1)).toBe(true);
+    gs.breakShot=false;
+    expect(placeCue(gs,.4,.2)).toBe(false);
+  }
+  const fixed=newGame(1,matchConfig({preset:'custom',breakPlacement:false}));
+  expect(placeCue(fixed,.4,.2)).toBe(false);
 });

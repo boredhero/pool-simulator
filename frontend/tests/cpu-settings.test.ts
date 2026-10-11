@@ -1,6 +1,6 @@
 import {expect,it} from 'vitest';
 import {planCpuTurn} from '../src/sim/cpu';
-import {newGame,beginShot,applyShot} from '../src/sim/rules';
+import {newGame,beginShot,applyShot,placeCue} from '../src/sim/rules';
 import {strike,simulateShot,allAsleep,shootSpeed} from '../src/sim/physics';
 import {cueElevation} from '../src/sim/cue';
 import type {RuleConfig} from '../src/sim/config';
@@ -20,9 +20,10 @@ function fixture(rules:Partial<RuleConfig>){
   return gs;
 }
 function execute(gs:ReturnType<typeof newGame>,shot:NonNullable<ReturnType<typeof planCpuTurn>>){
+  if(shot.placement)expect(placeCue(gs,shot.placement.x,shot.placement.y)).toBe(true);
   const cue=gs.balls[0];beginShot(gs,shot.ball,shot.pocket);
   strike(cue,Math.cos(shot.angle),Math.sin(shot.angle),shot.power,shot.tipX,shot.tipY,
-    gs.rules[gs.breakShot?'breakMax':'normalMax'],cueElevation(cue.x,cue.y,shot.angle,0,gs.balls));
+    gs.rules[gs.breakShot?'breakMax':'normalMax'],cueElevation(cue.x,cue.y,shot.angle,0,gs.balls,shot.tipX,shot.tipY));
   const ev=simulateShot(gs.balls,0);applyShot(gs,ev);expect(allAsleep(gs.balls)).toBe(true);return ev;
 }
 it.each(settings)('plans and executes with custom settings %j',rules=>{
@@ -40,8 +41,8 @@ it('calibrates zero-budget geometry to physical speed at both custom cap boundar
   expect(low.power).toBe(1);expect(low.verified).toBe(false);
   expect(shootSpeed(high.power,8.5)).toBeCloseTo(shootSpeed(standard.power,3.5),10);
 });
-it.each([1,9.5,12])('executes a full break at cap %s even when strict break cannot be satisfied',breakMax=>{
+it.each([1,9.5,12])('executes a varied break within cap %s even when strict break cannot be satisfied',breakMax=>{
   const gs=newGame(1,{preset:'custom',breakMax,strictBreak:true});
-  const shot=planCpuTurn(gs,1,Infinity)!;expect(shot.power).toBe(1);const ev=execute(gs,shot);
+  const shot=planCpuTurn(gs,1,Infinity,()=>.5)!;expect(shot.power).toBeLessThanOrEqual(1);expect(shootSpeed(shot.power,breakMax)).toBeLessThanOrEqual(breakMax);const ev=execute(gs,shot);
   if(breakMax===9.5)expect(ev.offTable).toEqual([]);
 });

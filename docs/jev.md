@@ -169,7 +169,10 @@ Jev can select between break candidates using the same metered request and fallb
 path as other turns. CPU seats never call Jev. A single surviving candidate needs
 no model call. Different racks sample different setups, but a particular style is
 not forbidden from recurring and a timeout can still use the standard fallback.
-Ordinary offline CPU planning is unchanged.
+Offline CPU breaks sample the same five strategy families using local randomness and
+bounded browser physics previews. No provider request is made. The selected placement
+and strike are latched for animation and execution. Custom fixed starts prevent
+relocation for both planners.
 
 Research: David Alciatore's [How to Break Like a Pro / Break Dance](https://billiardsdigest.com/new_current_issue/sep_16/bb_index.php)
 compares square head-ball power breaks with more controlled second-ball breaks,
@@ -178,3 +181,16 @@ control using slight follow and the accuracy cost of excessive side spin. Our
 implementation samples these families with vertical spin and evaluates the actual
 configured rules rather than assuming a real-world pocketing pattern transfers
 unchanged to this simulation. No random forces or rack perturbations were added.
+
+
+Opening placement follows [WPA 4.3(a), 3.10](https://www.wpapool.com/wp-content/uploads/2026/01/2026.01.02-WPA-Rules.pdf)
+and [APA breaking guidance](https://rules.poolplayers.com/game-rules/breaking/):
+the cue-ball center must be behind the head string. Bar and Tournament presets
+allow repeated placement until the stroke; Custom can disable repositioning while
+retaining a legal fixed start. The default spot is one millimeter behind the line.
+Human local, Jev, and online placement share the same bounds and collision tests;
+online placement remains restricted to the active seat and current revision.
+The desktop/touch Place cue ball control enters the existing placement interaction.
+The practice tutorial uses a non-break practice layout; the controls guide explains
+opening placement separately. Existing foul placement remains independent of the
+custom opening-placement switch.

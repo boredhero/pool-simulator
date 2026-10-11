@@ -554,3 +554,18 @@ def test_jev_chooses_a_break_and_executes_its_previewed_placement(
     cue = result["state"]["balls"][0]
     assert cue["x"] == selected["evidence"]["cueFinish"]["x"]
     assert cue["y"] == selected["evidence"]["cueFinish"]["y"]
+
+
+def test_human_can_choose_break_position_and_server_rejects_outside_kitchen(monkeypatch):
+    monkeypatch.setattr(jev.opening, "choose_breaker", lambda: 0)
+    game = start()
+    url = f"/api/opponents/jev/games/{game['id']}/turn"
+    shot = {"aim": 0.0, "power": 0.1, "x": 1.0, "y": 0.3}
+    assert client.post(url, headers=HEADERS, json={"revision": 0, "shot": shot}).status_code == 422
+    with Session() as db:
+        assert db.get(JevGame, game["id"]).revision == 0
+    shot["x"] = 0.4
+    response = client.post(url, headers=HEADERS, json={"revision": 0, "shot": shot})
+    assert response.status_code == 200, response.text
+    assert response.json()["placement"] == {"x": 0.4, "y": 0.3}
+    assert response.json()["source"] == "human"

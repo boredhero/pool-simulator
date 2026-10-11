@@ -44,6 +44,7 @@ def test_shared_rules(case):
 
 def test_placement_policy():
     gs = new_game()
+    gs.break_shot = False
     assert not place_cue(gs, 0.3, 0.6)
     gs.ball_in_hand, gs.placement = True, "kitchen"
     assert not place_cue(gs, 0.635, 0.6)
@@ -65,3 +66,18 @@ def test_bar_soft_dry_break_keeps_layout_and_passes_open_table():
     apply_shot(gs, ShotEvents(first_contact=2, rail_after_contact=True))
     assert gs.current == 0 and gs.open
     assert [(b.x, b.y) for b in gs.balls] == layout
+
+
+def test_opening_placement_is_rule_gated_repeatable_and_ends_after_break():
+    for preset in ("bar", "tournament", "custom"):
+        gs = new_game(options={"preset": preset})
+        assert gs.balls[0].x < 2.54 / 4
+        assert not place_cue(gs, 2.54 / 4, 0.6)
+        assert place_cue(gs, 0.4, 0.2)
+        assert place_cue(gs, 0.5, 1.0)
+        gs.break_shot = False
+        assert not place_cue(gs, 0.3, 0.6)
+    gs = new_game(options={"preset": "custom", "breakPlacement": False})
+    assert not place_cue(gs, 0.4, 0.2)
+    gs.ball_in_hand, gs.placement = True, "anywhere"
+    assert place_cue(gs, 1.0, 0.2)  # House switch never disables foul placement.

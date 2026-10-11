@@ -454,3 +454,21 @@ def test_real_spin_overflow_still_rejected():
         )
         assert "error" in first.receive_json()
         assert lobby.get(code).revision == 0
+
+
+def test_online_breaker_can_reposition_and_both_players_receive_it(monkeypatch):
+    monkeypatch.setattr("app.sim.opening.choose_breaker", lambda: 0)
+    with (
+        TestClient(app).websocket_connect("/ws") as host,
+        TestClient(app).websocket_connect("/ws") as guest,
+    ):
+        code = pair(host, guest)
+        room = lobby.get(code)
+        for revision, y in enumerate((0.2, 1.0)):
+            host.send_json({"t": "place", "revision": revision, "x": 0.4, "y": y})
+            for connection in (host, guest):
+                state = connection.receive_json()
+                assert state["revision"] == revision + 1
+                assert state["break_shot"] and not state["ball_in_hand"]
+                assert state["balls"][0]["x"] == 0.4 and state["balls"][0]["y"] == y
+        assert room.gs.kitchen_shot

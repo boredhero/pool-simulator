@@ -11,6 +11,7 @@ BAR_RULES = dict(
     scratchOnEightLoss=True,
     assignOnBreak=True,
     strictBreak=False,
+    breakPlacement=True,
     normalMax=3.5,
     breakMax=9.5,
 )
@@ -41,7 +42,7 @@ def match_config(value=None):
     ):
         if data.get(key) in choices:
             out[key] = data[key]
-    for key in ("scratchOnEightLoss", "assignOnBreak", "strictBreak"):
+    for key in ("scratchOnEightLoss", "assignOnBreak", "strictBreak", "breakPlacement"):
         if isinstance(data.get(key), bool):
             out[key] = data[key]
     for key, maximum in (("normalMax", 8.5), ("breakMax", 12)):

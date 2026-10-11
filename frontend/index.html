@@ -49,7 +49,7 @@ button.on{background:#264e38;border-color:#88ba91}
 #chargebar{height:14px;border-radius:7px;background:#62584b;overflow:hidden}
 #chargefill{height:100%;width:0%;border-radius:7px;background:linear-gradient(90deg,#80b58b,#e6bd71,#dd765c)}
 .control-help{font-size:13px;color:#c7bdad;margin-top:6px}
-.spin-control{display:flex;align-items:center;gap:12px;border-left:1px solid #635747;padding-left:24px}
+@media(min-width:901px){#breakplace{position:absolute;bottom:calc(100% + 8px);left:0;background:#302a21;border:1px solid #75634a}}#breakplace[hidden]{display:none}#breakplace{min-height:44px;flex-shrink:0;font-size:14px;padding:0 12px}.spin-control{display:flex;align-items:center;gap:12px;border-left:1px solid #635747;padding-left:24px}
 .spin-control .control-label{margin:0}
 #spin{width:56px;height:56px;border-radius:50%;background:radial-gradient(circle at center,#f7f1e3 17%,#995748 18%,#995748 24%,#f7f1e3 25%);position:relative;touch-action:none;flex:none;cursor:crosshair;box-shadow:inset -3px -4px 8px #0003}
 #spin::after{content:'';position:absolute;left:calc(50% + var(--tx,0%));top:calc(50% + var(--ty,0%));width:9px;height:9px;margin:-4.5px;border-radius:50%;background:#244c73;}
@@ -154,6 +154,7 @@ body:has(#tutorial:not([hidden])) .privacy-notice{display:none}
   </div>
   <div class="hint" id="hint">Aim on the felt · pull back and release to shoot · right-drag to orbit</div>
   <div class="control-tray">
+    <button id="breakplace" type="button" hidden>Place cue ball</button>
     <div id="callpanel" hidden><label for="callball">Call ball</label><select id="callball" aria-label="Called ball" title="Choose a ball, then select its pocket on the table"></select></div>
     <div class="touch-shot"><label id="touchpowerlabel" for="touchpower">Power 50%</label><input id="touchpower" type="range" min="4" max="100" value="50" aria-label="Shot power"><button id="touchshoot">Shoot</button></div>
     <button id="morecontrols" aria-expanded="false" aria-controls="shotextras">New Game</button>
@@ -171,6 +172,7 @@ body:has(#tutorial:not([hidden])) .privacy-notice{display:none}
   <dl id="mouseguide"><dt>01 · Line it up</dt><dd>Move over the felt to aim.</dd><dt>02 · Take the shot</dt><dd>Press, drag back to build power, then release. Your aim locks while pulling. Secondary-click to cancel; press the primary button again to start a new shot.</dd><dt>03 · Find your view</dt><dd>Choose Mouse &amp; Keyboard Mode or Trackpad Mode in the camera HUD. Mouse: right-drag to orbit, scroll to zoom. Trackpad: two-finger scroll to orbit, pinch to zoom, Option-scroll to pan. WASD moves; Space rises, Left Shift descends, Q/E turns. Focus the felt and press Enter for a 40% shot. View → Move camera also allows left-drag orbit.</dd></dl>
   <dl id="touchguide" hidden><dt>01 · Line it up</dt><dd>Touch the felt to aim. Keep holding and swing your finger sideways to turn the cue.</dd><dt>02 · Take the shot</dt><dd>Lift your finger when lined up. Set the power slider, then tap Shoot. Lifting your aiming finger never fires.</dd><dt>03 · Find your view</dt><dd>Tap Move Camera on the bottom bar for one-finger orbit and two-finger pinch/pan. Return to play when ready. During play, drag two fingers together to orbit, even after pinching to zoom. Lift both fingers before aiming again.</dd></dl>
   <p class="guide-note"><strong>Add spin</strong> · Drag the blue dot on the cue ball below. Reset returns it to center. Arrow keys adjust a focused spin control; hold Shift for finer steps. Cue elevation is assisted around obstacles and changes the shot.</p>
+  <p class="guide-note"><strong>Before the break</strong> · Choose Place cue ball, then tap or click behind the head string. You can reposition again until you shoot.</p>
   <p class="guide-note"><strong>After a foul</strong> · Tap or click a legal spot inside the tinted outline to place the cue ball. The outline shows your placement area.</p>
   <p class="guide-note"><strong>Call a shot</strong> · When prompted, choose your ball, then tap its destination pocket on the table.</p>
   <p id="kitchenhelp" class="guide-note"><strong>Head string &amp; kitchen</strong> · After a scratch, place the cue ball in the shaded area behind the dashed line. It must leave the kitchen before contacting a ball inside it.</p>
@@ -190,6 +192,7 @@ body:has(#tutorial:not([hidden])) .privacy-notice{display:none}
     <label for="eightbreakrule">8-Ball on the break</label><select id="eightbreakrule"><option value="win">Win</option><option value="spot">Spot it; keep playing</option></select>
     <label class="check"><input id="scratch8rule" type="checkbox"> Scratch while on the 8 loses</label>
     <label class="check"><input id="assignrule" type="checkbox"> Assign groups on the break</label>
+    <label class="check"><input id="breakplacementrule" type="checkbox"> Allow cue placement behind the head string before breaking</label>
     <label class="check"><input id="strictbreakrule" type="checkbox"> Legal break: pot or four object rails</label>
     <label for="normalspeed">Maximum shot speed (m/s)</label><input id="normalspeed" type="number" min="1" max="8.5" step="0.1" value="3.5">
     <label for="breakspeed">Maximum break speed (m/s)</label><input id="breakspeed" type="number" min="1" max="12" step="0.1" value="9.5">

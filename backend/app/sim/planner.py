@@ -350,8 +350,11 @@ def _break_seeds(gs, seed):
     rng.shuffle(styles)
     shots = []
     for style, lane, target, power, spin in styles:
-        x = TABLE_W / 4 - rng.uniform(0.015, 0.09)
-        y = TABLE_H * lane + rng.uniform(-0.035, 0.035)
+        movable = gs.rules.get("breakPlacement", True)
+        x = TABLE_W / 4 - rng.uniform(0.015, 0.09) if movable else gs.balls[0].x
+        y = TABLE_H * lane + rng.uniform(-0.035, 0.035) if movable else gs.balls[0].y
+        if not movable and style.startswith("second-"):
+            continue
         if not can_place(state, x, y):
             continue
         cue = copy.copy(state.balls[0])
@@ -373,15 +376,15 @@ def _break_seeds(gs, seed):
             tipY=spin + rng.uniform(-0.025, 0.025),
             pace="firm",
         )
+        if not movable:
+            shot.pop("placement")
         shots.append(shot)
     return shots
 
 
 def _preview(gs, shot, deadline):
     state = copy.deepcopy(gs)
-    if state.break_shot and shot.get("placement"):
-        state.ball_in_hand, state.placement = True, "kitchen"
-    if state.ball_in_hand:
+    if state.ball_in_hand or shot.get("placement"):
         placement = shot.get("placement")
         if not placement or not place_cue(state, placement["x"], placement["y"]):
             return None
