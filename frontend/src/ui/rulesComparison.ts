@@ -13,8 +13,8 @@ const rows: [string, (c: MatchConfig) => string][] = [
 ];
 
 export function renderRulesComparison(container: HTMLElement, selected: MatchConfig): void {
-  const columns: [string, MatchConfig][] = [['Bar', BAR_RULES], ['Tournament', TOURNAMENT_RULES]];
-  if (selected.preset === 'custom') columns.push(['Your Custom', selected]);
+  const columns: [string, MatchConfig][] = [['House', BAR_RULES], ['Tourny', TOURNAMENT_RULES]];
+  if (selected.preset === 'custom') columns.push(['Custom', selected]);
   const table = document.createElement('table');
   const caption = table.createCaption();
   caption.textContent = 'Ruleset comparison';

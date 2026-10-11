@@ -29,11 +29,11 @@ for(const mobile of [false,true])test.describe(mobile?'mobile settings layout':'
   await expect(scratchRow.locator('td').last()).toHaveText('Lose rack');
   await page.locator('#scratch8rule').uncheck();
   await expect(scratchRow.locator('td').last()).toHaveText('Ordinary foul');
-  await expect(page.locator('#rules-comparison')).toContainText('Your Custom');
+  await expect(page.locator('#rules-comparison thead')).toContainText('Custom');
   await page.locator('#rules-comparison > summary').scrollIntoViewIfNeeded();
   await page.screenshot({path:testInfo.outputPath('rules-comparison.png')});
   await page.locator('#rulespreset').selectOption('bar');
-  await expect(page.locator('#rules-comparison')).not.toContainText('Your Custom');
+  await expect(page.locator('#rules-comparison thead')).not.toContainText('Custom');
   await page.locator('summary').filter({hasText:'Appearance'}).click();await expect(page.locator('#cueappearance')).toBeVisible();await expect(page.locator('#settingspanel .settings-label').filter({hasText:'Felt'})).toBeVisible();
   await page.locator('#cueappearance').selectOption('red-spots');
   await page.screenshot({path:testInfo.outputPath('table-settings.png')});
