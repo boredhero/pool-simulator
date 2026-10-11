@@ -59,7 +59,7 @@ def test_authoritative_jev_finish_updates_owned_durable_stats_once(player, monke
     with Session.begin() as db:
         db.get(JevGame, game["id"]).state = json.dumps(asdict(state))
 
-    def final_shot(balls, _cue_id):
+    def final_shot(balls, _cue_id, *_stroke):
         next(ball for ball in balls if ball.n == 8).potted = True
         return ShotEvents(
             first_contact=8,
@@ -69,7 +69,7 @@ def test_authoritative_jev_finish_updates_owned_durable_stats_once(player, monke
             rail_after_contact=True,
         )
 
-    monkeypatch.setattr(jev, "simulate_shot", final_shot)
+    monkeypatch.setattr(jev, "simulate_stroke", final_shot)
     url = f"/api/opponents/jev/games/{game['id']}/turn"
     payload = {
         "revision": 0,
@@ -207,11 +207,11 @@ def test_jev_winning_stroke_counts_account_loss_without_crediting_ai_shots_to_us
         ],
     )
 
-    def final_shot(balls, _cue_id):
+    def final_shot(balls, _cue_id, *_stroke):
         next(ball for ball in balls if ball.n == 8).potted = True
         return ShotEvents(first_contact=8, potted=[8], pockets=[{"n": 8, "pocket": 0}])
 
-    monkeypatch.setattr(jev, "simulate_shot", final_shot)
+    monkeypatch.setattr(jev, "simulate_stroke", final_shot)
     result = client.post(
         f"/api/opponents/jev/games/{game['id']}/turn", headers=HEADERS, json={"revision": 0}
     )

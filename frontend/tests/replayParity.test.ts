@@ -1,22 +1,22 @@
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {expect, it} from 'vitest';
-import {simulateShot, strike, type Ball} from '../src/sim/physics';
+import {strikeBalls} from '../src/sim/stroke';
+import {simulateShot, type Ball} from '../src/sim/physics';
 
 // Run explicitly in the cross-runtime CI job; ordinary browser-only installs do
 // not need Python. Expectations are live server results, not refreshed snapshots.
 const enabled = process.env.POOL_REPLAY_PARITY === '1';
-it.skipIf(!enabled)('matches Python outcomes for 60 full-rack, spin, flight and worn-chalk replays', () => {
+it.skipIf(!enabled)('matches Python outcomes for racks, close ball spacing, pocket entries, spin and flight', () => {
   const script = fileURLToPath(new URL('../../scripts/physics-replay.py', import.meta.url));
   const cases = JSON.parse(execFileSync(process.env.POOL_PYTHON ?? 'python3', [script], {
     encoding: 'utf8', timeout: 180_000, maxBuffer: 8 * 1024 * 1024,
   }));
   for (const fixture of cases) {
     const balls: Ball[] = structuredClone(fixture.balls);
-    fixture.args[0] = Math.cos(fixture.aim);
-    fixture.args[1] = Math.sin(fixture.aim);
-    strike(balls[0], ...fixture.args as [number, number, number, number, number, number, number, number]);
-    const events = simulateShot(balls, 0);
+    if(fixture.args){fixture.args[0] = Math.cos(fixture.aim);fixture.args[1] = Math.sin(fixture.aim);}
+    const startEvents = fixture.args ? strikeBalls(balls, 0, ...fixture.args as [number, number, number, number, number, number, number, number]) : undefined;
+    const events = simulateShot(balls, 0, 45, startEvents);
     const label = fixture.name;
     expect(events.potted, `${label} pot order`).toEqual(fixture.events.potted);
     expect(events.offTable, `${label} off-table`).toEqual(fixture.events.off_table);

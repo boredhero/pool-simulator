@@ -3,7 +3,7 @@ import {chalkContact} from './chalk';
 // Planar rolling plus 3D flight and spin. Fixed dt=1/240, semi-implicit Euler
 // for friction + swept (analytic TOI) ball-ball / cushion / jaw collisions.
 // Mirror of backend/app/sim/physics.py — keep constants + behavior in sync.
-import { BALL_R, POCKETS, TABLE_H, TABLE_W, captureRadius, cushions, jaws } from './table';
+import { BALL_R, POCKETS, TABLE_H, TABLE_W, cushions, jaws } from './table';
 
 const CUSHIONS = cushions();
 const JAWS = jaws();
@@ -116,7 +116,7 @@ export function land(b: Ball): void {
 function advance(b: Ball, dt: number, ev: ShotEvents, cueId: number): void {
   if (b.potted || b.asleep) return;
   b.x += b.vx * dt; b.y += b.vy * dt;
-  if (b.z > 0 || b.vz !== 0) {
+  if (b.z !== 0 || b.vz !== 0 || hole(b.x,b.y) !== null) {
     b.z += b.vz * dt - 0.5 * G * dt * dt;
     b.vz -= G * dt;
     if (b.z < 0 && b.z > -1e-7) b.z = 0;
@@ -125,20 +125,6 @@ function advance(b: Ball, dt: number, ev: ShotEvents, cueId: number): void {
 }
 
 function friction(b: Ball, dt: number): void {
-  // Pocket lip gravity: overhanging slow balls get pulled in, never rest on air.
-  const spd0 = norm(b.vx, b.vy);
-  if (spd0 < 1.5) {
-    for (const p of POCKETS) {
-      const dx = p.x - b.x, dy = p.y - b.y;
-      const d = norm(dx, dy);
-      const cr = captureRadius(p, spd0);
-      if (d < cr + BALL_R && d > 1e-6) {
-        const a = 0.5 + 3.0 * (1 - d / (cr + BALL_R));
-        b.vx += ((a * dx) / d) * dt;
-        b.vy += ((a * dy) / d) * dt;
-      }
-    }
-  }
   const ux = b.vx - BALL_R * b.wy;
   const uy = b.vy + BALL_R * b.wx;
   const s = norm(ux, uy);
@@ -198,10 +184,11 @@ function earliestContact(balls: Ball[], dt: number): Contact | null {
   }
   // Cushion swept TOI (axis-aligned segments, line inset by R).
   for (const A of live) {
-    if (A.z > 0 || A.vz !== 0) {
+    if ((A.z > 0 || A.vz !== 0) && A.z >= 0) {
       const t = (A.vz + Math.sqrt(A.vz * A.vz + 2 * G * Math.max(0, A.z))) / G;
-      if (t >= 0 && t <= dt && (!best || t < best.t)) best = { t, kind: 'floor', a: A.id, b: -1, nx: 0, ny: 0 };
+      if (t >= 0 && t <= dt && hole(A.x+A.vx*t,A.y+A.vy*t) === null && (!best || t < best.t)) best = { t, kind: 'floor', a: A.id, b: -1, nx: 0, ny: 0 };
     }
+    if (A.z < -BALL_R) continue;
     for (const cu of CUSHIONS) {
       const horiz = cu.y1 === cu.y2;
       if (horiz) {
@@ -326,13 +313,23 @@ function resolveRail(A: Ball, nx: number, ny: number, ev: ShotEvents, contactMad
   }
 }
 
-export function step(balls: Ball[], dt: number, ev: ShotEvents, cueId: number, contactMade: { v: boolean }): void {
+
+function hole(x:number,y:number):number|null {
+  for (const [i,p] of POCKETS.entries()) if ((x-p.x)**2+(y-p.y)**2 < p.r*p.r) return i;
+  return null;
+}
+
+export function step(balls:Ball[],dt:number,ev:ShotEvents,cueId:number,contactMade:{v:boolean}):void {
+  const near=balls.filter(b=>!b.potted&&POCKETS.some(p=>norm(b.x-p.x,b.y-p.y)<p.r+BALL_R+norm(b.vx,b.vy)*dt));
+  const count=near.length?Math.max(1,Math.ceil(dt*1920),Math.ceil(Math.max(...near.map(b=>norm(b.vx,b.vy,b.vz)*dt/.001)))):1;
+  for(let i=0;i<count;i++) stepSub(balls,dt/count,ev,cueId,contactMade);
+}
+
+function stepSub(balls: Ball[], dt: number, ev: ShotEvents, cueId: number, contactMade: { v: boolean }): void {
   if (ev.firstContact !== null || ev.potted.length > 0) contactMade.v = true;
-  const prev = new Map<number, [number, number]>();
   for (const b of balls) {
     if (b.potted || b.asleep) continue;
-    prev.set(b.id, [b.x, b.y]);
-    if (b.z <= 1e-9 && b.vz === 0) friction(b, dt);
+    if (Math.abs(b.z) <= 1e-9 && b.vz === 0 && hole(b.x,b.y) === null) friction(b, dt);
   }
   let remaining = dt;
   for (let iter = 0; iter < 64 && remaining > 1e-9; iter++) {
@@ -362,37 +359,19 @@ export function step(balls: Ball[], dt: number, ev: ShotEvents, cueId: number, c
     for (const b of balls) {
       if (b.potted || b.asleep) continue;
       advance(b, remaining, ev, cueId);
-      if (b.z < 0) land(b);
+      if (b.z < 0 && hole(b.x,b.y) === null) land(b);
     }
   }
-  // Pockets (swept: segment vs capture circle) + off-table + sleep.
-  const segDist = (x1: number, y1: number, x2: number, y2: number, px: number, py: number) => {
-    const dx = x2 - x1, dy = y2 - y1;
-    const l2 = dx * dx + dy * dy;
-    let t = l2 > 0 ? ((px - x1) * dx + (py - y1) * dy) / l2 : 0;
-    t = Math.max(0, Math.min(1, t));
-    return norm(px - (x1 + dx * t), py - (y1 + dy * t));
-  };
   for (const b of balls) {
     if (b.potted) continue;
-    let captured = false;
-    const pr = prev.get(b.id);
-    const spd = norm(b.vx, b.vy);
-    for (const [pocket, p] of POCKETS.entries()) {
-      if (b.z > 0.005) continue;
-      const cr = captureRadius(p, spd);
-      const d = pr
-        ? segDist(pr[0], pr[1], b.x, b.y, p.x, p.y)
-        : norm(b.x - p.x, b.y - p.y);
-      if (d < cr) {
-        b.potted = true;
-        b.asleep = true;
-        b.z = b.vz = b.vx = b.vy = b.wx = b.wy = b.wz = 0;
-        if (b.n !== null) { ev.potted.push(b.n); (ev.pockets ??= []).push({ n: b.n, pocket }); }
-        else ev.cuePotted = true;
-        captured = true;
-        break;
-      }
+    const pocket = hole(b.x,b.y);
+    // Geometric termination: https://ekiefl.github.io/2020/12/20/pooltool-alg/
+    const captured = pocket !== null && b.z <= 1e-9 && b.vz <= 0;
+    if (captured) {
+      b.potted = b.asleep = true;
+      b.z = b.vz = b.vx = b.vy = b.wx = b.wy = b.wz = 0;
+      if (b.n !== null) { ev.potted.push(b.n); (ev.pockets ??= []).push({n:b.n,pocket: pocket!}); }
+      else ev.cuePotted = true;
     }
     if (!captured && (b.x < -0.12 || b.x > TABLE_W + 0.12 || b.y < -0.12 || b.y > TABLE_H + 0.12)) {
       // Escaped through a gap edge: off the table (foul, stays down).
@@ -404,7 +383,7 @@ export function step(balls: Ball[], dt: number, ev: ShotEvents, cueId: number, c
       continue;
     }
     // Pure sidespin cannot move an isolated resting ball; do not hold the turn for its decay.
-    if (!b.potted && b.z <= 1e-9 && b.vz === 0 && norm(b.vx, b.vy) < SLEEP_V && norm(b.wx, b.wy) < SLEEP_W) {
+    if (!b.potted && Math.abs(b.z) <= 1e-9 && hole(b.x,b.y) === null && b.vz === 0 && norm(b.vx, b.vy) < SLEEP_V && norm(b.wx, b.wy) < SLEEP_W) {
       b.z = b.vz = b.vx = b.vy = b.wx = b.wy = b.wz = 0;
       b.asleep = true;
     }
@@ -416,8 +395,8 @@ export function allAsleep(balls: Ball[]): boolean {
 }
 
 /** Run the shot to rest. Mutates balls. Returns events for rules. */
-export function simulateShot(balls: Ball[], cueId: number, maxSim = 45): ShotEvents {
-  const ev: ShotEvents = { firstContact: null, potted: [], offTable: [], railAfterContact: false, cuePotted: false };
+export function simulateShot(balls: Ball[], cueId: number, maxSim = 45, events?: ShotEvents): ShotEvents {
+  const ev: ShotEvents = events ?? { firstContact: null, potted: [], offTable: [], railAfterContact: false, cuePotted: false };
   const contactMade = { v: false };
   let t = 0;
   while (t < maxSim && !allAsleep(balls)) {

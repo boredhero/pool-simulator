@@ -114,7 +114,7 @@
     "balls": [],
     "minDegrees": 3,
     "maxDegrees": 15,
-    "elevation": 0.20448176955402825
+    "elevation": 0.19990219774352794
   },
   {
     "name": "top jaw -1",
@@ -153,7 +153,7 @@
     "balls": [],
     "minDegrees": 3,
     "maxDegrees": 15,
-    "elevation": 0.20448176955402825
+    "elevation": 0.19990219774352794
   },
   {
     "name": "bottom jaw -1",
@@ -192,7 +192,7 @@
     "balls": [],
     "minDegrees": 3,
     "maxDegrees": 20,
-    "elevation": 0.22318728041852676
+    "elevation": 0.23029712158071136
   },
   {
     "name": "top right corner",
@@ -205,7 +205,7 @@
     "balls": [],
     "minDegrees": 3,
     "maxDegrees": 20,
-    "elevation": 0.22318728041852676
+    "elevation": 0.23029712158071136
   },
   {
     "name": "bottom left corner",
@@ -218,7 +218,7 @@
     "balls": [],
     "minDegrees": 3,
     "maxDegrees": 20,
-    "elevation": 0.22318728041852676
+    "elevation": 0.23029712158071136
   },
   {
     "name": "bottom right corner",
@@ -231,7 +231,7 @@
     "balls": [],
     "minDegrees": 3,
     "maxDegrees": 20,
-    "elevation": 0.22318728041852676
+    "elevation": 0.23029712158071136
   },
   {
     "name": "object ball tangent",
@@ -340,7 +340,7 @@
     "balls": [],
     "minDegrees": 8,
     "maxDegrees": 20,
-    "elevation": 0.19381314622717075
+    "elevation": 0.19798711860365198
   },
   {
     "name": "right side spin corner",
@@ -353,7 +353,7 @@
     "balls": [],
     "minDegrees": 8,
     "maxDegrees": 20,
-    "elevation": 0.19381314622717075
+    "elevation": 0.19798711860365198
   },
   {
     "name": "open center",
@@ -372,14 +372,14 @@
     "name": "side jaw first clear interval",
     "x": 1.33,
     "y": 0.028575,
-    "aim": 1.4224433403753787,
+    "aim": 1.3700834628155487,
     "tipX": 0,
     "tipY": 0,
     "pull": 0,
     "balls": [],
     "minDegrees": 3,
     "maxDegrees": 15,
-    "elevation": 0.2192924073242859
+    "elevation": 0.20419894184626178
   },
   {
     "name": "dense touching cluster contact",
@@ -536,5 +536,18 @@
     "minDegrees": 44,
     "maxDegrees": 50,
     "elevation": 0.8209926429468992
+  },
+  {
+    "name": "side jaw blocks former clear interval",
+    "x": 1.33,
+    "y": 0.028575,
+    "aim": 1.4224433403753787,
+    "tipX": 0,
+    "tipY": 0,
+    "pull": 0,
+    "balls": [],
+    "minDegrees": 25,
+    "maxDegrees": 35,
+    "elevation": 0.5099375581545198
   }
 ]

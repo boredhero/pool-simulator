@@ -25,6 +25,8 @@ server resolves turns, fouls and results. Both simulators use shared fixtures in
 the covered cases, not every possible trajectory. See [simulation synchronization](docs/simulation-sync.md)
 for snapshot precision and replay checks. Ball flight, spin, cushions and pockets are approximations rather than
 a calibrated professional billiards model. See [planner evaluation and limitations](docs/planner-research.md).
+The [physics research decisions](docs/physics-research-decisions.md) list the published
+bases for the pocket and planning changes, and the effects deliberately deferred.
 
 - `frontend/src/`: rendering, input, local simulation and interface.
 - `backend/app/`: FastAPI routes, authoritative simulation, rooms and persistence.

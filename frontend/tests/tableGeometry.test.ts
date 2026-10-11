@@ -78,10 +78,10 @@ it('closes both side reveals inside the return window',()=>{
   }
 });
 
-it('removes the felt cut edge underneath the leather pocket flange',()=>{
+it('keeps physical slate support immediately outside the shared hole boundary',()=>{
   const felt=surface(bedGeometry());
   for(const p of POCKETS)for(let i=0;i<32;i++) {
     const a=i*Math.PI/16;
-    expect(felt(p.x+(p.r+.003)*Math.cos(a),p.y+(p.r+.003)*Math.sin(a))).toBe(false);
+    expect(felt(p.x+(p.r+.003)*Math.cos(a),p.y+(p.r+.003)*Math.sin(a))).toBe(true);
   }
 });

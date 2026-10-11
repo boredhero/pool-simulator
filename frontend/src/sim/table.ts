@@ -4,28 +4,23 @@ export const TABLE_W = 2.54;
 export const TABLE_H = 1.27;
 export const BALL_R = 0.028575;
 export const BALL_M = 0.17;
+// Dimensions: https://www.wpapool.com/wp-content/uploads/2024/01/RECOMMENDED-EQUIPMENT-SPECIFICATIONS.pdf
 // WPA mouths: corner 4.5in, side 5.0in. Cushion noses end at the mouth edges.
-const CORNER_HALF = 0.0572;
+const CORNER_HALF = 0.1143 / Math.sqrt(2);
 const SIDE_HALF = 0.0635;
 
 export interface Pocket { x: number; y: number; r: number; corner: boolean }
-// Capture circles sit behind the nose line (pooltool layout, SI).
-const CB = 0.0287; // 1.6in along the corner bisector per axis
+// Actual slate cutouts. Selected shelves are within WPA dimensional ranges.
+export const CORNER_SHELF = .032, SIDE_SHELF = .00635;
+const CB = (.061 + CORNER_SHELF - .1143 / 2) / Math.sqrt(2);
 export const POCKETS: Pocket[] = [
   { x: -CB, y: -CB, r: 0.061, corner: true },
-  { x: TABLE_W / 2, y: -0.066, r: 0.0635, corner: false },
+  { x: TABLE_W / 2, y: -(.0635 + SIDE_SHELF), r: 0.0635, corner: false },
   { x: TABLE_W + CB, y: -CB, r: 0.061, corner: true },
   { x: -CB, y: TABLE_H + CB, r: 0.061, corner: true },
-  { x: TABLE_W / 2, y: TABLE_H + 0.066, r: 0.0635, corner: false },
+  { x: TABLE_W / 2, y: TABLE_H + .0635 + SIDE_SHELF, r: 0.0635, corner: false },
   { x: TABLE_W + CB, y: TABLE_H + CB, r: 0.061, corner: true },
 ];
-
-/** Effective capture radius shrinks for fast balls (rattle-out). v in m/s. */
-export function captureRadius(p: Pocket, v: number): number {
-  if (v <= 1.0) return p.r;
-  const shave = 0.01016 * (v - 1.0); // 0.4in per m/s
-  return Math.max(0.6 * p.r, p.r - shave);
-}
 
 export interface Cushion { x1: number; y1: number; x2: number; y2: number }
 export function cushions(): Cushion[] {

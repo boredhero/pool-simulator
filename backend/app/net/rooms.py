@@ -21,7 +21,7 @@ from app.sim import opening
 from app.sim.chalk import contact, wear
 from app.sim.config import match_config
 from app.sim.cue import cue_elevation
-from app.sim.physics import Ball, ShotEvents, simulate_shot, strike
+from app.sim.physics import Ball, ShotEvents
 from app.sim.rules import (
     GameState,
     apply_shot,
@@ -32,6 +32,7 @@ from app.sim.rules import (
     new_game,
     place_cue,
 )
+from app.sim.stroke import simulate_stroke
 from app.sim.table import TABLE_W
 
 logger = logging.getLogger("pool.rooms")
@@ -404,20 +405,21 @@ async def handle(ws: WebSocket) -> None:
                             chalkLevel=chalk_level, miscue=contact(chalk_level, tip_x, tip_y)[3] < 1
                         )
                         next_state.chalk[seat] = wear(chalk_level, power, tip_x, tip_y)
-                    strike(
-                        cue,
-                        math.cos(aim),
-                        math.sin(aim),
-                        power,
-                        tip_x,
-                        tip_y,
-                        vmax,
-                        elevation,
-                        chalk_level,
-                    )
                     await room.broadcast({"t": "shot", "by": seat, "shot": shot})
                     worker = asyncio.create_task(
-                        asyncio.to_thread(simulate_shot, next_state.balls, 0)
+                        asyncio.to_thread(
+                            simulate_stroke,
+                            next_state.balls,
+                            0,
+                            math.cos(aim),
+                            math.sin(aim),
+                            power,
+                            tip_x,
+                            tip_y,
+                            vmax,
+                            elevation,
+                            chalk_level,
+                        )
                     )
                     try:
                         server_ev = await asyncio.shield(worker)

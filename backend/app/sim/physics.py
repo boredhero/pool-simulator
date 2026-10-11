@@ -10,7 +10,7 @@ import math
 from dataclasses import dataclass, field
 
 from app.sim.numeric import norm
-from app.sim.table import BALL_R, POCKETS, TABLE_H, TABLE_W, capture_radius, cushions, jaws
+from app.sim.table import BALL_R, POCKETS, TABLE_H, TABLE_W, cushions, jaws
 
 DT = 1.0 / 240.0
 G = 9.81
@@ -144,7 +144,7 @@ def _advance(b: Ball, dt: float, ev: ShotEvents, cue_id: int) -> None:
         return
     b.x += b.vx * dt
     b.y += b.vy * dt
-    if b.z > 0 or b.vz != 0:
+    if b.z != 0 or b.vz != 0 or _hole(b.x, b.y) is not None:
         b.z += b.vz * dt - 0.5 * G * dt * dt
         b.vz -= G * dt
         if -1e-7 < b.z < 0:
@@ -154,16 +154,6 @@ def _advance(b: Ball, dt: float, ev: ShotEvents, cue_id: int) -> None:
 
 
 def _friction(b: Ball, dt: float) -> None:
-    speed = norm(b.vx, b.vy)
-    if speed < 1.5:
-        for px, py, radius, _ in POCKETS:
-            dx, dy = px - b.x, py - b.y
-            distance = norm(dx, dy)
-            capture = capture_radius(radius, speed)
-            if 1e-6 < distance < capture + BALL_R:
-                acceleration = 0.5 + 3 * (1 - distance / (capture + BALL_R))
-                b.vx += acceleration * dx / distance * dt
-                b.vy += acceleration * dy / distance * dt
     ux = b.vx - BALL_R * b.wy
     uy = b.vy + BALL_R * b.wx
     s = norm(ux, uy)
@@ -221,10 +211,16 @@ def _earliest_contact(balls: list[Ball], dt: float):
                     (dz + dvz * t) / r2,
                 )
     for a in live:
-        if a.z > 0 or a.vz != 0:
+        if (a.z > 0 or a.vz != 0) and a.z >= 0:
             t = (a.vz + math.sqrt(a.vz * a.vz + 2 * G * max(0, a.z))) / G
-            if 0 <= t <= dt and (best is None or t < best[0]):
+            if (
+                0 <= t <= dt
+                and _hole(a.x + a.vx * t, a.y + a.vy * t) is None
+                and (best is None or t < best[0])
+            ):
                 best = (t, "floor", a.id, -1, 0.0, 0.0)
+        if a.z < -BALL_R:
+            continue
         for cu in _CUSHIONS:
             x1, y1, x2, y2 = cu.x1, cu.y1, cu.x2, cu.y2
             if y1 == y2:
@@ -359,14 +355,45 @@ def _resolve_rail(a: Ball, nx: float, ny: float, ev: ShotEvents, contact_made: d
             ev.object_rails.append(a.n)
 
 
+def _hole(x: float, y: float) -> int | None:
+    for i, (px, py, radius, _) in enumerate(POCKETS):
+        if (x - px) ** 2 + (y - py) ** 2 < radius * radius:
+            return i
+    return None
+
+
 def step(balls: list[Ball], dt: float, ev: ShotEvents, cue_id: int, contact_made: dict) -> None:
+    # Resolve pocket entry geometrically within 1 mm travel / 1/1920 s.
+    # Fixed deterministic subdivision, independent of render rate.
+    near = [
+        b
+        for b in balls
+        if not b.potted
+        and any(
+            norm(b.x - p[0], b.y - p[1]) < p[2] + BALL_R + norm(b.vx, b.vy) * dt for p in POCKETS
+        )
+    ]
+    count = (
+        max(
+            1,
+            math.ceil(dt * 1920),
+            math.ceil(max((norm(b.vx, b.vy, b.vz) * dt / 0.001 for b in near), default=0)),
+        )
+        if near
+        else 1
+    )
+    for _ in range(count):
+        _step_sub(balls, dt / count, ev, cue_id, contact_made)
+
+
+def _step_sub(
+    balls: list[Ball], dt: float, ev: ShotEvents, cue_id: int, contact_made: dict
+) -> None:
     if ev.first_contact is not None or ev.potted:
         contact_made["v"] = True
-    prev: dict[int, tuple[float, float]] = {}
     for b in balls:
         if not b.potted and not b.asleep:
-            prev[b.id] = (b.x, b.y)
-            if b.z <= 1e-9 and b.vz == 0:
+            if abs(b.z) <= 1e-9 and b.vz == 0 and _hole(b.x, b.y) is None:
                 _friction(b, dt)
     remaining = dt
     for _ in range(64):
@@ -401,41 +428,24 @@ def step(balls: list[Ball], dt: float, ev: ShotEvents, cue_id: int, contact_made
         for b in balls:
             if not b.potted and not b.asleep:
                 _advance(b, remaining, ev, cue_id)
-                if b.z < 0:
+                if b.z < 0 and _hole(b.x, b.y) is None:
                     land(b)
-
-    def seg_dist(x1: float, y1: float, x2: float, y2: float, px: float, py: float) -> float:
-        dx, dy = x2 - x1, y2 - y1
-        l2 = dx * dx + dy * dy
-        t = ((px - x1) * dx + (py - y1) * dy) / l2 if l2 > 0 else 0.0
-        t = max(0.0, min(1.0, t))
-        return norm(px - (x1 + dx * t), py - (y1 + dy * t))
 
     for b in balls:
         if b.potted:
             continue
-        captured = False
-        pr = prev.get(b.id)
-        spd = norm(b.vx, b.vy)
-        for pocket, p in enumerate(POCKETS):
-            if b.z > 0.005:
-                continue
-            cr = capture_radius(p[2], spd)
-            if pr is not None:
-                d = seg_dist(pr[0], pr[1], b.x, b.y, p[0], p[1])
+        # Geometric termination: https://ekiefl.github.io/2020/12/20/pooltool-alg/
+        # This is not a simulated rim/liner impact or a speed-dependent catch.
+        pocket = _hole(b.x, b.y)
+        captured = pocket is not None and b.z <= 1e-9 and b.vz <= 0
+        if captured:
+            b.potted = b.asleep = True
+            b.z = b.vz = b.vx = b.vy = b.wx = b.wy = b.wz = 0.0
+            if b.n is not None:
+                ev.potted.append(b.n)
+                ev.pockets.append({"n": b.n, "pocket": pocket})
             else:
-                d = norm(b.x - p[0], b.y - p[1])
-            if d < cr:
-                b.potted = True
-                b.asleep = True
-                b.z = b.vz = b.vx = b.vy = b.wx = b.wy = b.wz = 0.0
-                if b.n is not None:
-                    ev.potted.append(b.n)
-                    ev.pockets.append({"n": b.n, "pocket": pocket})
-                else:
-                    ev.cue_potted = True
-                captured = True
-                break
+                ev.cue_potted = True
         if not captured and (
             b.x < -0.12 or b.x > TABLE_W + 0.12 or b.y < -0.12 or b.y > TABLE_H + 0.12
         ):
@@ -448,7 +458,8 @@ def step(balls: list[Ball], dt: float, ev: ShotEvents, cue_id: int, contact_made
             continue
         if (
             not b.potted
-            and b.z <= 1e-9
+            and abs(b.z) <= 1e-9
+            and _hole(b.x, b.y) is None
             and b.vz == 0
             and norm(b.vx, b.vy) < SLEEP_V
             and norm(b.wx, b.wy) < SLEEP_W
@@ -461,8 +472,10 @@ def all_asleep(balls: list[Ball]) -> bool:
     return all(b.potted or b.asleep for b in balls)
 
 
-def simulate_shot(balls: list[Ball], cue_id: int, max_sim: float = 45.0) -> ShotEvents:
-    ev = ShotEvents()
+def simulate_shot(
+    balls: list[Ball], cue_id: int, max_sim: float = 45.0, events: ShotEvents | None = None
+) -> ShotEvents:
+    ev = events if events is not None else ShotEvents()
     contact_made: dict = {"v": False}
     t = 0.0
     while t < max_sim and not all_asleep(balls):
