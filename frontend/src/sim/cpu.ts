@@ -98,13 +98,13 @@ export function legalTargets(balls: Ball[], group: string | null, open: boolean)
 
 export interface CpuPlan extends CpuShot {
   ball: number; pocket: number;
-  family: 'direct' | 'bank' | 'kick' | 'safety' | 'break' | 'development' | 'jump' | 'masse';
+  family: 'direct' | 'bank' | 'kick' | 'safety' | 'break' | 'development';
   placement?: { x: number; y: number };
   breakStyle?: string;
   verified: boolean;
   score: number;
   evidence?: { clusterLinksOpened: number; newObjectRoutes: number; newTargetsAvailable: number;
-    opponentClusterLinksOpened: number; opponentNewObjectRoutes: number; nextShots: number; opponentShots: number; lookaheadDepth?: number; followUpTrials?: number; followUpVerified?: boolean; runout?: boolean; peakHeight?: number; curveDisplacement?: number };
+    opponentClusterLinksOpened: number; opponentNewObjectRoutes: number; nextShots: number; opponentShots: number; lookaheadDepth?: number; followUpTrials?: number; followUpVerified?: boolean; runout?: boolean };
 }
 
 function powerForSpeed(speed: number, vmax: number): number {
@@ -279,31 +279,6 @@ function placementSeeds(gs: GameState, rnd:()=>number): CpuPlan[] {
   return unique;
 }
 
-/** Geometry proposes elevated rescue shots; full physics must establish legality. */
-export function advancedPlans(gs:GameState):CpuPlan[] {
-  if(gs.breakShot||gs.ballInHand)return [];
-  const cue=gs.balls[0],plans:CpuPlan[]=[];
-  for(const ball of gs.balls){
-    if(ball.potted||ball.n===null||!ruleTargets(gs).includes(ball.n))continue;
-    if(gs.kitchenShot&&ball.x<TABLE_W/4)continue;
-    for(let pocket=0;pocket<POCKETS.length;pocket++){
-      const p=POCKETS[pocket],distance=Math.hypot(ball.x-p.x,ball.y-p.y);
-      if(!distance)continue;
-      const gx=ball.x+2*BALL_R*(ball.x-p.x)/distance,gy=ball.y+2*BALL_R*(ball.y-p.y)/distance;
-      if(gx<BALL_R||gx>TABLE_W-BALL_R||gy<BALL_R||gy>TABLE_H-BALL_R)continue;
-      if(!segClear(ball.x,ball.y,p.x,p.y,gs.balls,[0,ball.id]))continue;
-      if(segClear(cue.x,cue.y,gx,gy,gs.balls,[0,ball.id]))continue;
-      const seed:CpuPlan={angle:Math.atan2(gy-cue.y,gx-cue.x),power:.85,tipX:0,tipY:.1,
-        ball:ball.n,pocket,family:'jump',score:0,verified:false};
-      for(const elevation of [.45,.7,.95])plans.push({...seed,elevation});
-      for(const side of [-1,1])plans.push({...seed,family:'masse',elevation:1.05,power:.55,
-        tipY:0,tipX:side*.45,angle:Math.atan2(ball.y-cue.y,ball.x-cue.x)-side*.4});
-      if(plans.length>=10)return plans;
-    }
-  }
-  return plans;
-}
-
 function previewPlan(gs:GameState,seed:CpuPlan,deadline:number){
     const state=structuredClone(gs),me=state.current;
     if((state.ballInHand||seed.placement) && (!seed.placement || !placeCue(state,seed.placement.x,seed.placement.y))) return null;
@@ -315,19 +290,12 @@ function previewPlan(gs:GameState,seed:CpuPlan,deadline:number){
     const ev=strikeBalls(state.balls,0,Math.cos(seed.angle),Math.sin(seed.angle),seed.power,seed.tipX,seed.tipY,
       state.rules[state.breakShot?'breakMax':'normalMax'],elevation,chalk);
     const contact={v:ev.firstContact!==null};let ticks=0;
-    let peak=cue.z,curvature=0,trackingCurve=true;
-    const initialX=cue.x,initialY=cue.y,initialAngle=Math.atan2(cue.vy,cue.vx);
     while(ticks<45/DT && !allAsleep(state.balls)) {
       if(ticks%64===0 && performance.now()>=deadline) break;
       step(state.balls,DT,ev,0,contact);ticks++;
-      peak=Math.max(peak,cue.z);
-      if(Math.min(cue.x,TABLE_W-cue.x,cue.y,TABLE_H-cue.y)<BALL_R+.002)trackingCurve=false;
-      if(ev.firstContact===null&&trackingCurve)curvature=Math.max(curvature,Math.abs(-(cue.x-initialX)*Math.sin(initialAngle)+(cue.y-initialY)*Math.cos(initialAngle)));
     }
     if(!allAsleep(state.balls)) return null;
     if(seed.breakStyle?.startsWith('second-')&&ev.firstContact!==seed.ball)return null;
-    if(seed.family==='jump'&&(peak<.01||ev.firstContact!==seed.ball))return null;
-    if(seed.family==='masse'&&(curvature<.01||ev.firstContact!==seed.ball))return null;
     applyShot(state,ev);
     if(state.winner===1-me || state.ballInHand || state.message.startsWith('Illegal break')) return null;
     const resolvedCurrent=state.current,continues=state.current===me;
@@ -350,7 +318,7 @@ function previewPlan(gs:GameState,seed:CpuPlan,deadline:number){
     let score=state.winner===me?10000:(continues?80+Math.min(own.length,5)*3:30-Math.min(opponent,5)*3);
     if(before.pairs.size) score+=Math.min(20,Math.min(6,.5*opened)+Math.min(4,2*newRoutes)+Math.min(12,6*newTargets))-Math.min(15,.8*opponentOpened+4*opponentRoutes);
     score-=.2*seed.power;
-    const plan:CpuPlan={...seed,elevation,score,verified:true,evidence:{peakHeight:peak,curveDisplacement:curvature,clusterLinksOpened:opened,newObjectRoutes:newRoutes,newTargetsAvailable:newTargets,
+    const plan:CpuPlan={...seed,elevation,score,verified:true,evidence:{clusterLinksOpened:opened,newObjectRoutes:newRoutes,newTargetsAvailable:newTargets,
       opponentClusterLinksOpened:opponentOpened,opponentNewObjectRoutes:opponentRoutes,nextShots:own.length,opponentShots:opponent}};
     state.current=resolvedCurrent;
     return {plan,state,continues};
@@ -371,8 +339,6 @@ export function planCpuTurn(gs: GameState, maxTrials = 12, budgetMs = 120, rnd:(
   const queue=[...seeds.slice(0,1),...(gs.breakShot?[]:[firm]),...seeds.slice(1,8),...(gs.breakShot?[]:seeds.slice(0,2)).flatMap(s=>[
     {...s,power:Math.max(.12,s.power*.7),tipY:.18}, {...s,tipY:-.22},
   ])];
-  const advanced=advancedPlans(gs);
-  if(advanced.length)queue.splice(5,0,advanced[0],advanced[3],advanced[4],advanced[1]);
   const limit=Math.max(0,Math.min(64,maxTrials));
   const rootLimit=gs.breakShot||limit<8?limit:limit-Math.min(4,Math.floor(limit/3));
   let trials=0;
@@ -384,6 +350,9 @@ export function planCpuTurn(gs: GameState, maxTrials = 12, budgetMs = 120, rnd:(
     if(result)completed.push(result);
   }
   completed.sort((a,b)=>b.plan.score-a.plan.score);
+  // Simulation lookahead: Smith, AAAI 2006, Running the Table, Figs. 3-4.
+  // https://fileadmin.cs.lth.se/ai/Proceedings/aaai06/09/AAAI06-156.pdf
+  // Width/depth/trial limits are computation budgets, not physical constants.
   if(!gs.breakShot){
     for(const root of completed.filter(r=>r.continues&&r.state.winner===null).slice(0,2)){
       for(const seed of placementSeeds(root.state,rnd).slice(0,2)){

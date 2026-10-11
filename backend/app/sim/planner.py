@@ -384,44 +384,6 @@ def _break_seeds(gs, seed):
     return shots
 
 
-def _advanced_seeds(gs):
-    """Rescue routes are proposals, never successes until full 3D replay verifies them."""
-    if gs.break_shot or gs.ball_in_hand:
-        return []
-    cue, result = gs.balls[0], []
-    for target in gs.balls:
-        if target.potted or target.n not in legal_targets(gs):
-            continue
-        if gs.kitchen_shot and target.x < TABLE_W / 4:
-            continue
-        for pocket, point in enumerate(POCKETS):
-            ghost = _ghost(target, point)
-            if not ghost or not _inside(*ghost):
-                continue
-            if not clear(target.x, target.y, *point[:2], gs.balls, [0, target.id]):
-                continue
-            if clear(cue.x, cue.y, *ghost, gs.balls, [0, target.id]):
-                continue
-            seed = _shot(cue, ghost, target, pocket, "jump", 0.85)
-            for elevation in (0.45, 0.7, 0.95):
-                result.append({**seed, "elevation": elevation, "tipY": 0.1})
-            for side in (-1, 1):
-                result.append(
-                    {
-                        **seed,
-                        "family": "masse",
-                        "elevation": 1.05,
-                        "power": 0.55,
-                        "tipY": 0.0,
-                        "tipX": side * 0.45,
-                        "aim": math.atan2(target.y - cue.y, target.x - cue.x) - side * 0.4,
-                    }
-                )
-            if len(result) >= 10:
-                return result
-    return result
-
-
 def _preview(gs, shot, deadline, *, keep_state=False):
     state = copy.deepcopy(gs)
     if state.ball_in_hand or shot.get("placement"):
@@ -449,27 +411,11 @@ def _preview(gs, shot, deadline, *, keep_state=False):
         elevation,
         chalk,
     )
-    contact, elapsed, ticks = {"v": events.first_contact is not None}, 0.02, 0
-    peak = cue.z
-    initial_x, initial_y = cue.x, cue.y
-    initial_angle = math.atan2(cue.vy, cue.vx)
-    curvature = 0.0
-    tracking_curve = True
+    contact, elapsed, ticks = {"v": events.first_contact is not None}, 0.0, 0
     while elapsed < 45 and not all_asleep(state.balls):
         if ticks % 24 == 0 and deadline is not None and time.monotonic() >= deadline:
             return None
         step(state.balls, DT, events, 0, contact)
-        peak = max(peak, cue.z)
-        if min(cue.x, TABLE_W - cue.x, cue.y, TABLE_H - cue.y) < BALL_R + 0.002:
-            tracking_curve = False
-        if events.first_contact is None and tracking_curve:
-            curvature = max(
-                curvature,
-                abs(
-                    -(cue.x - initial_x) * math.sin(initial_angle)
-                    + (cue.y - initial_y) * math.cos(initial_angle)
-                ),
-            )
         elapsed += DT
         ticks += 1
     if not all_asleep(state.balls):
@@ -529,8 +475,6 @@ def _preview(gs, shot, deadline, *, keep_state=False):
         "score": score,
         "evidence": {
             "verified": True,
-            "peakHeight": peak,
-            "curveDisplacement": curvature,
             "legal": legal,
             "continues": continues,
             "potted": events.potted,
@@ -602,14 +546,10 @@ def plan_shots(gs: GameState, *, max_trials=16, budget_seconds=2.0, break_seed=0
     queue = list(seeds[:1])
     if seeds and not state.break_shot:
         queue.append(_firm_variant(seeds[0], state))
-    advanced = _advanced_seeds(gs)
     queue.extend(s for s in seeds[1:4])
     glance = next((s for s in seeds if s.get("contactStyle") == "glancing"), None)
     if glance is not None and glance not in queue:
         queue.append(glance)
-    if advanced:
-        # Reserve bounded coverage for both airborne and curved rescue families.
-        queue.extend([advanced[0], advanced[3], advanced[4], advanced[1]])
     queue.extend(s for s in seeds[4:8])
     # Cushion friction/restitution make the ideal mirror only a starting point.
     # Reserve a small correction sweep for a bank, without unbounded angle search.
@@ -645,14 +585,6 @@ def plan_shots(gs: GameState, *, max_trials=16, budget_seconds=2.0, break_seed=0
             and preview["evidence"]["firstContact"] != shot["calledBall"]
         ):
             continue
-        if shot["family"] in ("jump", "masse"):
-            evidence = preview["evidence"]
-            if evidence["firstContact"] != shot["calledBall"]:
-                continue
-            if shot["family"] == "jump" and evidence["peakHeight"] < 0.01:
-                continue
-            if shot["family"] == "masse" and evidence["curveDisplacement"] < 0.01:
-                continue
         completed.append(preview)
         # Small throw corrections around promising near misses, not random aim.
         evidence = preview["evidence"]
@@ -666,6 +598,9 @@ def plan_shots(gs: GameState, *, max_trials=16, budget_seconds=2.0, break_seed=0
                 queue.insert(
                     min(4, len(queue)), {**shot, "aim": shot["aim"] + offset, "refined": True}
                 )
+    # Simulation lookahead: Smith, AAAI 2006, Running the Table, Figs. 3-4.
+    # https://fileadmin.cs.lth.se/ai/Proceedings/aaai06/09/AAAI06-156.pdf
+    # Beam width/trial counts are computational budgets, not physical constants.
     # A small two-ply beam spends the remaining *same* trial/time budget on actual
     # continuations. It does not mistake geometric next-shot counts for a runout.
     roots = sorted(

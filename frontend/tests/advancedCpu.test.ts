@@ -1,5 +1,5 @@
 import {afterEach,expect,it,vi} from 'vitest';
-import {advancedPlans,planCpuTurn} from '../src/sim/cpu';
+import {planCpuTurn} from '../src/sim/cpu';
 import {newGame,type GameState} from '../src/sim/rules';
 
 function layout(positions:Record<number,[number,number]>):GameState{
@@ -8,13 +8,6 @@ function layout(positions:Record<number,[number,number]>):GameState{
  return state;
 }
 afterEach(()=>vi.unstubAllGlobals());
-it('proposes distinct elevated rescue mechanics only for blocked routes',()=>{
- const s=layout({0:[.5,.635],1:[1.4,.635],9:[.85,.635],8:[2,.3]}),before=structuredClone(s);
- const proposals=advancedPlans(s);
- expect(proposals.some(p=>p.family==='jump'&&p.elevation!>.4)).toBe(true);
- expect(proposals.some(p=>p.family==='masse'&&Math.abs(p.tipX)>.4)).toBe(true);
- expect(s).toEqual(before);s.breakShot=true;expect(advancedPlans(s)).toEqual([]);
-});
 it('verifies continuation through the eight without any provider calls',()=>{
  const fetcher=vi.fn(()=>{throw Error('CPU cannot use a provider');});vi.stubGlobal('fetch',fetcher);
  const s=layout({0:[1.27,.6],1:[1.27,.12],8:[2.4,.12]}),before=structuredClone(s);
