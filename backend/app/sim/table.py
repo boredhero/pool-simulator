@@ -6,6 +6,7 @@ TABLE_W = 2.54  # playfield x
 TABLE_H = 1.27  # playfield y
 BALL_R = 0.028575
 BALL_DIA = BALL_R * 2
+# Dimensions: https://www.wpapool.com/wp-content/uploads/2024/01/RECOMMENDED-EQUIPMENT-SPECIFICATIONS.pdf
 # WPA mouths: corner 4.5in, side 5.0in. Cushion noses end at the mouth edges.
 CORNER_HALF = 0.1143 / 2**0.5
 SIDE_HALF = 0.0635

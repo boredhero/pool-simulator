@@ -36,9 +36,6 @@ export interface Ball {
 }
 
 export interface ShotEvents {
-  _strokeContacts?:Array<{id:number;nx:number;ny:number;nz:number}>;
-  cueDoubleHit?: boolean;
-  cuePush?: boolean;
   firstContact: number | null; // ball number (or -1 = cue? use id) first hit by cue
   potted: number[]; // ball numbers in order
   offTable: Array<number | null>; // driven off the table (null = cue)
@@ -273,7 +270,6 @@ function resolveBallBall(A: Ball, B: Ball, nx: number, ny: number, ev: ShotEvent
     A.wz += dwz;
     B.wz += dwz;
     A.asleep = B.asleep = false;
-    if(ev._strokeContacts && (A.id===cueId||B.id===cueId))ev._strokeContacts.push({id:A.id===cueId?B.id:A.id,nx,ny,nz});
     if (ev.firstContact === null && (A.id === cueId || B.id === cueId)) {
       const other = A.id === cueId ? B : A;
       ev.firstContact = other.n;
@@ -323,31 +319,6 @@ function hole(x:number,y:number):number|null {
   return null;
 }
 
-/** Finite slate lip and an uncalibrated e=.25 cylindrical liner. Mirror Python. */
-function pocketContact(b:Ball):number|null {
-  const pocket=hole(b.x,b.y); if(pocket===null) return null;
-  const p=POCKETS[pocket], dx=b.x-p.x, dy=b.y-p.y, rho=norm(dx,dy);
-  const ux=rho>1e-12?dx/rho:1, uy=rho>1e-12?dy/rho:0;
-  const d=p.r-rho, height=b.z+BALL_R;
-  if(d>0 && d<BALL_R && height>=0){
-    const contactHeight=Math.sqrt(Math.max(0,BALL_R*BALL_R-d*d));
-    if(height<contactHeight){
-      b.z=contactHeight-BALL_R;
-      const nx=-ux*d/BALL_R, ny=-uy*d/BALL_R, nz=contactHeight/BALL_R;
-      const vn=b.vx*nx+b.vy*ny+b.vz*nz;
-      if(vn<0){b.vx-=vn*nx;b.vy-=vn*ny;b.vz-=vn*nz;}
-      b.asleep=false;
-    }
-  }
-  const outwardSide=dx*(p.x-TABLE_W/2)+dy*(p.y-TABLE_H/2)>0;
-  if((height<0 || outwardSide) && b.z<.04 && rho>p.r-BALL_R){
-    b.x=p.x+ux*(p.r-BALL_R);b.y=p.y+uy*(p.r-BALL_R);
-    const outward=b.vx*ux+b.vy*uy;
-    if(outward>0){b.vx-=1.25*outward*ux;b.vy-=1.25*outward*uy;}
-  }
-  return pocket;
-}
-
 export function step(balls:Ball[],dt:number,ev:ShotEvents,cueId:number,contactMade:{v:boolean}):void {
   const near=balls.filter(b=>!b.potted&&POCKETS.some(p=>norm(b.x-p.x,b.y-p.y)<p.r+BALL_R+norm(b.vx,b.vy)*dt));
   const count=near.length?Math.max(1,Math.ceil(dt*1920),Math.ceil(Math.max(...near.map(b=>norm(b.vx,b.vy,b.vz)*dt/.001)))):1;
@@ -393,11 +364,12 @@ function stepSub(balls: Ball[], dt: number, ev: ShotEvents, cueId: number, conta
   }
   for (const b of balls) {
     if (b.potted) continue;
-    const pocket = pocketContact(b);
-    const captured = pocket !== null && b.z < -.11;
+    const pocket = hole(b.x,b.y);
+    // Geometric termination: https://ekiefl.github.io/2020/12/20/pooltool-alg/
+    const captured = pocket !== null && b.z <= 1e-9 && b.vz <= 0;
     if (captured) {
       b.potted = b.asleep = true;
-      b.vz = b.vx = b.vy = b.wx = b.wy = b.wz = 0;
+      b.z = b.vz = b.vx = b.vy = b.wx = b.wy = b.wz = 0;
       if (b.n !== null) { ev.potted.push(b.n); (ev.pockets ??= []).push({n:b.n,pocket: pocket!}); }
       else ev.cuePotted = true;
     }
@@ -411,7 +383,7 @@ function stepSub(balls: Ball[], dt: number, ev: ShotEvents, cueId: number, conta
       continue;
     }
     // Pure sidespin cannot move an isolated resting ball; do not hold the turn for its decay.
-    if (!b.potted && !ev._strokeContacts && Math.abs(b.z) <= 1e-9 && hole(b.x,b.y) === null && b.vz === 0 && norm(b.vx, b.vy) < SLEEP_V && norm(b.wx, b.wy) < SLEEP_W) {
+    if (!b.potted && Math.abs(b.z) <= 1e-9 && hole(b.x,b.y) === null && b.vz === 0 && norm(b.vx, b.vy) < SLEEP_V && norm(b.wx, b.wy) < SLEEP_W) {
       b.z = b.vz = b.vx = b.vy = b.wx = b.wy = b.wz = 0;
       b.asleep = true;
     }

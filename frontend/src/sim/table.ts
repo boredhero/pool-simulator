@@ -4,6 +4,7 @@ export const TABLE_W = 2.54;
 export const TABLE_H = 1.27;
 export const BALL_R = 0.028575;
 export const BALL_M = 0.17;
+// Dimensions: https://www.wpapool.com/wp-content/uploads/2024/01/RECOMMENDED-EQUIPMENT-SPECIFICATIONS.pdf
 // WPA mouths: corner 4.5in, side 5.0in. Cushion noses end at the mouth edges.
 const CORNER_HALF = 0.1143 / Math.sqrt(2);
 const SIDE_HALF = 0.0635;

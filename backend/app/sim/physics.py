@@ -52,8 +52,6 @@ class Ball:
 
 @dataclass
 class ShotEvents:
-    cue_double_hit: bool = False
-    cue_push: bool = False
     first_contact: int | None = None
     potted: list[int] = field(default_factory=list)
     off_table: list[int | None] = field(default_factory=list)
@@ -320,9 +318,6 @@ def _resolve_bb(
         a.wz += dwz
         b.wz += dwz
         a.asleep = b.asleep = False
-        trace = getattr(ev, "_stroke_contacts", None)
-        if trace is not None and (a.id == cue_id or b.id == cue_id):
-            trace.append({"id": b.id if a.id == cue_id else a.id, "nx": nx, "ny": ny, "nz": nz})
         if ev.first_contact is None and (a.id == cue_id or b.id == cue_id):
             other = b if a.id == cue_id else a
             ev.first_contact = other.n
@@ -367,47 +362,8 @@ def _hole(x: float, y: float) -> int | None:
     return None
 
 
-def _pocket_contact(b: Ball) -> int | None:
-    """Finite slate: support at the hole lip, then free fall inside the well.
-
-    z is bottom height. The sharp lip's sphere contact is d²+(z+R)²=R².
-    Inelastic unilateral support removes only inward normal velocity, without
-    tangential rim friction. Liner restitution is an uncalibrated default.
-    """
-    pocket = _hole(b.x, b.y)
-    if pocket is None:
-        return None
-    px, py, radius, _ = POCKETS[pocket]
-    dx, dy = b.x - px, b.y - py
-    rho = norm(dx, dy)
-    ux, uy = (dx / rho, dy / rho) if rho > 1e-12 else (1.0, 0.0)
-    d, height = radius - rho, b.z + BALL_R
-    if 0 < d < BALL_R and height >= 0:
-        contact_height = math.sqrt(max(0, BALL_R * BALL_R - d * d))
-        if height < contact_height:
-            b.z = contact_height - BALL_R
-            nx, ny, nz = -ux * d / BALL_R, -uy * d / BALL_R, contact_height / BALL_R
-            vn = b.vx * nx + b.vy * ny + b.vz * nz
-            if vn < 0:
-                impulse = -vn
-                b.vx += impulse * nx
-                b.vy += impulse * ny
-                b.vz += impulse * nz
-            b.asleep = False
-    outward_side = dx * (px - TABLE_W / 2) + dy * (py - TABLE_H / 2) > 0
-    if (height < 0 or outward_side) and b.z < 0.04 and rho > radius - BALL_R:
-        # Cylindrical leather/rubber liner. No artificial upward kick.
-        b.x, b.y = px + ux * (radius - BALL_R), py + uy * (radius - BALL_R)
-        outward = b.vx * ux + b.vy * uy
-        if outward > 0:
-            impulse = 1.25 * outward  # e=.25, explicitly uncalibrated liner.
-            b.vx -= impulse * ux
-            b.vy -= impulse * uy
-    return pocket
-
-
 def step(balls: list[Ball], dt: float, ev: ShotEvents, cue_id: int, contact_made: dict) -> None:
-    # Limit travel near a lip to 1 mm and gravity interval to 1/1920 s.
+    # Resolve pocket entry geometrically within 1 mm travel / 1/1920 s.
     # Fixed deterministic subdivision, independent of render rate.
     near = [
         b
@@ -478,11 +434,13 @@ def _step_sub(
     for b in balls:
         if b.potted:
             continue
-        pocket = _pocket_contact(b)
-        captured = pocket is not None and b.z < -0.11
+        # Geometric termination: https://ekiefl.github.io/2020/12/20/pooltool-alg/
+        # This is not a simulated rim/liner impact or a speed-dependent catch.
+        pocket = _hole(b.x, b.y)
+        captured = pocket is not None and b.z <= 1e-9 and b.vz <= 0
         if captured:
             b.potted = b.asleep = True
-            b.vz = b.vx = b.vy = b.wx = b.wy = b.wz = 0.0
+            b.z = b.vz = b.vx = b.vy = b.wx = b.wy = b.wz = 0.0
             if b.n is not None:
                 ev.potted.append(b.n)
                 ev.pockets.append({"n": b.n, "pocket": pocket})
@@ -500,7 +458,6 @@ def _step_sub(
             continue
         if (
             not b.potted
-            and not hasattr(ev, "_stroke_contacts")
             and abs(b.z) <= 1e-9
             and _hole(b.x, b.y) is None
             and b.vz == 0

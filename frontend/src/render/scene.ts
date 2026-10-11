@@ -1,3 +1,4 @@
+import { PocketDrops } from './pocketDrop';
 import {pickPocket} from './pocketPicking';
 import {GoldCoin} from './goldCoin';
 import { guideColor } from './guideColor';
@@ -163,6 +164,7 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
   scene.add(chalks.group);
   // Recessed wells, with open tops and leather lips, remain visible while
   // orbiting. Their bottoms sit below the cut bed instead of over the felt.
+  const pocketDrops = new PocketDrops();
   const pocketCenters: Array<[number, number, number]> = [];
   const pocketMat = new THREE.MeshBasicMaterial({ color: 0x070605, side: THREE.DoubleSide });
   const rimMat = new THREE.MeshStandardMaterial({ color: 0x24180f, roughness: 0.9, side: THREE.DoubleSide });
@@ -397,6 +399,12 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
         const m = getMesh(b.n);
         const [rx, rz] = toRender(b.x, b.y);
         m.position.set(rx, BALL_R, rz);
+        const drop=pocketDrops.update(b,visualDt);
+        if(drop){
+          const [x,z]=toRender(drop.x,drop.y);
+          m.visible=true;m.position.set(x,drop.height,z);
+          continue;
+        }
         const slot=b.n===null?-1:returnOrder.indexOf(b.n);
         m.visible = !b.potted || slot>=0;
         if (b.potted && slot>=0) {
