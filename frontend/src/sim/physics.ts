@@ -411,7 +411,7 @@ function stepSub(balls: Ball[], dt: number, ev: ShotEvents, cueId: number, conta
       continue;
     }
     // Pure sidespin cannot move an isolated resting ball; do not hold the turn for its decay.
-    if (!b.potted && !(b.id===cueId && ev._strokeContacts) && Math.abs(b.z) <= 1e-9 && hole(b.x,b.y) === null && b.vz === 0 && norm(b.vx, b.vy) < SLEEP_V && norm(b.wx, b.wy) < SLEEP_W) {
+    if (!b.potted && !ev._strokeContacts && Math.abs(b.z) <= 1e-9 && hole(b.x,b.y) === null && b.vz === 0 && norm(b.vx, b.vy) < SLEEP_V && norm(b.wx, b.wy) < SLEEP_W) {
       b.z = b.vz = b.vx = b.vy = b.wx = b.wy = b.wz = 0;
       b.asleep = true;
     }

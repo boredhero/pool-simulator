@@ -500,7 +500,7 @@ def _step_sub(
             continue
         if (
             not b.potted
-            and not (b.id == cue_id and hasattr(ev, "_stroke_contacts"))
+            and not hasattr(ev, "_stroke_contacts")
             and abs(b.z) <= 1e-9
             and _hole(b.x, b.y) is None
             and b.vz == 0
