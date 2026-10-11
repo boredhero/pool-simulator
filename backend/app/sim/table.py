@@ -7,27 +7,22 @@ TABLE_H = 1.27  # playfield y
 BALL_R = 0.028575
 BALL_DIA = BALL_R * 2
 # WPA mouths: corner 4.5in, side 5.0in. Cushion noses end at the mouth edges.
-CORNER_HALF = 0.0572
+CORNER_HALF = 0.1143 / 2**0.5
 SIDE_HALF = 0.0635
-_CB = 0.0287  # 1.6in along the corner bisector per axis
+CORNER_SHELF = 0.032  # Chosen within WPA 25.4–57.15 mm range.
+SIDE_SHELF = 0.00635  # Chosen within WPA 0–9.525 mm range.
+_CB = (0.061 + CORNER_SHELF - 0.1143 / 2) / 2**0.5
 
-# Capture circles sit behind the nose line (pooltool layout, SI).
+# Actual circular slate cutouts; shelf measured from mouth midpoint.
 # (x, y, radius, is_corner)
 POCKETS: list[tuple[float, float, float, bool]] = [
     (-_CB, -_CB, 0.061, True),
-    (TABLE_W / 2, -0.066, 0.0635, False),
+    (TABLE_W / 2, -(0.0635 + SIDE_SHELF), 0.0635, False),
     (TABLE_W + _CB, -_CB, 0.061, True),
     (-_CB, TABLE_H + _CB, 0.061, True),
-    (TABLE_W / 2, TABLE_H + 0.066, 0.0635, False),
+    (TABLE_W / 2, TABLE_H + 0.0635 + SIDE_SHELF, 0.0635, False),
     (TABLE_W + _CB, TABLE_H + _CB, 0.061, True),
 ]
-
-
-def capture_radius(r: float, v: float) -> float:
-    """Effective capture radius shrinks for fast balls (rattle-out)."""
-    if v <= 1.0:
-        return r
-    return max(0.6 * r, r - 0.01016 * (v - 1.0))
 
 
 HEAD_STRING_X = TABLE_W * 0.25

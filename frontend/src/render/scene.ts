@@ -1,7 +1,6 @@
 import {pickPocket} from './pocketPicking';
 import {GoldCoin} from './goldCoin';
 import { guideColor } from './guideColor';
-import { PocketDrops } from './pocketDrop';
 import { CameraRig } from './cameraRig';
 import { ballTexture, type CueStyle } from './ballTextures';
 import { cushionGeometry } from './cushionGeometry';
@@ -208,7 +207,6 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
   // Ball meshes keyed by number ('cue' for cue ball).
   const ballGeo = new THREE.SphereGeometry(BALL_R, 48, 32);
   const meshes = new Map<string, THREE.Mesh>();
-  const pocketDrops = new PocketDrops();
   let cueAppearance:CueStyle='plain';
   const getMesh = (n: number | null): THREE.Mesh => {
     const key = n === null ? 'cue' : `b${n}`;
@@ -399,13 +397,6 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
         const m = getMesh(b.n);
         const [rx, rz] = toRender(b.x, b.y);
         m.position.set(rx, BALL_R, rz);
-        const drop=pocketDrops.update(b,visualDt);
-        if(drop){
-          const [x,z]=toRender(drop.x,drop.y);
-          m.visible=true;m.position.set(x,drop.height,z);
-          m.rotateZ(visualDt*3);
-          continue;
-        }
         const slot=b.n===null?-1:returnOrder.indexOf(b.n);
         m.visible = !b.potted || slot>=0;
         if (b.potted && slot>=0) {
@@ -416,15 +407,7 @@ export function init(canvas: HTMLCanvasElement): SceneHandle {
           m.rotation.set(0,0,0);continue;
         }
         if(b.n!==null)storedPositions.delete(b.n);
-        if (!b.potted) {
-          // Lip dip: balls sink as their center crosses into the pocket mouth.
-          let dip = 0;
-          for (const [px, pz, pr] of pocketCenters) {
-            const d = Math.hypot(rx - px, rz - pz);
-            if (d < pr * 1.5) dip = Math.max(dip, 1 - d / (pr * 1.5));
-          }
-          m.position.y = BALL_R + b.z - (b.z < .005 ? dip * dip * 0.024 : 0);
-        }
+        if (!b.potted) m.position.y = BALL_R + b.z;
         if (!b.potted && dt > 0) {
           // Sim (x right, y plan, z up) -> render (x right, y up, z plan):
           // axis swap + sign flip from the handedness change.
