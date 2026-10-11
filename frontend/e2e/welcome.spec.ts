@@ -26,11 +26,15 @@ test('explicit terms gate, separate analytics, live control profile and immediat
   await page.keyboard.press('Escape');await expect(welcome).toBeVisible();
   expect(await page.evaluate(()=>localStorage.getItem('pool:welcome'))).toBeNull();
   await expect(welcome.getByRole('link',{name:'Terms of Service'})).toHaveAttribute('href','/terms.html');
+  await page.locator('#welcomerules').selectOption('tournament');
+  await expect(page.locator('#welcomeruleshelp')).toContainText('Call every shot');
   await page.locator('#welcomeprofile').selectOption('trackpad');
   expect(await page.evaluate(()=>(window as any).__pool.scene.cameraRig.inputProfile)).toBe('trackpad');
   await expect(page.locator('#welcomecontrols')).toContainText('Two-finger scroll');
   await page.locator('#welcometerms').check();await page.locator('#welcometutorial').click();
   await expect(welcome).not.toBeVisible();await expect(page.locator('#tutorial')).toBeVisible();
+  await page.evaluate(()=>(window as any).__pool.tutorial.close());
+  expect(await page.evaluate(()=>(window as any).__pool.gs.rules.preset)).toBe('tournament');
   expect(consent).toEqual([false]);expect(accountTerms).toEqual([]);
   expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('pool:welcome')!))).toEqual({version:TERMS_VERSION,accepted:true});
   await page.reload();await expect(page.locator('#welcomedialog')).toHaveCount(0);
@@ -85,8 +89,11 @@ test.describe('small touch welcome',()=>{
     await expect(page.locator('#welcomeprofilelabel')).not.toBeVisible();await expect(page.locator('#welcomecontrols')).toContainText('Touch controls');
     const box=(await dialog.boundingBox())!;expect(box.width).toBeLessThanOrEqual(320);expect(box.height).toBeLessThanOrEqual(640);
     expect(await page.locator('.welcome-body').evaluate(element=>element.scrollWidth<=element.clientWidth)).toBe(true);
+    await page.locator('#welcomerules').selectOption('tournament');
     await page.locator('#welcometerms').check();await expect(page.locator('#welcometutorial')).toBeInViewport();
     await page.locator('#welcometutorial').tap();await expect(page.locator('#tutorial')).toBeVisible();
+    await page.evaluate(()=>(window as any).__pool.tutorial.close());
+    expect(await page.evaluate(()=>(window as any).__pool.gs.rules.preset)).toBe('tournament');
   });
 });
 
@@ -94,7 +101,7 @@ test('changed terms hash prompts independently of saved analytics',async({page})
  const changed='b'.repeat(64);
  await page.addInitScript(version=>{if(!localStorage.getItem('pool:welcome'))localStorage.setItem('pool:welcome',JSON.stringify({version,accepted:true}));localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-09',allow:false}));},TERMS_VERSION);
  await page.route('**/api/privacy/terms',r=>r.fulfill({json:{version:changed,accepted:false,authenticated:false,accountId:null}}));
- await page.goto('/');await expect(page.locator('#welcomedialog')).toBeVisible();await expect(page.locator('#welcometerms')).not.toBeChecked();await page.locator('#welcometerms').check();await page.locator('#welcomeplay').click();
+ await page.goto('/');await expect(page.locator('#welcomedialog')).toBeVisible();await expect(page.locator('#welcomerulessection')).toBeHidden();await expect(page.locator('#welcometerms')).not.toBeChecked();await page.locator('#welcometerms').check();await page.locator('#welcomeplay').click();
  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('pool:welcome')!).version)).toBe(changed);expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('pool:privacy')!).version)).toBe('2026-10-09');
  await page.reload();await expect(page.locator('#welcomedialog')).toHaveCount(0);
 });

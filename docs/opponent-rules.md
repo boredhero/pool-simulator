@@ -34,3 +34,15 @@ The search is bounded. If no completed legal preview is found, an explicitly
 unverified fallback still takes the turn and may foul. A custom speed cap of 1 m/s
 can make a long shot or four-rail legal break physically unattainable. Shot quality
 also depends on the simulator approximations and the candidates the planner finds.
+
+## House-rule previews (1.5.7)
+
+Bar now treats a scratch while on the 8 as an ordinary foul when the 8 stays on
+the table. Pocketing the 8 with a scratch still loses. Custom can enable the old
+scratch-on-8 loss option. Both engines and the Jev API default agree.
+
+Settings → Table & rules → Compare rulesets shows Bar and Tournament side by
+side, adding a live Custom column when selected. Previewing does not alter the
+active rack. First-time welcome offers Bar or Tournament for the first local
+rack; tutorial practice remains isolated and restores that rack on exit. Existing
+welcome acknowledgments are not invalidated to advertise the new selector.

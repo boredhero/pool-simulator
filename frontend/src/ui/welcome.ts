@@ -1,5 +1,6 @@
 import { chooseEssentialPrivacy, consent, privacyOptedOut, recordPrivacySession, savedPrivacyChoice } from './privacy';
 import './welcome.css';
+import { matchConfig, type MatchConfig } from '../sim/config';
 import {acceptTerms,termsStatus,TERMS_VERSION,type TermsStatus} from './terms';
 
 export const WELCOME_KEY='pool:welcome';
@@ -9,18 +10,21 @@ export function needsWelcome(version=WELCOME_VERSION):boolean {
 }
 
 /** Local onboarding is content-versioned; signed-in agreements are saved by the server. */
-export async function setupWelcome(startTutorial:()=>void):Promise<void> {
+export async function setupWelcome(startTutorial:()=>void, chooseRules:(rules:MatchConfig)=>void):Promise<void> {
   if(document.getElementById('welcomedialog'))return;
   let current:TermsStatus|null=null;
   try{current=await termsStatus();}catch{/* Offline guests can acknowledge the bundled Terms; account acceptance stays server-owned. */}
   const version=current?.version??WELCOME_VERSION;
   if(!needsWelcome(version))return;
+  let firstVisit=!current?.accepted;
+  try{firstVisit=firstVisit&&localStorage.getItem(WELCOME_KEY)===null;}catch{/* storage may be unavailable */}
   const dialog=document.createElement('dialog');dialog.id='welcomedialog';
   dialog.setAttribute('aria-labelledby','welcometitle');
   dialog.innerHTML=`<form id="welcomeform">
     <header class="welcome-header"><span class="welcome-eyebrow">A table. A little practice. Your next shot.</span><h1 id="welcometitle" tabindex="-1" autofocus>Welcome to Pool Simulator</h1><p>Play solo, challenge the CPU, or invite a friend. Sign in when you’re ready to meet Jev AI.</p></header>
     <div class="welcome-body">
       <section class="welcome-practice"><strong>Start with a quick practice</strong><p>Get comfortable with aiming, spin, your camera, and shooting before your first game.</p><p id="welcomeinvite" hidden>Your invite is ready in Online. You can practice first or go straight to joining your friend.</p></section>
+      <section id="welcomerulessection"><label class="welcome-profile" for="welcomerules">Choose your first game's rules<select id="welcomerules" aria-describedby="welcomeruleshelp"><option value="bar">Bar · relaxed house rules</option><option value="tournament">Tournament · called shots</option></select></label><p id="welcomeruleshelp" class="welcome-controls" aria-live="polite"></p><p class="welcome-small">Compare all rules or build a Custom ruleset later in Settings → Table &amp; rules. Online games use the host’s rules.</p></section>
       <label id="welcomeprofilelabel" class="welcome-profile">Your controls<select id="welcomeprofile"><option value="mouse">Mouse &amp; Keyboard Mode</option><option value="trackpad">Trackpad Mode</option></select></label>
       <p id="welcomecontrols" class="welcome-controls"></p>
       <div class="welcome-choice"><input id="welcometerms" type="checkbox" required><label for="welcometerms">I am 18 or older and accept the <a href="/terms.html" target="_blank" rel="noopener">Terms of Service</a>.</label></div>
@@ -36,6 +40,12 @@ export async function setupWelcome(startTutorial:()=>void):Promise<void> {
   const get=<T extends HTMLElement=HTMLElement>(id:string)=>dialog.querySelector<T>('#'+id)!;
   const agreement=get<HTMLInputElement>('welcometerms'),analytics=get<HTMLInputElement>('welcomeanalytics');
   const profile=get<HTMLSelectElement>('welcomeprofile'),primary=get<HTMLButtonElement>('welcometutorial'),secondary=get<HTMLButtonElement>('welcomeplay');
+  const rules=get<HTMLSelectElement>('welcomerules');
+  get('welcomerulessection').hidden=!firstVisit;
+  const describeRules=()=>{get('welcomeruleshelp').textContent=rules.value==='bar'
+    ?'Call only the 8-ball. Scratches give placement behind the head string. A legal 8-ball break wins; break pots can assign groups.'
+    :'Call every shot. Ordinary scratches give placement anywhere. The table stays open after the break; an 8-ball break is respotted. Simplified tournament rules.';};
+  describeRules();rules.addEventListener('change',describeRules);
   const touch=document.documentElement.classList.contains('touch-input');
   if(touch)document.documentElement.classList.add('touch-input');
   const cameraProfile=document.getElementById('camera-input-profile') as HTMLSelectElement|null;
@@ -65,7 +75,7 @@ export async function setupWelcome(startTutorial:()=>void):Promise<void> {
     agreement.checked=true;agreement.closest('.welcome-choice')!.setAttribute('hidden','');
   }
   let busy=false;
-  const refresh=()=>{primary.disabled=secondary.disabled=busy||!agreement.checked;agreement.disabled=busy;analytics.disabled=busy||privacyOptedOut();profile.disabled=busy;};
+  const refresh=()=>{primary.disabled=secondary.disabled=busy||!agreement.checked;agreement.disabled=busy;analytics.disabled=busy||privacyOptedOut();profile.disabled=busy;rules.disabled=busy;};
   agreement.addEventListener('change',refresh);refresh();
   const proceed=async(tutorial:boolean)=>{
     if(busy||!agreement.checked)return;
@@ -84,6 +94,7 @@ export async function setupWelcome(startTutorial:()=>void):Promise<void> {
       }
       // Guest acknowledgment is local; authenticated acceptance was confirmed by the server above.
       try {localStorage.setItem(WELCOME_KEY,JSON.stringify({version,accepted:true}));localStorage.setItem('pool:help-dismissed','1');}catch{/* session works without persistent storage */}
+      if(firstVisit)chooseRules(matchConfig({preset:rules.value==='tournament'?'tournament':'bar'}));
       dialog.close();
       if(tutorial)startTutorial();
       else if(!get('welcomeinvite').hidden)document.getElementById('joinbtn')?.focus();

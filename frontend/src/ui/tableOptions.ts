@@ -1,3 +1,4 @@
+import { renderRulesComparison } from './rulesComparison';
 import { accountPreferences } from './accountPreferences';
 import { matchConfig, rulesName, type MatchConfig } from '../sim/config';
 const el = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -25,6 +26,7 @@ export class TableOptions {
     let dismissed = false;
     try { dismissed = localStorage.getItem('pool:help-dismissed') === '1'; } catch { /* private storage */ }
     select('rulespreset').addEventListener('change', () => this.write(matchConfig({ preset: select('rulespreset').value as MatchConfig['preset'] }),this.context));
+    el('rulefields').addEventListener('input', () => renderRulesComparison(el('rules-comparison-content'), this.read()));
     el('closesettings').addEventListener('click',()=>{el('settingspanel').classList.remove('open');el('settingsbtn').focus();});
     el('applyrules').addEventListener('click', () => { start(this.read()); el('settingspanel').classList.remove('open'); });
     const show = (open: boolean, remember = false) => {
@@ -62,6 +64,7 @@ export class TableOptions {
     return matchConfig({ preset: select('rulespreset').value as MatchConfig['preset'], scratch: select('scratchrule').value as MatchConfig['scratch'], calls: select('callsrule').value as MatchConfig['calls'], eightOnBreak: select('eightbreakrule').value as MatchConfig['eightOnBreak'], scratchOnEightLoss: input('scratch8rule').checked, assignOnBreak: input('assignrule').checked, strictBreak: input('strictbreakrule').checked, breakPlacement: input('breakplacementrule').checked, normalMax: input('normalspeed').valueAsNumber, breakMax: input('breakspeed').valueAsNumber });
   }
   write(c: MatchConfig, context:typeof this.context='local'): void {
+    renderRulesComparison(el('rules-comparison-content'), c);
     this.context=context;const online=context==='room'||context==='jev';
     select('rulespreset').value = c.preset; select('rulespreset').disabled = online;
     select('scratchrule').value = c.scratch; select('callsrule').value = c.calls; select('eightbreakrule').value = c.eightOnBreak;
@@ -74,6 +77,6 @@ export class TableOptions {
   }
   summary(c: MatchConfig): void {
     el('kitchenhelp').hidden=c.scratch!=='kitchen';
-    el('rulesummary').textContent = `${rulesName(c)} · Break placement: ${c.breakPlacement!==false?'behind the head string':'fixed starting spot'}. Scratch: ${c.scratch === 'kitchen' ? 'behind the head string' : 'ball in hand anywhere'}. Calls: ${c.calls === 'eight' ? '8-Ball only' : c.calls === 'all' ? 'every ball' : 'none'}. ${c.assignOnBreak ? 'Groups may be assigned on the break.' : 'Table stays open after the break.'} Groups require a legal pot; a scratch leaves an open table unassigned. 8 on break: ${c.eightOnBreak === 'win' ? 'win' : 'respot'}. ${c.strictBreak ? 'Illegal break: rerack for the opponent.' : 'Empty break: keep the layout and pass the turn; no rerack.'} ${c.preset==='tournament'?'Off-table objects stay out. The 8 off on the break is respotted; the opponent places in the kitchen. The 8 off during regular play loses. ':'Off-table objects are respotted. The 8 off the table loses. Bar/Custom use house rules.'}`;
+    el('rulesummary').textContent = `${rulesName(c)} · Break placement: ${c.breakPlacement!==false?'behind the head string':'fixed starting spot'}. Scratch: ${c.scratch === 'kitchen' ? 'behind the head string' : 'ball in hand anywhere'}. Calls: ${c.calls === 'eight' ? '8-Ball only' : c.calls === 'all' ? 'every ball' : 'none'}. ${c.assignOnBreak ? 'Groups may be assigned on the break.' : 'Table stays open after the break.'} Groups require a legal pot; a scratch leaves an open table unassigned. Scratch while on the 8 with the 8 still up: ${c.scratchOnEightLoss ? 'loss' : 'ordinary foul'}. 8 on break: ${c.eightOnBreak === 'win' ? 'win' : 'respot'}. ${c.strictBreak ? 'Illegal break: rerack for the opponent.' : 'Empty break: keep the layout and pass the turn; no rerack.'} ${c.preset==='tournament'?'Off-table objects stay out. The 8 off on the break is respotted; the opponent places in the kitchen. The 8 off during regular play loses. ':'Off-table objects are respotted. The 8 off the table loses. Bar/Custom use house rules.'}`;
   }
 }

@@ -83,7 +83,7 @@ class RuleSettings(BaseModel):
     scratch: Literal["kitchen", "anywhere"] = "kitchen"
     calls: Literal["none", "eight", "all"] = "eight"
     eightOnBreak: Literal["win", "spot"] = "win"
-    scratchOnEightLoss: bool = True
+    scratchOnEightLoss: bool = False
     assignOnBreak: bool = True
     strictBreak: bool = False
     breakPlacement: bool = True

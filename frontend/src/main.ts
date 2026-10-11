@@ -15,7 +15,7 @@ const game = new Game(canvas);
 setupDraggablePanels();
 setupCameraFly(game.scene.cameraRig);
 setupMobileHud();
-setupWelcome(()=>game.tutorial.start());
+setupWelcome(()=>game.tutorial.start(),rules=>{if(!game.room&&!game.jevGame)game.reset(rules);});
 (window as unknown as { __pool: Game }).__pool = game;
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
