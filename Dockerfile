@@ -1,5 +1,5 @@
 # Frontend build and Python runtime in one release image.
-FROM node:22-slim AS web
+FROM node:26-slim AS web
 WORKDIR /web
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
