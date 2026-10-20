@@ -1,5 +1,22 @@
 [
-  {"version": "1.6.0", "date": "2026-10-11", "title": "Pocket geometry and smarter position play", "changes": ["Owner Admin settings now opens from the signed-in account panel instead of Table settings.", "Stabilized the desktop break-placement browser check on software-rendered CI runners.", "Felt and rail color swatches stay circular on desktop and mobile.", "Pocket openings and shelf geometry match the rendered table more closely, without magnetic attraction or speed-dependent capture circles.", "CPU and Jev can compare simulated follow-up shots and short endgame runouts within their existing planning budgets. CPU remains entirely offline.", "Documented the published research behind these changes and the advanced contact and pocket effects deferred pending validated models."]},
+  {
+    "version": "1.6.0",
+    "date": "2026-10-20",
+    "title": "Pocket geometry, smarter position play and account controls",
+    "changes": [
+      "Pocket mouths, shelves and rendered openings now share dimensions based on published pool equipment specifications.",
+      "Pocket capture no longer uses artificial attraction or speed-dependent capture circles. Balls crossing above a pocket remain in flight, and grounded entries use the shared pocket geometry.",
+      "Pocketed balls fall vertically into the opening, replacing the inward pull and early sinking animation.",
+      "CPU and Jev can compare simulated follow-up shots and short endgame runouts within their existing planning budgets. CPU remains entirely offline.",
+      "Shot previews and execution share the same cue-impact entry points across local play, online rooms and Jev games, including cue-clearance elevation.",
+      "Owner Admin settings now opens from the signed-in account panel: click your username instead of opening Table settings.",
+      "Felt and rail color swatches stay circular with larger touch targets on desktop and mobile.",
+      "Expanded pocket, cue-stroke, planning and browser regression coverage, including matching Python and browser shot replays; stabilized desktop break-placement checks on CI runners.",
+      "Updated backend libraries, frontend build and browser-test tools, and CI actions. Release containers now build with Node 26 and run the backend on Python 3.14.",
+      "Refreshed the installed-app cache for this release.",
+      "Added research and limitations notes for pocket geometry, cue impact and AI planning. Finite tip contact, new double-hit detection, pocket-liner rebounds and deliberate jump or masse planning remain deferred."
+    ]
+  },
   {"version": "1.5.7", "date": "2026-10-11", "title": "House rules and ruleset previews", "changes": ["In Bar rules, scratching while on the 8 is an ordinary foul if the 8 stays on the table. Pocketing the 8 with a scratch still loses.", "Compare Bar, Tournament, and your Custom settings before starting a new rack. New visitors can choose Bar or Tournament during welcome."]},
   {"version":"1.5.6","date":"2026-10-11","title":"Varied Jev breaks","changes":["Jev chooses between previewed head-ball and second-ball breaks with varied legal placements, pace, and spin.","Break setups vary between racks while keeping server and client shot physics deterministic.","CPU uses varied offline break plans without Jev requests.","Place and reposition the cue ball behind the head string before breaking. Bar and Tournament allow it; Custom can use a fixed start."]},
   {"version":"1.5.5","date":"2026-10-09","title":"Diagnostics and visit counts","changes":["Show diagnostic references on request errors and explain Jev CPU fallbacks.","Add compressed, bounded application logs with retention across deployments.","Show consented anonymous visit counts in the owner dashboard without browser fingerprinting."]},
