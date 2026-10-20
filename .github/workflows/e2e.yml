@@ -30,7 +30,7 @@ jobs:
           - {suite: online, shard: 1, config: playwright.online.config.ts}
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -66,7 +66,7 @@ jobs:
           fi
       - name: Upload results and traces
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: browser-${{ matrix.suite }}-${{ matrix.shard }}
           path: |
@@ -81,14 +81,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
         working-directory: frontend
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v8
         with:
           pattern: browser-*
           path: browser-results
@@ -99,7 +99,7 @@ jobs:
       - name: Merge browser report
         working-directory: frontend
         run: npx playwright merge-reports --reporter html ../all-blob-reports
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: browser-report

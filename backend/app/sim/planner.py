@@ -13,9 +13,10 @@ import math
 import random
 import time
 
+from app.sim.chalk import wear
 from app.sim.cpu import candidates, clear, fallback
 from app.sim.cue import cue_elevation
-from app.sim.physics import DT, VMIN, ShotEvents, all_asleep, shoot_speed, step, strike
+from app.sim.physics import DT, VMIN, all_asleep, shoot_speed, step
 from app.sim.rules import (
     GameState,
     apply_shot,
@@ -24,6 +25,7 @@ from app.sim.rules import (
     legal_targets,
     place_cue,
 )
+from app.sim.stroke import strike_balls
 from app.sim.table import BALL_R, POCKETS, TABLE_H, TABLE_W, cushions
 
 
@@ -382,26 +384,34 @@ def _break_seeds(gs, seed):
     return shots
 
 
-def _preview(gs, shot, deadline):
+def _preview(gs, shot, deadline, *, keep_state=False):
     state = copy.deepcopy(gs)
     if state.ball_in_hand or shot.get("placement"):
         placement = shot.get("placement")
         if not placement or not place_cue(state, placement["x"], placement["y"]):
             return None
     cue, me = state.balls[0], state.current
+    elevation = max(
+        shot.get("elevation", 0.0),
+        cue_elevation(cue.x, cue.y, shot["aim"], 0, state.balls, shot["tipX"], shot["tipY"]),
+    )
     begin_shot(state, shot["calledBall"], shot["calledPocket"])
-    strike(
-        cue,
+    chalk = state.chalk[me] if state.rules.get("chalkSim") else 1.0
+    if state.rules.get("chalkSim"):
+        state.chalk[me] = wear(chalk, shot["power"], shot["tipX"], shot["tipY"])
+    events = strike_balls(
+        state.balls,
+        0,
         math.cos(shot["aim"]),
         math.sin(shot["aim"]),
         shot["power"],
         shot["tipX"],
         shot["tipY"],
         state.rules["breakMax" if state.break_shot else "normalMax"],
-        cue_elevation(cue.x, cue.y, shot["aim"], 0, state.balls, shot["tipX"], shot["tipY"]),
-        state.chalk[me] if state.rules.get("chalkSim") else 1.0,
+        elevation,
+        chalk,
     )
-    events, contact, elapsed, ticks = ShotEvents(), {"v": False}, 0.0, 0
+    contact, elapsed, ticks = {"v": events.first_contact is not None}, 0.0, 0
     while elapsed < 45 and not all_asleep(state.balls):
         if ticks % 24 == 0 and deadline is not None and time.monotonic() >= deadline:
             return None
@@ -414,6 +424,7 @@ def _preview(gs, shot, deadline):
     lost, won = state.winner == 1 - me, state.winner == me
     legal = not lost and not state.ball_in_hand and not state.message.startswith("Illegal break")
     continues = legal and state.current == me
+    resolved_current = state.current
     # Cheap positional evaluation, always from the original shooter's perspective.
     state.current = me
     own = candidates(state) if state.winner is None else []
@@ -456,8 +467,11 @@ def _preview(gs, shot, deadline):
     score -= 0.2 * shot["power"]  # Prefer controlled energy when outcomes tie.
     target = next(b for b in state.balls if b.n == shot["calledBall"])
     miss = math.dist((target.x, target.y), POCKETS[shot["calledPocket"]][:2])
+    state.current = resolved_current
     return {
         **shot,
+        "elevation": elevation,
+        **({"_state": state} if keep_state else {}),
         "score": score,
         "evidence": {
             "verified": True,
@@ -490,7 +504,7 @@ def _preview(gs, shot, deadline):
     }
 
 
-def plan_shots(gs: GameState, *, max_trials=16, budget_seconds=2.0, break_seed=0):
+def plan_shots(gs: GameState, *, max_trials=16, budget_seconds=2.0, break_seed=0, lookahead=True):
     """Return ranked executable options. None budget is for deterministic CI only.
 
     A safety may still need a legal ball/pocket call under call-all rules; such a
@@ -532,7 +546,11 @@ def plan_shots(gs: GameState, *, max_trials=16, budget_seconds=2.0, break_seed=0
     queue = list(seeds[:1])
     if seeds and not state.break_shot:
         queue.append(_firm_variant(seeds[0], state))
-    queue.extend(s for s in seeds[1:8])
+    queue.extend(s for s in seeds[1:4])
+    glance = next((s for s in seeds if s.get("contactStyle") == "glancing"), None)
+    if glance is not None and glance not in queue:
+        queue.append(glance)
+    queue.extend(s for s in seeds[4:8])
     # Cushion friction/restitution make the ideal mirror only a starting point.
     # Reserve a small correction sweep for a bank, without unbounded angle search.
     bank = next((s for s in seeds if s["family"] == "bank"), None)
@@ -550,12 +568,16 @@ def plan_shots(gs: GameState, *, max_trials=16, budget_seconds=2.0, break_seed=0
     queue.extend(seeds[8:])
     completed = []
     trial = 0
-    while queue and trial < max(0, min(max_trials, 64)):
+    limit = max(0, min(max_trials, 64))
+    root_limit = (
+        limit - min(4, limit // 3) if lookahead and not gs.break_shot and limit >= 8 else limit
+    )
+    while queue and trial < root_limit:
         if deadline is not None and time.monotonic() >= deadline:
             break
         shot = queue.pop(0)
         trial += 1
-        preview = _preview(gs, shot, deadline)
+        preview = _preview(gs, shot, deadline, keep_state=True)
         if preview is None:
             continue
         if (
@@ -576,6 +598,90 @@ def plan_shots(gs: GameState, *, max_trials=16, budget_seconds=2.0, break_seed=0
                 queue.insert(
                     min(4, len(queue)), {**shot, "aim": shot["aim"] + offset, "refined": True}
                 )
+    # Simulation lookahead: Smith, AAAI 2006, Running the Table, Figs. 3-4.
+    # https://fileadmin.cs.lth.se/ai/Proceedings/aaai06/09/AAAI06-156.pdf
+    # Beam width/trial counts are computational budgets, not physical constants.
+    # A small two-ply beam spends the remaining *same* trial/time budget on actual
+    # continuations. It does not mistake geometric next-shot counts for a runout.
+    roots = sorted(
+        (s for s in completed if s["evidence"]["continues"] and not s["evidence"]["won"]),
+        key=lambda s: -s["score"],
+    )[:2]
+    if lookahead and not gs.break_shot:
+        for root in roots:
+            followups = _seeds(root["_state"])[:2]
+            for followup in followups:
+                if trial >= limit or (deadline is not None and time.monotonic() >= deadline):
+                    break
+                trial += 1
+                if followup["family"] != "development":
+                    followup["power"] = _power_for_speed(
+                        shoot_speed(followup["power"], 3.5), gs.rules["normalMax"]
+                    )
+                child = _preview(root["_state"], followup, deadline, keep_state=True)
+                if child is None:
+                    continue
+                evidence = root["evidence"]
+                evidence["lookaheadDepth"] = max(2, evidence.get("lookaheadDepth", 1))
+                evidence["followUpTrials"] = evidence.get("followUpTrials", 0) + 1
+                if child["evidence"]["legal"] and child["evidence"]["continues"]:
+                    if not evidence.get("followUpVerified"):
+                        root["score"] += 35
+                    evidence["followUpVerified"] = True
+                    evidence["followUpBall"] = child["calledBall"]
+                    if not evidence.get("runout"):
+                        evidence["continuation"] = [
+                            {
+                                k: child[k]
+                                for k in (
+                                    "aim",
+                                    "power",
+                                    "tipX",
+                                    "tipY",
+                                    "elevation",
+                                    "calledBall",
+                                    "calledPocket",
+                                    "family",
+                                )
+                            }
+                        ]
+                    if child["evidence"]["won"]:
+                        if not evidence.get("runout"):
+                            root["score"] += 150
+                        evidence["runout"] = True
+                    elif len(legal_targets(child["_state"])) <= 2 and trial < limit:
+                        next_seeds = _seeds(child["_state"])
+                        if next_seeds and (deadline is None or time.monotonic() < deadline):
+                            third = next_seeds[0]
+                            if third["family"] != "development":
+                                third["power"] = _power_for_speed(
+                                    shoot_speed(third["power"], 3.5), gs.rules["normalMax"]
+                                )
+                            trial += 1
+                            leaf = _preview(child["_state"], third, deadline)
+                            if leaf is not None:
+                                evidence["lookaheadDepth"] = 3
+                                if leaf["evidence"]["won"]:
+                                    if not evidence.get("runout"):
+                                        root["score"] += 150
+                                        evidence["continuation"].append(
+                                            {
+                                                k: leaf[k]
+                                                for k in (
+                                                    "aim",
+                                                    "power",
+                                                    "tipX",
+                                                    "tipY",
+                                                    "elevation",
+                                                    "calledBall",
+                                                    "calledPocket",
+                                                    "family",
+                                                )
+                                            }
+                                        )
+                                    evidence["runout"] = True
+    for option in completed:
+        option.pop("_state", None)
     safe = [s for s in completed if s["evidence"]["legal"] and not s["evidence"]["lost"]]
     winners = [s for s in safe if s["evidence"]["won"]]
     choices = winners or safe or [s for s in completed if not s["evidence"]["lost"]] or [backup]

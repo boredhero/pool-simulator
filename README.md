@@ -25,6 +25,8 @@ server resolves turns, fouls and results. Both simulators use shared fixtures in
 the covered cases, not every possible trajectory. See [simulation synchronization](docs/simulation-sync.md)
 for snapshot precision and replay checks. Ball flight, spin, cushions and pockets are approximations rather than
 a calibrated professional billiards model. See [planner evaluation and limitations](docs/planner-research.md).
+The [physics research decisions](docs/physics-research-decisions.md) list the published
+bases for the pocket and planning changes, and the effects deliberately deferred.
 
 - `frontend/src/`: rendering, input, local simulation and interface.
 - `backend/app/`: FastAPI routes, authoritative simulation, rooms and persistence.
@@ -353,7 +355,7 @@ or hide ball details; there is no floating Show balls button.
 Set `ADMIN_ACCOUNT_ID` in the deployment environment to the existing owner's
 immutable account ID. An unset value disables administration. Usernames do not
 grant privileges, and registration cannot assign admin status. The owner sees
-**Admin settings** in Settings. Disable/re-enable revokes sessions and controls account access, including password recovery. Permanent deletion requires the exact username, removes private account and Jev records, and clears account links/replaces display names in shared match history. Shared shot/match rows and limited lifecycle audits remain. The configured owner cannot be disabled or deleted. Lifecycle actions are audited; deleting an account waits until any active Jev shot has finished. Every `/api/admin/*` endpoint checks the active
+**Admin settings** in their account panel (open it by clicking your username). Disable/re-enable revokes sessions and controls account access, including password recovery. Permanent deletion requires the exact username, removes private account and Jev records, and clears account links/replaces display names in shared match history. Shared shot/match rows and limited lifecycle audits remain. The configured owner cannot be disabled or deleted. Lifecycle actions are audited; deleting an account waits until any active Jev shot has finished. Every `/api/admin/*` endpoint checks the active
 server session and configured ID; other callers receive 404. Premium mutations
 require the same origin/request header protection as account mutations and
 record an audit entry.

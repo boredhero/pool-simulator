@@ -59,6 +59,11 @@ disagreements with rendering or scoring changes.
 
 ## Validation
 
+The live differential suite also covers close ball spacing and slow, fast and
+off-center pocket approaches through the shared shot entry points. These check
+engine agreement, not finite-tip contact or pocket-liner accuracy; see the
+[research decisions](physics-research-decisions.md).
+
 `contracts/snapshot-replay.json` covers the precision-sensitive rack and two
 successive object-ball pots. Both unit suites exercise those cases; browser
 coverage checks that applying the Jev result keeps both balls down and preserves

@@ -14,7 +14,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 
-from app.sim.physics import simulate_shot, strike
+from app.sim.stroke import simulate_stroke
+from app.sim.physics import Ball, simulate_shot
+from app.sim.table import BALL_R, TABLE_W
 from app.sim.rules import new_game
 
 cases = []
@@ -33,8 +35,7 @@ for index in range(60):
         1 if index < 40 else 0.1,
     ]
     before = [asdict(ball) for ball in balls]
-    strike(balls[0], *args)
-    events = simulate_shot(balls, 0)
+    events = simulate_stroke(balls, 0, *args)
     cases.append(
         {
             "name": f"rack-{index}",
@@ -45,4 +46,18 @@ for index in range(60):
             "events": asdict(events),
         }
     )
+# Contact boundaries and physical pocket transitions use the same live engines.
+for gap in (0.0, .0005, .005, .02):
+    balls = [Ball(x=1, y=.6), Ball(id=1, n=1, x=1+2*BALL_R+gap, y=.6)]
+    args = [1, 0, .5, 0, 0, 3.5, 0, 1]
+    before = [asdict(ball) for ball in balls]
+    events = simulate_stroke(balls, 0, *args)
+    cases.append({"name": f"contact-gap-{gap}", "aim": 0, "balls": before, "args": args,
+                  "expected": [asdict(ball) for ball in balls], "events": asdict(events)})
+for offset, speed in ((0, .5), (0, 7), (.045, 1), (.03, 3)):
+    balls = [Ball(potted=True), Ball(id=1, n=1, x=TABLE_W/2+offset, y=.15, vy=-speed, asleep=False)]
+    before = [asdict(ball) for ball in balls]
+    events = simulate_shot(balls, 0)
+    cases.append({"name": f"pocket-{offset}-{speed}", "balls": before, "args": None,
+                  "expected": [asdict(ball) for ball in balls], "events": asdict(events)})
 json.dump(cases, sys.stdout, allow_nan=False)

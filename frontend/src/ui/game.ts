@@ -19,7 +19,8 @@ import { sightStyle } from '../render/railSights';
 import { cueElevation } from '../sim/cue';
 import { matchConfig, type MatchConfig } from '../sim/config';
 import { TableOptions } from './tableOptions';
-import { allAsleep, strike, type Ball, type ShotEvents } from '../sim/physics';
+import { strikeBalls } from '../sim/stroke';
+import { allAsleep, type Ball, type ShotEvents } from '../sim/physics';
 import { applyShot, beginShot, callRequired, canPlace, legalTargets, newGame, placeCue, type GameState } from '../sim/rules';
 import { planCpuTurn } from '../sim/cpu';
 import { jevRequest, jevFallbackNotice } from '../sim/jev';
@@ -841,10 +842,9 @@ export class Game {
     beginShot(this.gs, this.calledBall, this.calledPocket);
     const params = { aim: this.angle, power, tipX, tipY, vmax, elevation, calledBall: this.calledBall, calledPocket: this.calledPocket };
     if(!this.cpuOpponent||this.gs.current===0)this.tutorial.record('shot');
-    strike(c, Math.cos(this.angle), Math.sin(this.angle), power, tipX, tipY, vmax, elevation,chalkLevel);
+    this.ev = strikeBalls(this.gs.balls, 0, Math.cos(this.angle), Math.sin(this.angle), power, tipX, tipY, vmax, elevation,chalkLevel);
     if(this.gs.rules.chalkSim&&chalkContact(chalkLevel,tipX,tipY).grip<1)this.el.opponentstatus.textContent='Miscue · chalk the cue before using strong spin';
-    this.ev = freshEv();
-    this.contact = { v: false };
+    this.contact = { v: this.ev.firstContact !== null };
     this.whoShot = this.seat;
     this.mode = 'rolling';
     this.cameraShotPending=true;this.cameraShotRevision=this.scene.cameraRig.revision; this.lastT = 0; this.accumulator = 0;
@@ -866,13 +866,13 @@ export class Game {
       if(!valid())return;
       const plan=planCpuTurn(state);if(!plan)return;
       const selected=freezeShot({aim:plan.angle,power:plan.power,tipX:plan.tipX,tipY:plan.tipY,
-        calledBall:plan.ball,calledPocket:plan.pocket,placement:plan.placement??{x:this.cue().x,y:this.cue().y}});
+        elevation:plan.elevation,calledBall:plan.ball,calledPocket:plan.pocket,placement:plan.placement??{x:this.cue().x,y:this.cue().y}});
       if(!await this.showOpponentShot(selected,valid))return;
       if((state.ballInHand||plan.placement)&&!placeCue(state,selected.placement.x,selected.placement.y))return;
       this.opponentAction=null;this.mode='aim';
       this.angle=this.targetAngle=selected.aim;
       this.calledBall=selected.calledBall;this.calledPocket=selected.calledPocket;
-      this.fire(selected.power,undefined,undefined,selected);
+      this.fire(selected.power,undefined,selected.elevation,selected);
     } finally {if(this.opponentAction===action)this.opponentAction=null;}
   }
 
@@ -1214,10 +1214,9 @@ export class Game {
       beginShot(this.gs, shot.calledBall, shot.calledPocket);
       // Server is authoritative on break speed; ignore client-claimed vmax.
       const vmax = this.gs.breakShot ? this.gs.rules.breakMax : this.gs.rules.normalMax;
-      strike(c, Math.cos(shot.aim), Math.sin(shot.aim), shot.power, shot.tipX, shot.tipY, vmax, shot.elevation ?? 0, this.gs.rules.chalkSim?(shot.chalkLevel??this.gs.chalk[by]):1);
+      this.ev = strikeBalls(this.gs.balls, 0, Math.cos(shot.aim), Math.sin(shot.aim), shot.power, shot.tipX, shot.tipY, vmax, shot.elevation ?? 0, this.gs.rules.chalkSim?(shot.chalkLevel??this.gs.chalk[by]):1);
       if(this.gs.rules.chalkSim)this.gs.chalk[by]=wearChalk(shot.chalkLevel??this.gs.chalk[by],shot.power,shot.tipX,shot.tipY);
-      this.ev = freshEv();
-      this.contact = { v: false };
+      this.contact = { v: this.ev.firstContact !== null };
       this.whoShot = by;
       this.mode = 'rolling';
       this.cameraShotPending=true;this.cameraShotRevision=this.scene.cameraRig.revision; this.lastT = 0; this.accumulator = 0;
