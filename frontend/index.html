@@ -221,7 +221,6 @@ body:has(#tutorial:not([hidden])) .privacy-notice{display:none}
   <input type="color" id="woodcustom" value="#4a2c14" />
   </div></details>
   <section class="settings-utilities" aria-label="Account and app">  <button id="settingspasskeys" type="button" hidden>Manage passkeys</button>
-  <button id="adminbtn" hidden type="button">Admin settings</button>
   <button id="installapp" data-install-app type="button">Install app</button><p id="installappstatus" role="status"></p>
   <a id="viewsource" href="https://github.com/boredhero/pool-simulator" target="_blank" rel="noopener noreferrer" aria-label="View source on GitHub (opens in a new tab)"><img src="/github-mark-white.svg" alt="" width="24" height="24">View source</a>
 </section>
@@ -295,6 +294,7 @@ body:has(#tutorial:not([hidden])) .privacy-notice{display:none}
       <div class="row"><button id="recoverycopy">Copy code</button><button id="recoverysaved">I've saved my code</button></div>
     </section>
     <section id="accountprofile" hidden>
+  <button id="adminbtn" hidden type="button">Admin settings</button>
       <h3><span id="accountname"></span> <span id="accountpremium" class="premium-badge" hidden>Premium</span></h3><p id="accountsince" class="guide-note"></p>
       <p id="accountjev"></p><p id="accounttermsstatus" role="status"></p><div id="termsupdate" hidden><label class="terms-check"><input id="termsadult" type="checkbox"> <span>I am 18 or older and agree to the <a href="/terms.html" target="_blank" rel="noopener">Terms</a>. I have read the <a href="/privacy.html" target="_blank" rel="noopener">Privacy Notice</a>.</span></label><button id="acceptterms" type="button">Accept Terms for Jev AI</button></div><div class="account-navigation" role="tablist" aria-label="Account sections"><button type="button" id="account-tab-overview" role="tab" aria-controls="account-section-overview" aria-selected="true" tabindex="0">Overview</button><button type="button" id="account-tab-signin" role="tab" aria-controls="account-section-signin" aria-selected="false" tabindex="-1">Sign-in</button><button type="button" id="account-tab-profile" role="tab" aria-controls="account-section-profile" aria-selected="false" tabindex="-1">Profile</button></div><section id="account-section-overview" class="account-section" role="tabpanel" aria-labelledby="account-tab-overview" tabindex="0">      <h3>Lifetime casual stats</h3>
 <dl id="accountstats"></dl><details class="account-note"><summary>What counts toward these stats?</summary><p class="guide-note">Recorded by the server. Local practice and CPU games do not count. Private and custom matches are unranked. Leaving after the first shot counts as a forfeit, even if your connection drops.</p></details><h3>Recent matches</h3><ul id="accountmatches"></ul>
