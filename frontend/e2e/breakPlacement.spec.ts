@@ -8,6 +8,16 @@ for(const mobile of [false,true])test.describe(mobile?'mobile':'desktop',()=>{
     await acceptWelcomeBeforeLoad(page);
     await page.route('**/api/**',r=>r.fulfill({json:{}}));
     await page.addInitScript(()=>{localStorage.setItem('pool:help-dismissed','1');localStorage.setItem('pool:headstring-dismissed','1');localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-09',allow:false}));});
+    // Placement exercises input and rules, not rendering. Disable GPU work before
+    // the first game frame so software rendering cannot starve the readiness wait.
+    await page.addInitScript(()=>{
+      const raf=window.requestAnimationFrame.bind(window);
+      window.requestAnimationFrame=cb=>raf(t=>{
+        const game=(window as any).__pool;
+        if(game)game.scene.renderer.render=()=>{};
+        cb(t);
+      });
+    });
     await page.goto('/');
     await page.waitForFunction(()=>!!(window as any).__pool);
     await page.evaluate(()=>{

@@ -15,8 +15,9 @@ test('ordinary accounts never see or load owner tools',async({page})=>{
   let requests=0;
   await page.route('**/api/admin/**',r=>{requests++;return r.fulfill({status:404,json:{detail:'Not found'}});});
   await page.route('**/api/account',r=>r.fulfill({json:{account:{...owner,isAdmin:false},stats:null}}));
-  await page.goto('/');await page.locator('#settingsbtn').click();
+  await page.goto('/');await page.locator('#accountidentity').click();
   await expect(page.locator('#accountbtn')).toHaveText('god · Account');
+  await expect(page.locator('#accountdialog')).toBeVisible();
   await expect(page.locator('#adminbtn')).toBeHidden();expect(requests).toBe(0);
 });
 test('owner can inspect usage, recover a failed toggle, search and close the dashboard',async({page})=>{
@@ -34,8 +35,10 @@ test('owner can inspect usage, recover a failed toggle, search and close the das
     const accounts=url.searchParams.get('search')==='missing'?[]:[{id:'player',username:'Player <safe>',createdAt:1780000000,premium,isAdmin:false,usage}];
     return r.fulfill({json:{accounts,total:accounts.length}});
   });
-  await page.goto('/');await page.locator('#settingsbtn').click();await page.locator('#adminbtn').click();
+  await page.goto('/');await page.locator('#accountidentity').click();await page.locator('#adminbtn').click();
   const dialog=page.locator('#admindialog');await expect(dialog).toBeVisible();
+  await expect(page.locator('#accountdialog #adminbtn')).toHaveCount(1);
+  await expect(page.locator('#settingspanel #adminbtn')).toHaveCount(0);
   await expect(page.locator('#adminsummary')).toContainText('$0.000050');
   await expect(page.locator('#adminvisitors')).toContainText('Visitor IDs · 24h');
   await expect(page.locator('#adminvisitors .admin-metric strong')).toHaveText(['8','12','34','56']);
@@ -49,7 +52,7 @@ test('owner can inspect usage, recover a failed toggle, search and close the das
   await page.setViewportSize({width:390,height:844});
   const box=(await dialog.boundingBox())!;expect(box.width).toBeLessThanOrEqual(390);
   await page.locator('#adminsearch').fill('missing');await expect(page.locator('#adminempty')).toBeVisible();
-  await page.locator('#adminclose').focus();await page.keyboard.press('Escape');await expect(dialog).not.toBeVisible();await expect(page.locator('#adminbtn')).toBeFocused();
+  await page.locator('#adminclose').focus();await page.keyboard.press('Escape');await expect(dialog).not.toBeVisible();await expect(page.locator('#accountdialog')).toBeVisible();await expect(page.locator('#adminbtn')).toBeFocused();
 });
 
 test('owner can disable, re-enable and confirm deletion without owner self-actions',async({page})=>{
@@ -62,7 +65,7 @@ test('owner can disable, re-enable and confirm deletion without owner self-actio
     if(method==='DELETE'){expect(r.request().postDataJSON()).toEqual({username:'ManagedPlayer'});deleted=true;deleteCalls++;return r.fulfill({json:{deleted:true}});}
     return r.fulfill({json:{total:deleted?1:2,accounts:[{...owner,usage},...deleted?[]:[{id:'managed',username:'ManagedPlayer',createdAt:1780000000,premium:false,isAdmin:false,disabled,usage}]]}});
   });
-  await page.goto('/');await page.locator('#settingsbtn').click();await page.locator('#adminbtn').click();
+  await page.goto('/');await page.locator('#accountidentity').click();await page.locator('#adminbtn').click();
   const panel=page.locator('#admindialog');
   await expect(panel.getByRole('button',{name:'Delete account god',exact:true})).toHaveCount(0);
   await panel.getByRole('button',{name:'Disable account ManagedPlayer',exact:true}).click();
@@ -91,7 +94,7 @@ test('monthly budgets show last activity and save defaults, limits and top-ups',
   if(path.endsWith('/accounts/player'))return r.fulfill({json:{budget,lastActiveAt:1780000060,lifetimeAttempts:12,lifetimeCompleted:10,games:[],audit:[],requests:[{id:'request-1',at:1780000060,model:'jev-1.13.0',seat:1,status:'metered',costNano:42000,inputTokens:1000}],budgetAdjustments:[]}});
   return r.fulfill({json:{total:1,accounts:[{id:'player',username:'BudgetPlayer',createdAt:1780000000,lastActiveAt:1780000060,premium:false,isAdmin:false,usage}]}});
  });
- await page.goto('/');await page.locator('#settingsbtn').click();await page.locator('#adminbtn').click();
+ await page.goto('/');await page.locator('#accountidentity').click();await page.locator('#adminbtn').click();
  const panel=page.locator('#admindialog');await expect(page.locator('#adminrows')).toContainText('Last active');
  await expect(panel).toContainText('TypeSafe prepaid balance: unavailable');
  const defaultForm=panel.locator('.budget-default form');await defaultForm.locator('input').fill('0.10');await defaultForm.getByRole('button',{name:'Save default',exact:true}).click();
@@ -116,7 +119,7 @@ test('budget top-up preserves retry identity, freezes pending amount, and preven
   if(path.endsWith('/accounts/player'))return r.fulfill({json:{budget,lifetimeAttempts:12,lifetimeCompleted:10,games:[],audit:[],requests:[],budgetAdjustments:[]}});
   return r.fulfill({json:{total:1,accounts:[{id:'player',username:'BudgetPlayer',createdAt:1780000000,premium:false,isAdmin:false,usage}]}});
  });
- await page.goto('/');await page.locator('#settingsbtn').click();await page.locator('#adminbtn').click();await page.getByRole('button',{name:'Usage details for BudgetPlayer'}).click();
+ await page.goto('/');await page.locator('#accountidentity').click();await page.locator('#adminbtn').click();await page.getByRole('button',{name:'Usage details for BudgetPlayer'}).click();
  const form=page.locator('.budget-account form').nth(1),input=form.locator('input'),button=form.getByRole('button',{name:'Add credit'});
  await input.fill('0.05');await button.click();await expect(form).toContainText('Temporary failure');await button.click();await expect(input).toBeDisabled();await expect(button).toBeDisabled();
  await form.dispatchEvent('submit');expect(calls).toHaveLength(2);expect(calls[0].requestId).toBe(calls[1].requestId);release();
