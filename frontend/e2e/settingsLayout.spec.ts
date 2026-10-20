@@ -1,4 +1,4 @@
-import {test,expect} from '@playwright/test';
+import {test,expect} from './fixtures';
 import {TERMS_VERSION} from '../src/ui/terms';
 import {acceptWelcomeBeforeLoad} from './welcomeFixture';
 for(const mobile of [false,true])test.describe(mobile?'mobile settings layout':'desktop settings layout',()=>{
@@ -6,7 +6,9 @@ for(const mobile of [false,true])test.describe(mobile?'mobile settings layout':'
  test('account sections support keyboard navigation and settings expose grouped controls',async({page},testInfo)=>{
   await acceptWelcomeBeforeLoad(page);
   await page.addInitScript(()=>{localStorage.setItem('pool:help-dismissed','1');localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-09',allow:false}));const raf=requestAnimationFrame.bind(window);window.requestAnimationFrame=cb=>raf(t=>{const g=(window as any).__pool;if(g)g.scene.renderer.render=()=>{};cb(t);});});
-  await page.route('**/api/account',r=>r.fulfill({json:{account:{id:'account',username:'Player',createdAt:1,premium:true,isAdmin:false},stats:{matches:8,wins:5,losses:3,abandoned:0,shots:42,ballsPocketed:22,scratches:1,fouls:2,recent:[]}}}));
+  const account={id:'account',username:'Player',createdAt:1,premium:true,isAdmin:false,settings:{} as Record<string,string>};
+  await page.route('**/api/account/preferences',r=>{Object.assign(account.settings,r.request().postDataJSON().settings);return r.fulfill({json:{account}});});
+  await page.route('**/api/account',r=>r.fulfill({json:{account,stats:{matches:8,wins:5,losses:3,abandoned:0,shots:42,ballsPocketed:22,scratches:1,fouls:2,recent:[]}}}));
   await page.route('**/api/privacy/terms',r=>r.fulfill({json:{version:TERMS_VERSION,accepted:true,authenticated:true,accountId:'account'}}));
   await page.route('**/api/opponents/jev',r=>r.fulfill({json:{available:true,usage:{unlimited:true}}}));
   await page.route('**/api/account/passkeys',r=>r.fulfill({json:{passkeys:[],recentlyVerified:true}}));
@@ -36,6 +38,8 @@ for(const mobile of [false,true])test.describe(mobile?'mobile settings layout':'
   await expect(page.locator('#rules-comparison thead')).not.toContainText('Custom');
   await page.locator('summary').filter({hasText:'Appearance'}).click();await expect(page.locator('#cueappearance')).toBeVisible();await expect(page.locator('#settingspanel .settings-label').filter({hasText:'Felt'})).toBeVisible();
   await page.locator('#cueappearance').selectOption('red-spots');
+  await expect.poll(()=>account.settings['pool:cue-style']).toBe('red-spots');
+  await expect(page.locator('#preferencesstatus')).toBeHidden();
   await page.screenshot({path:testInfo.outputPath('table-settings.png')});
   expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(mobile?390:1280);
  });

@@ -1,10 +1,9 @@
-import {expect,test} from '@playwright/test';
+import {expect,test} from './fixtures';
 import {acceptWelcomeBeforeLoad} from './welcomeFixture';
 
 for(const profile of ['mouse','trackpad'])for(const firstRelease of ['left','right'] as const)
 test(`${profile}: secondary click cancels a pull with ${firstRelease} released first`,async({page})=>{
   await acceptWelcomeBeforeLoad(page);
-  await page.route('**/api/**',route=>route.fulfill({json:{}}));
   await page.addInitScript(profile=>{
     localStorage.setItem('pool:cameraInput',profile);
     localStorage.setItem('pool:help-dismissed','1');

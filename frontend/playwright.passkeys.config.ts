@@ -4,6 +4,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 const database=join(mkdtempSync(join(tmpdir(),'pool-passkeys-')),'pool.db');
 export default defineConfig({
+  outputDir: './test-results/passkeys',
  testDir:'./e2e',testMatch:'passkeys.spec.ts',workers:1,timeout:60000,
  use:{baseURL:'http://localhost:8013',trace:'retain-on-failure',screenshot:'only-on-failure',actionTimeout:10000},
  projects:[{name:'chromium',use:{...devices['Desktop Chrome']}}],

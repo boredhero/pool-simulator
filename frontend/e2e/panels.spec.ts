@@ -1,5 +1,5 @@
 import { acceptWelcomeBeforeLoad } from './welcomeFixture';
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 test.beforeEach(async ({ page }) => {
   await acceptWelcomeBeforeLoad(page);

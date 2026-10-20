@@ -1,11 +1,10 @@
-import {expect,test} from '@playwright/test';
+import {expect,test} from './fixtures';
 import {acceptWelcomeBeforeLoad} from './welcomeFixture';
 
 for(const mobile of [false,true])test.describe(mobile?'touch shot execution':'desktop shot execution',()=>{
   test.use({viewport:mobile?{width:390,height:844}:{width:1280,height:800},hasTouch:mobile,isMobile:mobile});
   test.beforeEach(async({page})=>{
     await acceptWelcomeBeforeLoad(page);
-    await page.route('**/api/**',r=>r.fulfill({json:{}}));
     await page.addInitScript(()=>{localStorage.setItem('pool:help-dismissed','1');const raf=requestAnimationFrame.bind(window);window.requestAnimationFrame=callback=>raf(time=>{const g=(window as any).__pool;if(g)g.scene.renderer.render=()=>{};callback(time);});});
     await page.goto('/');await page.waitForFunction(()=>!!(window as any).__pool);
   });

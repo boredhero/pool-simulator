@@ -1,5 +1,6 @@
+import {selectInputProfile} from './fixtures';
 import { acceptWelcomeBeforeLoad, waitForOpening } from './welcomeFixture';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 
 // Camera checks need an idle rack; coin animation has its own browser coverage.
 test.use({ reducedMotion: 'reduce' });
@@ -117,8 +118,8 @@ test('Space rises, Left Shift descends, release stops, and buttons retain Space 
 });
 
 test('trackpad profile persists and independently controls yaw, pitch, pinch and pan',async({page})=>{
-  await page.locator('#camera-input-profile').selectOption('trackpad');
-  await page.reload();await expect(page.locator('#camera-input-profile')).toHaveValue('trackpad');
+  await selectInputProfile(page,'trackpad');
+  await page.reload();await expect(page.locator('#camera-input-profile')).toHaveAttribute('value','trackpad');
   await page.evaluate(()=>{const s=(window as any).__pool.scene;s.cameraRig.cancel(true);s.controls.enableDamping=false;});
   const canvas=page.locator('#game-canvas');const start=await pose(page);
   await canvas.dispatchEvent('wheel',{deltaX:50,deltaY:0,bubbles:true,cancelable:true});
@@ -155,7 +156,7 @@ test('movement cancels a pending pull and editing or dialogs cannot fly or fire'
 });
 
 test('trackpad momentum never steers or fires the cue and Shift spin precision stays in the UI',async({page})=>{
-  await page.locator('#camera-input-profile').selectOption('trackpad');
+  await selectInputProfile(page,'trackpad');
   const result=await page.evaluate(()=>{
     const g=(window as any).__pool,canvas=document.getElementById('game-canvas')!;
     canvas.focus();const aim=g.targetAngle;

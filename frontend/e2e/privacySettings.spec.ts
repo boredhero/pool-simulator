@@ -1,4 +1,4 @@
-import {test,expect} from '@playwright/test';
+import {test,expect} from './fixtures';
 import {acceptWelcomeBeforeLoad} from './welcomeFixture';
 async function prepare(page:import('@playwright/test').Page,allow=false,signal=false){
  await acceptWelcomeBeforeLoad(page);

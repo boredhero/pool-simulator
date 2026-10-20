@@ -1,8 +1,7 @@
-import {test,expect,type Page} from '@playwright/test';
+import {test,expect,type Page} from './fixtures';
 import {acceptWelcomeBeforeLoad} from './welcomeFixture';
 async function prepare(page:Page){
   await acceptWelcomeBeforeLoad(page);
-  await page.route('**/api/**',r=>r.fulfill({json:{}}));
   await page.addInitScript(()=>{localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-09',allow:false}));const raf=requestAnimationFrame.bind(window);window.requestAnimationFrame=cb=>raf(t=>{const g=(window as any).__pool;if(g){g.__cameraDraw??=g.scene.renderer.render.bind(g.scene.renderer);g.scene.renderer.render=g.__cameraShow?g.__cameraDraw:()=>{};}cb(t);});});
   await page.goto('/');await page.waitForFunction(()=>!!(window as any).__pool);
   await page.evaluate(()=>{
