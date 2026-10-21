@@ -4,6 +4,7 @@
     "date": "2026-10-20",
     "title": "Custom input controls, integrated admin access and stricter browser checks",
     "changes": [
+      "Top-bar account access now uses a distinct profile treatment with a user icon and account label, aligned with the neighboring buttons on desktop and mobile.",
       "Choose Mouse & Keyboard or Trackpad mode from an in-game menu with matching styling, keyboard navigation and saved preferences.",
       "Owner Admin settings is now an integrated action tile in Account Overview, with a clear description and responsive layout.",
       "Standalone browser tests now mock expected background API requests, eliminating connection-refused noise from the absent test backend.",
