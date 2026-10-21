@@ -1,4 +1,4 @@
-import {test,expect} from '@playwright/test';
+import {test,expect} from './fixtures';
 import {acceptWelcomeBeforeLoad} from './welcomeFixture';
 for(const mobile of [false,true])test.describe(mobile?'mobile username':'desktop username',()=>{
  if(mobile)test.use({viewport:{width:390,height:844},hasTouch:true,isMobile:true});

@@ -1,4 +1,4 @@
-import {test,expect} from '@playwright/test';
+import {test,expect} from './fixtures';
 import {acceptWelcomeBeforeLoad,waitForOpening} from './welcomeFixture';
 import {TERMS_VERSION} from '../src/ui/terms';
 test.use({hasTouch:true,isMobile:true});

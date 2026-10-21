@@ -1,6 +1,11 @@
-#accountidentity{display:flex;align-items:center;gap:8px;min-height:44px;min-width:0;max-width:200px;padding:0 12px;background:#302a21;border:1px solid #796748;border-radius:10px;color:#f1e5ce;font-size:14px;flex-shrink:1}
-#accountidentityname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}.accountidentityicon{color:#c4d6a2;font-size:18px}
-#accountidentity:hover{background:#403729;border-color:#b9a178}#accountidentity:focus-visible{outline:2px solid #e7c384;outline-offset:3px}
+/* Profile access shares the toolbar's hit area without its action-button chrome. */
+#accountidentity{display:flex;align-items:center;gap:10px;box-sizing:border-box;height:48px;min-height:48px;min-width:0;max-width:240px;padding:0 8px;background:transparent;border:1px solid transparent;border-radius:10px;color:#f1e5ce;font-size:14px;flex-shrink:1;text-align:left}
+.accountidentitytext{display:flex;flex-direction:column;gap:2px;min-width:0;line-height:1.2}
+.accountidentitylabel{color:#bdb09b;font-size:10px;font-weight:500;letter-spacing:.06em}
+#accountidentityname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.accountidentityicon{display:flex;align-items:center;justify-content:center;width:34px;height:34px;flex:none;border-radius:50%;background:#bad3a114;color:#c4d6a2;box-shadow:inset 0 0 0 1px #bad3a133}
+.accountidentitychevron{flex:none;color:#bdb09b;margin-left:2px}
+#accountidentity:hover{background:#bad3a10d}#accountidentity:focus-visible{outline:2px solid #e7c384;outline-offset:3px}
 @media(min-width:901px){#version::before{font-size:10px;letter-spacing:1px}}
 @media(max-width:900px){#accountidentity{order:0;max-width:calc(100% - 70px);margin-left:auto}.topbar .status-meta{flex:1}.topbar .toolbar{order:1;flex-basis:100%;justify-content:flex-end}.topbar #msg{order:2}}
 /* Account agreements use the same compact native checkbox as onboarding. */

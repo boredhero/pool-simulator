@@ -1,5 +1,6 @@
+import {selectInputProfile} from './fixtures';
 import { acceptWelcomeBeforeLoad, waitForOpening } from './welcomeFixture';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 
 test.beforeEach(async ({page}) => {
   await acceptWelcomeBeforeLoad(page);
@@ -486,7 +487,7 @@ test('compact mobile scores expand and explicit trackpad scrolling orbits',async
   await page.locator('#morecontrols').click();
   await expect(page.locator('#spin')).toBeVisible();
   const before=await page.evaluate(()=>(window as any).__pool.scene.controls.getAzimuthalAngle());
-  await page.locator('#camera-input-profile').selectOption('trackpad');
+  await selectInputProfile(page,'trackpad');
   await page.locator('#game-canvas').dispatchEvent('wheel',{deltaX:80,bubbles:true,cancelable:true});
   const after=await page.evaluate(()=>{const g=(window as any).__pool;return {theta:g.scene.controls.getAzimuthalAngle(),mode:g.mode};});
   expect(Math.abs(after.theta-before)).toBeGreaterThan(.01);expect(after.mode).toBe('aim');
@@ -619,7 +620,7 @@ test('optional interactive tutorial responds to controls and stays dismissed',as
   await expect(page.locator('#tutorialprogress')).toContainText('worked');
   await page.locator('#resetspin').click();
   await page.locator('#tutorialnext').click();
-  await page.locator('#camera-input-profile').selectOption('trackpad');
+  await selectInputProfile(page,'trackpad');
   await page.mouse.move(point.x,point.y);await page.mouse.wheel(100,0);
   await expect(page.locator('#tutorialprogress')).toContainText('worked');
   await page.locator('#tutorialnext').click();
@@ -862,10 +863,10 @@ test('practice touch aiming and profile-specific coaching use real controls',asy
   await expect(page.locator('#tutorialbody')).toContainText('two fingers');
   await cdp.send('Emulation.setTouchEmulationEnabled',{enabled:false});
   await page.evaluate(()=>document.documentElement.classList.remove('touch-input'));
-  await page.locator('#camera-input-profile').selectOption('trackpad');
+  await selectInputProfile(page,'trackpad');
   await expect(page.locator('#tutorialbody')).toContainText('Option-scroll');
   await expect(page.locator('#tutorialprogress')).toHaveText('Practice · game saved');
-  await page.locator('#camera-input-profile').selectOption('mouse');
+  await selectInputProfile(page,'mouse');
   await expect(page.locator('#tutorialbody')).toContainText('Right-drag');
 });
 
@@ -904,7 +905,7 @@ test('practice shot controls follow actual pointer interface and trackpad profil
   await cdp.send('Emulation.setTouchEmulationEnabled',{enabled:false});
   await page.evaluate(()=>(window as any).__pool.tutorial.start());
   for(let i=0;i<3;i++)await page.locator('#tutorialnext').click();
-  await page.locator('#camera-input-profile').selectOption('trackpad');
+  await selectInputProfile(page,'trackpad');
   await expect(page.locator('#tutorialbody')).toContainText('Pull farther');
   await expect(page.locator('.power-control')).toHaveClass(/tutorial-focus/);
   await cdp.send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:5});

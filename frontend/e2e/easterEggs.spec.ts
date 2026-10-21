@@ -1,4 +1,4 @@
-import {test,expect,type Page} from '@playwright/test';
+import {test,expect,type Page} from './fixtures';
 import {acceptWelcomeBeforeLoad} from './welcomeFixture';
 const keys=['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
 async function code(page:Page){await page.locator('canvas').first().focus();for(const key of keys)await page.keyboard.press(key);}

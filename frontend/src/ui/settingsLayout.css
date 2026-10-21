@@ -85,3 +85,15 @@
 #rules-comparison thead th{color:#d8e5c8}
 #rules-comparison tbody th{font-weight:400;color:#c7bca9}
 #rules-comparison .selected-rules{background:#303b29}
+
+#accountdialog .account-admin-entry{display:flex;align-items:center;gap:14px;width:100%;box-sizing:border-box;min-height:80px;margin:0 0 22px;padding:16px;border:1px solid #6e624c;border-radius:12px;background:#2b271f;color:#f0e3ca;text-align:left;white-space:normal}
+#accountdialog .account-admin-entry[hidden]{display:none}
+#accountdialog .account-admin-entry:hover{background:#373125;border-color:#b19a70}
+#accountdialog .account-admin-entry:focus-visible{outline:2px solid #e7c384;outline-offset:3px}
+.account-admin-icon{display:flex;align-items:center;justify-content:center;flex:none;width:40px;height:40px;border-radius:10px;background:#3c3828;color:#dfc28c}
+.account-admin-copy{flex:1;min-width:0}
+.account-admin-copy strong{display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:16px;font-weight:650;line-height:1.4}
+.account-admin-copy small{display:block;margin-top:4px;color:#caba9e;font-size:13px;font-weight:400;line-height:1.5}
+.account-owner-badge{padding:2px 7px;border:1px solid #776446;border-radius:5px;color:#e0c48e;font-size:10px;letter-spacing:.05em;text-transform:uppercase}
+.account-admin-arrow{flex:none;color:#caba9e}
+@media(max-width:400px){#accountdialog .account-admin-entry{gap:10px;padding:12px}.account-admin-icon{width:32px;height:36px}.account-admin-copy strong{font-size:15px}}
