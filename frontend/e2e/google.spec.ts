@@ -1,4 +1,4 @@
-import {test,expect,type Page} from '@playwright/test';
+import {test,expect,type Page} from './fixtures';
 import {acceptWelcomeBeforeLoad} from './welcomeFixture';
 import {TERMS_VERSION} from '../src/ui/terms';
 async function prepare(page:Page){

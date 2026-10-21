@@ -91,3 +91,18 @@ body.tutorial-practice #mobile-move-camera{display:none}
 @media(max-width:900px) and (pointer:coarse) and (orientation:landscape){#camera-view-actions{grid-row:4}}
 
 #camera-view-actions[hidden]{display:none}
+
+/* Custom input menu opens above the footer, clear of the viewport edge. */
+#camera-profile-dock #camera-input-profile{display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;font-weight:500;max-width:240px}
+.input-profile-chevron{display:flex;flex:none;color:#d5b57e}
+#camera-input-profile[aria-expanded=true] .input-profile-chevron{transform:rotate(180deg)}
+#camera-input-menu{position:absolute;right:0;bottom:calc(100% + 8px);z-index:10;width:280px;max-width:calc(100vw - 20px);padding:6px;box-sizing:border-box;background:#211d18;border:1px solid #8b7654;border-radius:12px;box-shadow:0 12px 36px #0008}
+#camera-input-menu[hidden]{display:none}
+#camera-input-menu button{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:64px;padding:10px 12px;border:1px solid transparent;border-radius:8px;background:transparent;color:#eee2cb;text-align:left;white-space:normal}
+#camera-input-menu button strong{display:block;font-size:14px;font-weight:650;line-height:1.4}
+#camera-input-menu button small{display:block;margin-top:4px;font-size:11px;line-height:1.5;color:#caba9e}
+#camera-input-menu button[aria-checked=true]{background:#343e2c;border-color:#657752}
+#camera-input-menu button:hover{background:#443b2d}
+#camera-input-menu button:focus-visible{outline:2px solid #e7c384;outline-offset:-2px}
+.input-profile-check{visibility:hidden;color:#c5daa9;font-size:18px}
+#camera-input-menu button[aria-checked=true] .input-profile-check{visibility:visible}

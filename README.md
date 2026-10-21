@@ -355,7 +355,7 @@ or hide ball details; there is no floating Show balls button.
 Set `ADMIN_ACCOUNT_ID` in the deployment environment to the existing owner's
 immutable account ID. An unset value disables administration. Usernames do not
 grant privileges, and registration cannot assign admin status. The owner sees
-**Admin settings** in their account panel (open it by clicking your username). Disable/re-enable revokes sessions and controls account access, including password recovery. Permanent deletion requires the exact username, removes private account and Jev records, and clears account links/replaces display names in shared match history. Shared shot/match rows and limited lifecycle audits remain. The configured owner cannot be disabled or deleted. Lifecycle actions are audited; deleting an account waits until any active Jev shot has finished. Every `/api/admin/*` endpoint checks the active
+**Admin settings** as an owner action tile in Account → Overview (open it by clicking your username). Disable/re-enable revokes sessions and controls account access, including password recovery. Permanent deletion requires the exact username, removes private account and Jev records, and clears account links/replaces display names in shared match history. Shared shot/match rows and limited lifecycle audits remain. The configured owner cannot be disabled or deleted. Lifecycle actions are audited; deleting an account waits until any active Jev shot has finished. Every `/api/admin/*` endpoint checks the active
 server session and configured ID; other callers receive 404. Premium mutations
 require the same origin/request header protection as account mutations and
 record an audit entry.

@@ -1,3 +1,4 @@
+import { createInputProfilePicker } from './inputProfilePicker';
 import { accountPreferences } from './accountPreferences';
 import type { CameraRig } from '../render/cameraRig';
 import './cameraFlyControls.css';
@@ -31,12 +32,9 @@ export function setupCameraFly(rig: CameraRig): void {
   viewActions.hidden=false;pad.append(viewActions);
   const header=document.createElement('div');header.className='camera-hud-header';
   hud.append(header,pad);
-  const profile=document.createElement('select');
-  profile.id='camera-input-profile';profile.setAttribute('aria-label','Camera input mode');
-  for(const [value,label] of [['mouse','Mouse & Keyboard Mode'],['trackpad','Trackpad Mode']]) {
-    const option=document.createElement('option');option.value=value;option.textContent=label;profile.append(option);
-  }
-  try { if(accountPreferences.getItem('pool:cameraInput')==='trackpad')profile.value='trackpad'; } catch { /* private mode */ }
+  const profilePicker=createInputProfilePicker();
+  const profile=profilePicker.button;
+  profilePicker.setValue(accountPreferences.getItem('pool:cameraInput')==='trackpad'?'trackpad':'mouse');
   rig.setInputProfile(profile.value as 'mouse'|'trackpad');
   const profileHint=document.createElement('span');profileHint.id='camera-input-hint';
   profile.setAttribute('aria-describedby',profileHint.id);
@@ -44,7 +42,7 @@ export function setupCameraFly(rig: CameraRig): void {
   updateHint();header.append(toggle);pad.append(profileHint);
   const profileDock=document.createElement('aside');profileDock.id='camera-profile-dock';profileDock.setAttribute('aria-label','Camera input');
   const profileLabel=document.createElement('label');profileLabel.htmlFor=profile.id;profileLabel.textContent='Controls';
-  profileDock.append(profileLabel,profile);
+  profileDock.append(profileLabel,profile,profilePicker.menu);
   const desktopStack=document.createElement('div');desktopStack.id='desktop-camera-stack';
   desktopStack.append(hud,profileDock);
   const legal=document.querySelector('.legal-links');if(legal)desktopStack.append(legal);
@@ -128,7 +126,7 @@ export function setupCameraFly(rig: CameraRig): void {
   };
   const stop = () => { keys.clear(); releasePointer(); };
   accountPreferences.subscribe(()=>{
-    stop();profile.value=accountPreferences.getItem('pool:cameraInput')==='trackpad'?'trackpad':'mouse';
+    stop();profilePicker.setValue(accountPreferences.getItem('pool:cameraInput')==='trackpad'?'trackpad':'mouse');
     rig.setInputProfile(profile.value as 'mouse'|'trackpad');updateHint();
   });
   for (const [name, symbol, forward, right, up, yaw] of [

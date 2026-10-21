@@ -1,4 +1,4 @@
-import {expect,test,type Page} from '@playwright/test';
+import {expect,test,type Page} from './fixtures';
 import {acceptWelcomeBeforeLoad,waitForOpening} from './welcomeFixture';
 
 const account={id:'winner-owner',username:'god',createdAt:1780000000,premium:true,isAdmin:true};

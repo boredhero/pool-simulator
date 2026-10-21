@@ -1,4 +1,4 @@
-import {test,expect,type Page} from '@playwright/test';
+import {test,expect,type Page} from './fixtures';
 import {acceptWelcomeBeforeLoad,waitForOpening} from './welcomeFixture';
 import {TERMS_VERSION} from '../src/ui/terms';
 const account={id:'chalk-player',username:'ChalkPlayer',createdAt:1,premium:true,isAdmin:false,easterEggsEnabled:true,chalkSim:true};

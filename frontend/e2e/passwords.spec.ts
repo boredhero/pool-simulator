@@ -1,4 +1,4 @@
-import {test,expect,devices} from '@playwright/test';
+import {test,expect,devices} from './fixtures';
 import {acceptWelcomeBeforeLoad} from './welcomeFixture';
 const password='a long password for pool';
 for(const mobile of [false,true])test.describe(mobile?'mobile passwords':'desktop passwords',()=>{

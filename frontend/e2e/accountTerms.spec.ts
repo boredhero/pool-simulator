@@ -1,4 +1,4 @@
-import {test,expect,type Page} from '@playwright/test';
+import {test,expect,type Page} from './fixtures';
 import {TERMS_VERSION} from '../src/ui/terms';
 import {acceptWelcomeBeforeLoad} from './welcomeFixture';
 const account={id:'player',username:'player',createdAt:1,premium:true,isAdmin:false};

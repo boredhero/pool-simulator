@@ -1,8 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
+  outputDir: './test-results/standalone',
   testDir: './e2e',
-  testMatch: ['physicalStroke.spec.ts', 'breakPlacement.spec.ts', 'cancelShot.spec.ts', 'calledPocket.spec.ts', 'accountPreferences.spec.ts', 'chalkSimulation.spec.ts', 'easterEggs.spec.ts', 'pool.spec.ts', 'panels.spec.ts', 'admin.spec.ts', 'cameraFly.spec.ts', 'welcome.spec.ts', 'accountIdentity.spec.ts', 'accountTerms.spec.ts', 'mobileHud.spec.ts', 'mobileCamera.spec.ts', 'winner.spec.ts', 'coin.spec.ts', 'jevLatency.spec.ts', 'jevRules.spec.ts', 'simulation.spec.ts', 'passwords.spec.ts', 'usernames.spec.ts', 'google.spec.ts', 'settingsLayout.spec.ts', 'privacySettings.spec.ts', 'installApp.spec.ts'],
+  testMatch: ['accountAdminEntry.spec.ts', 'inputProfile.spec.ts', 'apiFixture.spec.ts', 'physicalStroke.spec.ts', 'breakPlacement.spec.ts', 'cancelShot.spec.ts', 'calledPocket.spec.ts', 'accountPreferences.spec.ts', 'chalkSimulation.spec.ts', 'easterEggs.spec.ts', 'pool.spec.ts', 'panels.spec.ts', 'admin.spec.ts', 'cameraFly.spec.ts', 'welcome.spec.ts', 'accountIdentity.spec.ts', 'accountTerms.spec.ts', 'mobileHud.spec.ts', 'mobileCamera.spec.ts', 'winner.spec.ts', 'coin.spec.ts', 'jevLatency.spec.ts', 'jevRules.spec.ts', 'simulation.spec.ts', 'passwords.spec.ts', 'usernames.spec.ts', 'google.spec.ts', 'settingsLayout.spec.ts', 'privacySettings.spec.ts', 'installApp.spec.ts'],
   fullyParallel: true,
   workers: process.env.CI ? 1 : 2,
   timeout: 60_000,
@@ -10,7 +11,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: 0,
   reporter: 'list',
-  use: { baseURL: 'http://127.0.0.1:4173', trace: 'retain-on-failure', screenshot: 'only-on-failure', actionTimeout: 10_000 },
+  use: { serviceWorkers: 'block', baseURL: 'http://127.0.0.1:4173', trace: 'retain-on-failure', screenshot: 'only-on-failure', actionTimeout: 10_000 },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: { command: process.env.CI ? 'npx vite preview --port 4173 --strictPort --host 127.0.0.1' : 'npx vite --port 4173 --strictPort --host 127.0.0.1', port: 4173, reuseExistingServer: !process.env.CI },
 });

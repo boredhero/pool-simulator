@@ -1,5 +1,5 @@
 import {TERMS_VERSION} from '../src/ui/terms';
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 test.beforeEach(async({page})=>{
   await page.route('**/api/privacy/terms',route=>route.fulfill({json:{version:TERMS_VERSION,accepted:false,authenticated:false,accountId:null}}));

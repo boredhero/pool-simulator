@@ -1,10 +1,9 @@
-import {expect,test,type Page} from '@playwright/test';
+import {expect,test,type Page} from './fixtures';
 import {acceptWelcomeBeforeLoad} from './welcomeFixture';
 import replayFixtures from '../../contracts/snapshot-replay.json' with {type:'json'};
 
 test.beforeEach(async({page})=>{
   await acceptWelcomeBeforeLoad(page);
-  await page.route('**/api/**',route=>route.fulfill({json:{}}));
   await page.addInitScript(()=>{
     const raf=window.requestAnimationFrame.bind(window);
     window.requestAnimationFrame=callback=>raf(time=>{

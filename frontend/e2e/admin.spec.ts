@@ -1,5 +1,5 @@
 import { acceptWelcomeBeforeLoad } from './welcomeFixture';
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 const usage={games:2,requests:12,input_tokens:1200,output_tokens:0,estimated_cost_nano:50400,unmetered_requests:1,last_activity:1780000000};
 const owner={id:'owner',username:'god',createdAt:1780000000,premium:true,isAdmin:true};

@@ -1,4 +1,4 @@
-import {expect,test} from '@playwright/test';
+import {expect,test} from './fixtures';
 import {acceptWelcomeBeforeLoad} from './welcomeFixture';
 
 for(const mobile of [false,true])test.describe(mobile?'mobile':'desktop',()=>{
@@ -6,7 +6,6 @@ for(const mobile of [false,true])test.describe(mobile?'mobile':'desktop',()=>{
   test('breaker can reposition repeatedly and house rules can disable it',async({page})=>{
     await page.setViewportSize(mobile?{width:390,height:844}:{width:1280,height:800});
     await acceptWelcomeBeforeLoad(page);
-    await page.route('**/api/**',r=>r.fulfill({json:{}}));
     await page.addInitScript(()=>{localStorage.setItem('pool:help-dismissed','1');localStorage.setItem('pool:headstring-dismissed','1');localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-09',allow:false}));});
     // Placement exercises input and rules, not rendering. Disable GPU work before
     // the first game frame so software rendering cannot starve the readiness wait.

@@ -1,5 +1,17 @@
 [
   {
+    "version": "1.6.1",
+    "date": "2026-10-20",
+    "title": "Custom input controls, integrated admin access and stricter browser checks",
+    "changes": [
+      "Choose Mouse & Keyboard or Trackpad mode from an in-game menu with matching styling, keyboard navigation and saved preferences.",
+      "Owner Admin settings is now an integrated action tile in Account Overview, with a clear description and responsive layout.",
+      "Standalone browser tests now mock expected background API requests, eliminating connection-refused noise from the absent test backend.",
+      "Unexpected API calls fail with a clear method and endpoint so missing test coverage cannot silently pass. Feature-specific failure mocks and real-backend online/passkey tests remain separate.",
+      "Shared mocks also cover extra pages and mobile browser contexts, with regressions for mock overrides and unhandled requests. Browser suites use separate artifact directories so concurrent runs preserve each other's traces."
+    ]
+  },
+  {
     "version": "1.6.0",
     "date": "2026-10-20",
     "title": "Pocket geometry, smarter position play and account controls",

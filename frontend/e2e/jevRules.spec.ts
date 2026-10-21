@@ -1,4 +1,4 @@
-import {test,expect,type Page} from '@playwright/test';
+import {test,expect,type Page} from './fixtures';
 import {acceptWelcomeBeforeLoad} from './welcomeFixture';
 import {BAR_RULES,TOURNAMENT_RULES,type MatchConfig} from '../src/sim/config';
 import {TERMS_VERSION} from '../src/ui/terms';
