@@ -301,3 +301,39 @@ def test_sim_migration_preserves_existing_allowance_and_is_idempotent():
                 text("SELECT daily_slot, daily_cost, simulation FROM jev_games")
             ).one()
         ) == (3, 1, "")
+
+
+def test_cool_dev_defaults_and_explicit_owner_override(monkeypatch):
+    admin, actor = owner(monkeypatch)
+    user, target = register("RegularDev")
+    assert admin.get("/api/account").json()["account"]["is_a_cool_dev"] is True
+    assert user.get("/api/account").json()["account"]["is_a_cool_dev"] is False
+    for account, client in ((actor, admin), (target, user)):
+        path = f"/api/admin/accounts/{account['id']}/cool-dev"
+        for enabled in (True, False):
+            assert (
+                admin.patch(path, headers=HEADERS, json={"is_a_cool_dev": enabled}).status_code
+                == 200
+            )
+            assert client.get("/api/account").json()["account"]["is_a_cool_dev"] is enabled
+        assert admin.patch(path, headers=HEADERS, json={"is_a_cool_dev": "true"}).status_code == 422
+        assert admin.patch(path, json={"is_a_cool_dev": True}).status_code == 403
+
+
+def test_cool_dev_migration_is_additive_and_idempotent():
+    from sqlalchemy import create_engine, inspect, text
+
+    from app.models.migrations import upgrade_jev_debug
+
+    engine = create_engine("sqlite://")
+    with engine.begin() as connection:
+        connection.exec_driver_sql("CREATE TABLE accounts (id TEXT PRIMARY KEY)")
+        connection.exec_driver_sql("INSERT INTO accounts VALUES ('existing')")
+        connection.exec_driver_sql("CREATE TABLE jev_requests (id TEXT PRIMARY KEY)")
+        upgrade_jev_debug(connection)
+        upgrade_jev_debug(connection)
+        assert connection.execute(text("SELECT id, is_a_cool_dev FROM accounts")).one() == (
+            "existing",
+            None,
+        )
+        assert "debug_json" in {c["name"] for c in inspect(connection).get_columns("jev_requests")}

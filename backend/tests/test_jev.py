@@ -569,3 +569,65 @@ def test_human_can_choose_break_position_and_server_rejects_outside_kitchen(monk
     assert response.status_code == 200, response.text
     assert response.json()["placement"] == {"x": 0.4, "y": 0.3}
     assert response.json()["source"] == "human"
+
+
+@pytest.mark.parametrize("provider_status", [200, 429])
+def test_cool_dev_raw_exchange_and_access(monkeypatch, provider_status):
+    from app.models.db import Account
+
+    account = client.get("/api/account").json()["account"]
+    assert account["is_a_cool_dev"] is False
+    game = start()
+    set_cpu_turn(game)
+    url = f"/api/opponents/jev/games/{game['id']}/debug"
+    assert client.get(url).status_code == 403
+    toggle = f"/api/admin/accounts/{account['id']}/cool-dev"
+    assert client.patch(toggle, headers=HEADERS, json={"is_a_cool_dev": True}).status_code == 404
+    monkeypatch.setenv("ADMIN_ACCOUNT_ID", account["id"])
+    assert client.patch(toggle, headers=HEADERS, json={"is_a_cool_dev": True}).status_code == 200
+    assert client.get("/api/account").json()["account"]["is_a_cool_dev"] is True
+    sent = []
+    raw = {
+        "answers": {
+            "tactic": {"type": "choice", "choice": "safety"},
+            "shot_safety": {"type": "choice", "choice": "s1"},
+        },
+        "usage": {"input_tokens": 200, "output_tokens": 20},
+    }
+    original = httpx.AsyncClient
+
+    async def handler(request):
+        sent.append(json.loads(request.content))
+        return httpx.Response(provider_status, json=raw)
+
+    monkeypatch.setattr(
+        jev.httpx,
+        "AsyncClient",
+        lambda **kw: original(transport=httpx.MockTransport(handler), **kw),
+    )
+    monkeypatch.setattr(jev, "plan_shots", lambda gs: plans())
+    response = client.post(
+        f"/api/opponents/jev/games/{game['id']}/turn", headers=HEADERS, json={"revision": 0}
+    )
+    assert response.status_code == 200, response.text
+    debug = client.get(url)
+    assert debug.headers["cache-control"] == "no-store"
+    exchange = debug.json()["exchanges"][0]["exchange"]
+    assert exchange["request"] == sent[0]
+    assert exchange["response"] == raw
+    assert exchange["httpStatus"] == provider_status
+    assert exchange["selectedPlan"]["id"] == ("s1" if provider_status == 200 else "s0")
+    assert exchange["fallbackReason"] == (
+        None if provider_status == 200 else "provider_rate_limited"
+    )
+    assert "test-placeholder" not in debug.text
+    assert "Authorization" not in debug.text
+    assert client.patch(toggle, headers=HEADERS, json={"is_a_cool_dev": False}).status_code == 200
+    assert client.get(url).status_code == 403
+    client.cookies.clear()
+    other = register("otherdev")
+    with Session.begin() as db:
+        db.get(Account, other["id"]).is_a_cool_dev = True
+    assert client.get(url).status_code == 404
+    client.cookies.clear()
+    assert client.get(url).status_code == 401

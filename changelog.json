@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.6.2",
+    "date": "2026-11-02",
+    "title": "Jev developer JSON viewer",
+    "changes": [
+      "Admins can toggle is_a_cool_dev for each user. Access defaults off for regular accounts and on for the owner.",
+      "Developer accounts get a Jev JSON button showing raw requests, responses, selected shot plans and fallback reasons for their own games."
+    ]
+  },
+  {
     "version": "1.6.1",
     "date": "2026-10-20",
     "title": "Custom input controls, integrated admin access and stricter browser checks",

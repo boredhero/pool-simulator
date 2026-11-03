@@ -31,6 +31,11 @@ def is_admin(account_id: str) -> bool:
     return bool(owner) and secrets.compare_digest(account_id, owner)
 
 
+def is_cool_dev(user: Account) -> bool:
+    # NULL means the default: owner enabled, everyone else disabled.
+    return user.is_a_cool_dev if user.is_a_cool_dev is not None else is_admin(user.id)
+
+
 def public_account(user: Account) -> dict:
     return {
         "id": user.id,
@@ -46,6 +51,7 @@ def public_account(user: Account) -> dict:
         "lastActiveAt": user.last_active_at,
         "premium": user.premium,
         "simEnabled": user.sim_enabled,
+        "is_a_cool_dev": is_cool_dev(user),
         "easterEggsEnabled": user.easter_eggs_enabled,
         "chalkSim": user.chalk_sim,
         "settings": json.loads(user.settings_json or "{}"),

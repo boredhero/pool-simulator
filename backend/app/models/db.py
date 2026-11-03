@@ -57,6 +57,7 @@ def init_db() -> None:
         upgrade_account_status,
         upgrade_easter_eggs,
         upgrade_jev_allowance,
+        upgrade_jev_debug,
         upgrade_match_modes,
         upgrade_monthly_budget,
         upgrade_premium,
@@ -68,6 +69,7 @@ def init_db() -> None:
     with engine.begin() as connection:
         upgrade_username_changes(connection)
         upgrade_account_status(connection)
+        upgrade_jev_debug(connection)
         upgrade_premium(connection)
         upgrade_jev_allowance(connection)
         upgrade_simulation(connection)
@@ -95,6 +97,7 @@ class Account(Base):
     easter_eggs_enabled: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default=false()
     )
+    is_a_cool_dev: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     sim_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     last_active_at: Mapped[int | None] = mapped_column(Integer, nullable=True)
     monthly_budget_nano: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -270,6 +273,7 @@ class JevRequest(Base):
     input_price_nano: Mapped[int] = mapped_column(Integer)
     cost_nano: Mapped[int | None] = mapped_column(Integer, nullable=True)
     reserved_nano: Mapped[int] = mapped_column(Integer)
+    debug_json: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class JevBudgetSetting(Base):

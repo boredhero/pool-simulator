@@ -1,0 +1,5 @@
+#jev-debug-button{min-height:44px}
+#jev-debug{width:min(900px,90vw);max-height:85dvh;box-sizing:border-box;background:#18232b;color:#eef3f5;border:1px solid #6e8796;border-radius:12px;padding:20px}
+#jev-debug::backdrop{background:#000a}
+#jev-debug button{min-height:44px;margin:0 8px 12px 0}
+#jev-debug pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.5;text-align:left}
