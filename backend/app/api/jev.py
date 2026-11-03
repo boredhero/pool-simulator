@@ -18,10 +18,10 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.api.privacy import require_terms
-from app.models.db import Account, JevGame, JevUsage, Session
+from app.models.db import Account, JevGame, JevRequest, JevUsage, Session
 from app.net.rooms import Room
 from app.services import jev_budget
-from app.services.auth import current_account, mutation_guard
+from app.services.auth import current_account, is_cool_dev, mutation_guard
 from app.services.matches import ensure_jev_match, record_shot_in_session
 from app.sim import opening
 from app.sim.chalk import contact, wear
@@ -51,6 +51,7 @@ active_games: set[str] = set()
 class Selection:
     candidates: list[dict]
     state: dict
+    trace: dict | None = None
 
 
 @dataclass
@@ -383,12 +384,21 @@ async def evaluate(payload: Selection, key: str) -> Evaluation:
             "instructions": "If using the " + family + " family: " + instructions,
             "criteria": {pid: plan for pid, plan in criteria.items() if plan["family"] == family},
         }
+    request_body = {"model": MODEL, "state": payload.state, "questions": questions}
+    if payload.trace is not None:
+        payload.trace["request"] = request_body
     async with asyncio.timeout(8), httpx.AsyncClient(timeout=7) as client:
         response = await client.post(
             "https://api.typesafe.ai/v1/systemone",
             headers={"Authorization": f"Bearer {key}"},
-            json={"model": MODEL, "state": payload.state, "questions": questions},
+            json=request_body,
         )
+        if payload.trace is not None:
+            payload.trace["httpStatus"] = response.status_code
+            try:
+                payload.trace["response"] = response.json()
+            except ValueError:
+                payload.trace["response"] = response.text
         response.raise_for_status()
         body = response.json()
         if not isinstance(body, dict):
@@ -490,6 +500,7 @@ async def play_turn(
                 source = "cpu-fallback"
                 attempt = jev_budget.reserve(account["id"], game_id, payload.revision, by, MODEL)
                 result = None
+                trace = {} if is_cool_dev(current) else None
                 try:
                     if attempt is None:
                         source = "budget-fallback"
@@ -504,7 +515,7 @@ async def play_turn(
                         game.requests += 1
                         game.unmetered_requests += 1
                     result = await evaluate(
-                        Selection(candidates=options, state=decision_context(gs)),
+                        Selection(candidates=options, state=decision_context(gs), trace=trace),
                         os.environ["JEV_API_KEY"],
                     )
                     chosen = next((o for o in options if o["id"] == result.candidate_id), None)
@@ -543,6 +554,12 @@ async def play_turn(
                 finally:
                     if attempt is not None:
                         jev_budget.settle(attempt, result)
+                        if trace is not None:
+                            trace.update(
+                                source=source, fallbackReason=fallback_reason, selectedPlan=s
+                            )
+                            with Session.begin() as db:
+                                db.get(JevRequest, attempt).debug_json = json.dumps(trace)
                 if fallback_reason:
                     logging.getLogger("pool.jev").warning(
                         "jev_fallback",
@@ -664,3 +681,32 @@ async def chalk_cue(game_id: str, payload: ChalkRequest, account: dict = Depends
         game.revision += 1
         game.updated_at = int(time.time())
         return public_game(game, account.get("premium", False))
+
+
+@router.get("/games/{game_id}/debug")
+def game_debug(game_id: str, account: dict = Depends(require_account)):
+    with Session() as db:
+        current = db.get(Account, account["id"])
+        if current is None or not is_cool_dev(current):
+            raise HTTPException(403, "Developer access is not enabled.")
+        game = db.get(JevGame, game_id)
+        if game is None or game.account_id != account["id"]:
+            raise HTTPException(404, "Game not found.")
+        rows = db.scalars(
+            select(JevRequest)
+            .where(JevRequest.game_id == game_id, JevRequest.account_id == account["id"])
+            .order_by(JevRequest.revision, JevRequest.started_at, JevRequest.id)
+        ).all()
+        return {
+            "gameId": game_id,
+            "exchanges": [
+                {
+                    "id": row.id,
+                    "revision": row.revision,
+                    "seat": row.seat,
+                    "status": row.status,
+                    "exchange": json.loads(row.debug_json) if row.debug_json else None,
+                }
+                for row in rows
+            ],
+        }

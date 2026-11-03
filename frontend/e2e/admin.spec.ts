@@ -21,18 +21,19 @@ test('ordinary accounts never see or load owner tools',async({page})=>{
   await expect(page.locator('#adminbtn')).toBeHidden();expect(requests).toBe(0);
 });
 test('owner can inspect usage, recover a failed toggle, search and close the dashboard',async({page})=>{
-  let premium=false, fail=true;
+  let premium=false, coolDev=false, fail=true;
   await page.route('**/api/account',r=>r.fulfill({json:{account:owner,stats:null}}));
   await page.route('**/api/admin/**',async r=>{
     const url=new URL(r.request().url());
     if(url.pathname.endsWith('/overview'))return r.fulfill({json:{accounts:2,premium:1,usage,lifetimeAttempts:15,visitors:{day:12,week:34,month:56,dailyVisitors:8}}});
     if(r.request().method()==='PATCH'){
       expect(r.request().headers()['x-pool-request']).toBe('1');
+      if(url.pathname.endsWith('/cool-dev')){coolDev=r.request().postDataJSON().is_a_cool_dev;return r.fulfill({json:{is_a_cool_dev:coolDev}});}
       if(fail){fail=false;return r.fulfill({status:500,json:{}});}
       premium=r.request().postDataJSON().premium;return r.fulfill({json:{premium}});
     }
     if(url.pathname.endsWith('/accounts/player'))return r.fulfill({json:{lifetimeAttempts:15,lifetimeCompleted:12,games:[],audit:[]}});
-    const accounts=url.searchParams.get('search')==='missing'?[]:[{id:'player',username:'Player <safe>',createdAt:1780000000,premium,isAdmin:false,usage}];
+    const accounts=url.searchParams.get('search')==='missing'?[]:[{id:'player',username:'Player <safe>',createdAt:1780000000,premium,is_a_cool_dev:coolDev,isAdmin:false,usage}];
     return r.fulfill({json:{accounts,total:accounts.length}});
   });
   await page.goto('/');await page.locator('#accountidentity').click();await page.locator('#adminbtn').click();
@@ -47,6 +48,10 @@ test('owner can inspect usage, recover a failed toggle, search and close the das
   await toggle.click();await expect(page.locator('#adminstatus')).toContainText('Could not complete');
   await expect(toggle).toHaveAttribute('aria-checked','false');await expect(toggle).toBeEnabled();
   await toggle.click();await expect(toggle).toHaveAttribute('aria-checked','true');
+  const dev=dialog.getByRole('switch',{name:'Cool dev for Player <safe>'});
+  await expect(dev).toHaveAttribute('aria-checked','false');
+  await dev.click();await expect(dev).toHaveAttribute('aria-checked','true');
+  await dev.click();await expect(dev).toHaveAttribute('aria-checked','false');
   await dialog.getByRole('button',{name:'Usage details for Player <safe>'}).click();
   await expect(dialog).toContainText('15 lifetime attempts');
   await page.setViewportSize({width:390,height:844});

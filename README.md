@@ -562,3 +562,18 @@ three 10 MiB files, oldest first. Docker does not provide an age-based retention
 option for this driver. Host Nginx logs and backups remain separately managed.
 Deploy through CI to apply the Compose logging settings; do not remove `pool_logs`
 or `pool_data` during deployment. `docker logs pool-simulator-api` still works.
+
+
+### Jev developer JSON viewer
+
+In Admin, use each account's **Cool dev on/off** switch to set `is_a_cool_dev`.
+Access defaults off for regular accounts and on for the owner pinned by
+`ADMIN_ACCOUNT_ID` (the god account). Explicit toggles override either default.
+The database uses NULL for the default and a boolean for an explicit override.
+
+Enabled accounts get a **Jev JSON** button. Start or resume a Jev game, then open
+the viewer and refresh after shots to inspect the exact provider request and
+response JSON, selected executable plan, and fallback reason. Only calls made
+while access is enabled are captured; historical uncaptured exchanges appear as
+null. Users can only read their own games, and revoking the flag blocks the API.
+API keys and authorization headers are never included in the captured exchange.

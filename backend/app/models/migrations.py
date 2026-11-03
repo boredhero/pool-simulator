@@ -141,3 +141,11 @@ def upgrade_username_changes(connection) -> None:
         Operations(MigrationContext.configure(connection)).add_column(
             "accounts", Column("username_changed_at", Integer, nullable=True)
         )
+
+
+def upgrade_jev_debug(connection) -> None:
+    op = Operations(MigrationContext.configure(connection))
+    if "is_a_cool_dev" not in {c["name"] for c in inspect(connection).get_columns("accounts")}:
+        op.add_column("accounts", Column("is_a_cool_dev", Boolean, nullable=True))
+    if "debug_json" not in {c["name"] for c in inspect(connection).get_columns("jev_requests")}:
+        op.add_column("jev_requests", Column("debug_json", Text, nullable=True))

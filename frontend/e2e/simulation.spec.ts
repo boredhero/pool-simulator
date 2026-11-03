@@ -33,3 +33,24 @@ for(const mobile of [false,true])test.describe(mobile?'mobile simulation':'deskt
   expect(requests.every(r=>r.new_game===true)).toBe(true);
  });
 });
+
+for(const enabled of [false,true])test(`Jev JSON access flag ${enabled}`,async({page})=>{
+ await acceptWelcomeBeforeLoad(page);
+ await page.addInitScript(()=>{localStorage.setItem('pool:help-dismissed','1');localStorage.setItem('pool:privacy',JSON.stringify({version:'2026-10-09',allow:false}));const raf=requestAnimationFrame.bind(window);window.requestAnimationFrame=cb=>raf(t=>{const g=(window as any).__pool;if(g)g.scene.renderer.render=()=>{};cb(t);});});
+ await page.route('**/api/account',r=>r.fulfill({json:{account:{id:'dev',username:'developer',premium:false,is_a_cool_dev:enabled,isAdmin:false,createdAt:1},stats:null}}));
+ await page.goto('/');
+ const button=page.locator('#jev-debug-button');
+ if(!enabled){await expect(button).toBeHidden();return;}
+ await expect(button).toBeVisible();await button.click();
+ await expect(page.locator('#jev-debug')).toBeVisible();
+ await expect(page.locator('#jev-debug pre')).toContainText('Start or resume');
+ await page.keyboard.press('Escape');await expect(page.locator('#jev-debug')).not.toBeVisible();
+ await page.evaluate(()=>{(window as any).__pool.jevGame={id:'debug-game',revision:1};});
+ const exchange={gameId:'debug-game',exchanges:[{revision:0,seat:1,exchange:{request:{state:{test:'<script>raw JSON</script>'}},response:{answers:{shot:{choice:'s1'}}},selectedPlan:{aim:0.5}}}]};
+ await page.route('**/api/opponents/jev/games/debug-game/debug',r=>r.fulfill({json:exchange}));
+ await button.click();await expect(page.locator('#jev-debug pre')).toHaveText(JSON.stringify(exchange,null,2));
+ await expect(page.locator('#jev-debug script')).toHaveCount(0);
+ await page.route('**/api/opponents/jev/games/debug-game/debug',r=>r.fulfill({status:403,json:{detail:'Developer access is not enabled.'}}));
+ await page.locator('#jev-debug').getByRole('button',{name:'Refresh'}).click();
+ await expect(page.locator('#jev-debug pre')).toHaveText('Developer access is not enabled.');
+});

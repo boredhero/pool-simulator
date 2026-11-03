@@ -33,7 +33,7 @@ from app.models.db import (
     VisitorSession,
 )
 from app.services import jev_budget
-from app.services.auth import current_account, is_admin, mutation_guard
+from app.services.auth import current_account, is_admin, is_cool_dev, mutation_guard
 
 
 def require_admin(request: Request) -> dict:
@@ -169,6 +169,7 @@ def accounts(
                     "premium": row["Account"].premium,
                     "disabled": row["Account"].disabled,
                     "simEnabled": row["Account"].sim_enabled,
+                    "is_a_cool_dev": is_cool_dev(row["Account"]),
                     "isAdmin": is_admin(row["Account"].id),
                     "usage": usage_dict(row),
                 }
@@ -232,6 +233,7 @@ def account_detail(account_id: str):
             "username": account.username,
             "disabled": account.disabled,
             "simEnabled": account.sim_enabled,
+            "is_a_cool_dev": is_cool_dev(account),
             "lifetimeAttempts": lifetime.attempts if lifetime else 0,
             "lifetimeCompleted": lifetime.completed if lifetime else 0,
             "games": [
@@ -458,3 +460,22 @@ def change_budget(
             account.monthly_budget_nano = int(Decimal(payload.dollars) * 1_000_000_000)
         db.flush()
         return jev_budget.balance(db, account)
+
+
+class CoolDevChange(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    is_a_cool_dev: bool
+
+
+@router.patch("/accounts/{account_id}/cool-dev", dependencies=[Depends(mutation_guard)])
+def set_cool_dev(account_id: str, payload: CoolDevChange, actor=Depends(require_admin)):
+    with Session.begin() as db:
+        account = db.get(Account, account_id)
+        if account is None:
+            raise HTTPException(404, "Account not found.")
+        if account.is_a_cool_dev != payload.is_a_cool_dev:
+            account.is_a_cool_dev = payload.is_a_cool_dev
+            log_account_action(
+                db, actor, account_id, "dev-enabled" if payload.is_a_cool_dev else "dev-disabled"
+            )
+        return {"id": account_id, "is_a_cool_dev": account.is_a_cool_dev}

@@ -1,3 +1,4 @@
+import { JevDebug } from './jevDebug';
 import { accountPreferences, mountPreferenceStatus } from './accountPreferences';
 import {EasterEggsPanel} from './easterEggs';
 import {chalkContact,wearChalk} from '../sim/chalk';
@@ -94,6 +95,7 @@ export class Game {
   simMode: SimMode|null = null;
   simControls!: SimControls;
   cpuOpponent = false;
+  private jevDebug = new JevDebug(()=>this.jevGame?.id??null);
   jevOpponent = false;
   jevRequest: AbortController | null = null;
   jevGame: {id:string;revision:number} | null = null;
@@ -134,6 +136,7 @@ export class Game {
     this.wire(canvas);
     this.simControls=new SimControls(mode=>this.startSimulation(mode));
     this.accountPanel=new AccountPanel(()=>!!this.room,account=>{
+      this.jevDebug.setEnabled(!!account?.is_a_cool_dev);
       this.account=account;this.easterEggs?.update();
       accountPreferences.bind(account, patch=>this.accountPanel.savePreferences(patch));
       this.simControls.setEnabled(!!account?.simEnabled);

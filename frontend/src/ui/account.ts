@@ -8,7 +8,7 @@ import './accountIdentity.css';
 import './mobileHud.css';
 import {acceptTerms,termsStatus,type TermsStatus} from './terms';
 import { AdminPanel } from './admin';
-export interface Account {id:string;username:string;usernameChangedAt?:number|null;usernameChangeAvailableAt?:number|null;hasPassword?:boolean;createdAt:number;premium:boolean;simEnabled?:boolean;easterEggsEnabled?:boolean;chalkSim?:boolean;settings?:Record<string,string>;isAdmin:boolean}
+export interface Account {id:string;username:string;usernameChangedAt?:number|null;usernameChangeAvailableAt?:number|null;hasPassword?:boolean;createdAt:number;premium:boolean;simEnabled?:boolean;is_a_cool_dev?:boolean;easterEggsEnabled?:boolean;chalkSim?:boolean;settings?:Record<string,string>;isAdmin:boolean}
 interface Stats {matches:number;wins:number;losses:number;abandoned:number;shots:number;ballsPocketed:number;scratches:number;fouls:number;shotStatsComplete?:boolean;byMode?:Record<string,{matches:number;wins:number;losses:number}>;recent:Array<{id:string;opponent:string;status:string;result:string|null;mode?:string;shotStatsComplete?:boolean}>}
 const el=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 

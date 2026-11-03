@@ -4,7 +4,7 @@ import type { Account } from './account';
 import './admin.css';
 
 type Usage = {games:number;requests:number;input_tokens:number;output_tokens:number;estimated_cost_nano:number;unmetered_requests:number;last_activity:number|null};
-type User = {id:string;username:string;createdAt:number;lastActiveAt?:number|null;premium:boolean;simEnabled?:boolean;disabled?:boolean;isAdmin:boolean;usage:Usage};
+type User = {id:string;username:string;createdAt:number;lastActiveAt?:number|null;premium:boolean;simEnabled?:boolean;is_a_cool_dev?:boolean;disabled?:boolean;isAdmin:boolean;usage:Usage};
 type Game = {id:string;status:string;startedAt:number;updatedAt:number;premiumGame:boolean} & Usage;
 const el=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 const number=(n:number)=>n.toLocaleString();
@@ -125,6 +125,14 @@ export class AdminPanel {
       } catch(error){el('adminstatus').textContent=error instanceof Error?error.message:'Update failed.';toggle.disabled=false;}
     });
     status.append(toggle);
+    const dev=node('button',user.is_a_cool_dev?'Cool dev on':'Cool dev off','admin-switch');dev.type='button';
+    dev.setAttribute('role','switch');dev.setAttribute('aria-checked',String(!!user.is_a_cool_dev));dev.setAttribute('aria-label',`Cool dev for ${user.username}`);
+    dev.addEventListener('click',async()=>{
+      dev.disabled=true;
+      try {await this.request(`/accounts/${encodeURIComponent(user.id)}/cool-dev`,{method:'PATCH',body:JSON.stringify({is_a_cool_dev:!user.is_a_cool_dev})});await this.load();this.accountChanged();}
+      catch(error){el('adminstatus').textContent=error instanceof Error?error.message:'Update failed.';dev.disabled=false;}
+    });
+    status.append(dev);
     const simulation=node('button',user.simEnabled?'Sim on':'Sim off','admin-switch');simulation.type='button';
     simulation.setAttribute('role','switch');simulation.setAttribute('aria-checked',String(!!user.simEnabled));simulation.setAttribute('aria-label',`Simulation for ${user.username}`);
     simulation.addEventListener('click',async()=>{
